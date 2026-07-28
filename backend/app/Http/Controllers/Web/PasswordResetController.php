@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 class PasswordResetController extends Controller {
     public function request(): View { return view('auth.forgot-password'); }
     public function email(Request $request): RedirectResponse {
@@ -17,7 +18,7 @@ class PasswordResetController extends Controller {
     }
     public function resetForm(Request $request,string $token): View { return view('auth.reset-password',['token'=>$token,'email'=>$request->string('email')->toString()]); }
     public function reset(Request $request): RedirectResponse {
-        $data=$request->validate(['email'=>['required','email'],'token'=>['required'],'password'=>['required','min:12','confirmed']]);
+        $data=$request->validate(['email'=>['required','email'],'token'=>['required'],'password'=>['required','confirmed',PasswordRule::min(12)->letters()->mixedCase()->numbers()->symbols()]]);
         $status=Password::reset($data,function(User $user,string $password){$user->forceFill(['password'=>Hash::make($password),'must_change_password'=>false,'password_changed_at'=>now()])->setRememberToken(Str::random(60));$user->save();$user->tokens()->delete();event(new PasswordReset($user));});
         return $status===Password::PASSWORD_RESET?redirect()->route('login')->with('status','Mot de passe réinitialisé. Vous pouvez vous connecter.'):back()->withErrors(['email'=>'Le lien est invalide ou a expiré.']);
     }

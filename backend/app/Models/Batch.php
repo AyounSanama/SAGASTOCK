@@ -1,0 +1,4 @@
+<?php
+namespace App\Models;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;use Illuminate\Database\Eloquent\Model;use Illuminate\Database\Eloquent\Relations\BelongsTo;use Illuminate\Database\Eloquent\SoftDeletes;
+class Batch extends Model {use HasUuids,SoftDeletes;public $incrementing=false;protected $keyType='string';protected $fillable=['organization_id','product_id','supplier_id','batch_number','manufactured_on','expires_on','unit_cost','currency','origin','status'];protected function casts():array{return ['manufactured_on'=>'date','expires_on'=>'date','unit_cost'=>'decimal:4'];}public function organization():BelongsTo{return $this->belongsTo(Organization::class);}public function product():BelongsTo{return $this->belongsTo(Product::class);}public function supplier():BelongsTo{return $this->belongsTo(Supplier::class);}}

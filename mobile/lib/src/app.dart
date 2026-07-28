@@ -9,7 +9,7 @@ class SagaStockApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'SAGASTOCK',
+      title: 'PharmaCare',
       debugShowCheckedModeBanner: false,
       locale: const Locale('fr'),
       theme: AppTheme.light,

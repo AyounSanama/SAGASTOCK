@@ -1,40 +1,166 @@
 <?php
+
 namespace App\Http\Controllers\Api\V1;
+
 use App\Http\Controllers\Controller;
+use App\Models\Organization;
+use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\HealthFacility;
+use App\Models\Site;
 use App\Services\AuditService;
+use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-class UserController extends Controller {
-    public function __construct(private AuditService $audit) {}
-    public function index(Request $request): JsonResponse {
-        $users=User::with('roles:id,code,name')->when($request->string('search')->toString(),fn($q,$s)=>$q->where(fn($x)=>$x->where('name','like',"%$s%")->orWhere('email','like',"%$s%")))->orderBy('name')->paginate(20);
+use Illuminate\Validation\Rules\Password;
+
+class UserController extends Controller
+{
+    public function __construct(private AuditService $audit, private UserScopeService $scopes) {}
+
+    public function index(Request $request): JsonResponse
+    {
+        $users = $this->scopes->users($request->user(), User::with('roles:id,code,name'))
+            ->when($request->string('search')->toString(), fn ($query, $search) => $query
+                ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")))
+            ->orderBy('name')->paginate(20);
         return response()->json($users);
     }
-    public function store(Request $request): JsonResponse {
-        $data=$request->validate(['name'=>['required','string','max:120'],'email'=>['required','email','max:190','unique:users,email'],'phone'=>['nullable','string','max:40'],'role_ids'=>['array'],'role_ids.*'=>['integer','exists:roles,id']]);
-        $temporary=Str::password(16, symbols: true);
-        $user=User::create([...$data,'password'=>$temporary,'is_active'=>true,'must_change_password'=>true]);
-        $user->roles()->sync(collect($data['role_ids']??[])->mapWithKeys(fn($id)=>[$id=>['scope_type'=>'platform','scope_id'=>null]]));
-        $this->audit->record($request,'user.created',$user,[],['name'=>$user->name,'email'=>$user->email]);
-        return response()->json(['user'=>$user->load('roles:id,code,name'),'temporary_password'=>$temporary],201);
+
+    public function show(User $user): JsonResponse
+    {
+        abort_unless($this->scopes->canAccess(request()->user(), $user), 404);
+        return response()->json(['user' => $user->load(['roles.permissions', 'devices'])]);
     }
-    public function update(Request $request, User $user): JsonResponse {
-        $old=$user->only(['name','email','phone','is_active']);
-        $data=$request->validate(['name'=>['sometimes','required','string','max:120'],'email'=>['sometimes','required','email','max:190',Rule::unique('users')->ignore($user->id)],'phone'=>['nullable','string','max:40'],'is_active'=>['sometimes','boolean'],'role_ids'=>['sometimes','array'],'role_ids.*'=>['integer','exists:roles,id']]);
-        $user->update(collect($data)->except('role_ids')->all());
-        if(array_key_exists('role_ids',$data)) $user->roles()->sync(collect($data['role_ids'])->mapWithKeys(fn($id)=>[$id=>['scope_type'=>'platform','scope_id'=>null]]));
-        $this->audit->record($request,'user.updated',$user,$old,$user->only(['name','email','phone','is_active']));
-        return response()->json(['user'=>$user->load('roles:id,code,name')]);
+
+    public function archived(Request $request): JsonResponse
+    {
+        return response()->json($this->scopes->users($request->user(), User::onlyTrashed()->with('roles:id,code,name'))
+            ->when($request->string('search')->toString(), fn ($query, $search) => $query
+                ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")->orWhere('username', 'like', "%{$search}%")))
+            ->latest('deleted_at')->paginate(20));
     }
-    public function resetPassword(Request $request, User $user): JsonResponse {
-        $temporary=Str::password(16, symbols: true); $user->update(['password'=>Hash::make($temporary),'must_change_password'=>true]); $user->tokens()->delete();
-        $this->audit->record($request,'user.password_reset',$user);
-        return response()->json(['temporary_password'=>$temporary]);
+
+    public function showArchived(string $user): JsonResponse
+    {
+        return response()->json(['user' => $this->scopes->users(request()->user(), User::onlyTrashed()->with(['roles.permissions', 'devices']))->findOrFail($user)]);
     }
-    public function roles(): JsonResponse { return response()->json(['roles'=>Role::orderBy('name')->get(['id','code','name'])]); }
+
+    public function restore(Request $request, string $user): JsonResponse
+    {
+        $managedUser = $this->scopes->users($request->user(), User::onlyTrashed())->findOrFail($user);
+        $archivedAt = $managedUser->deleted_at?->toISOString();
+        $managedUser->restore();
+        $managedUser->update(['is_active' => true]);
+        $this->audit->record($request, 'user.restored', $managedUser, ['deleted_at' => $archivedAt], ['is_active' => true]);
+        return response()->json(['user' => $managedUser->load('roles:id,code,name')]);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'max:190', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'role_id' => ['nullable', 'integer', 'exists:roles,id'],
+            'role_ids' => ['nullable', 'array'],
+            'role_ids.*' => ['integer', 'exists:roles,id'],
+            'scope_type' => ['nullable', Rule::in(['platform', 'organization', 'project', 'facility', 'site'])],
+            'scope_id' => ['nullable', 'uuid'],
+            'password' => ['nullable', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+            'must_change_password' => ['nullable', 'boolean'],
+        ]);
+        $generated = empty($data['password']);
+        $password = $generated ? Str::password(16, symbols: true) : $data['password'];
+        [$scopeType, $scopeId] = $this->scope($data['scope_type'] ?? 'platform', $data['scope_id'] ?? null);
+        abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
+        $roleIds = isset($data['role_id']) ? [$data['role_id']] : ($data['role_ids'] ?? []);
+        abort_unless($this->scopes->assignableRoles($request->user())->whereIn('id', $roleIds)->count() === count($roleIds), 403);
+        $user = User::create([
+            'name' => $data['name'], 'email' => $data['email'], 'phone' => $data['phone'] ?? null,
+            'password' => $password, 'is_active' => true,
+            'must_change_password' => $generated || ($data['must_change_password'] ?? false),
+        ]);
+        $user->roles()->sync(collect($roleIds)->mapWithKeys(fn ($id) => [$id => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]));
+        $this->audit->record($request, 'user.created', $user, [], ['name' => $user->name, 'email' => $user->email, 'scope_type' => $scopeType, 'scope_id' => $scopeId]);
+        $response = ['user' => $user->load('roles:id,code,name')];
+        if ($generated) $response['temporary_password'] = $password;
+        return response()->json($response, 201);
+    }
+
+    public function update(Request $request, User $user): JsonResponse
+    {
+        abort_unless($this->scopes->canAccess($request->user(), $user), 404);
+        $old = $user->only(['name', 'email', 'phone', 'is_active']);
+        $data = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:120'],
+            'email' => ['sometimes', 'required', 'email', 'max:190', Rule::unique('users')->ignore($user->id)],
+            'phone' => ['nullable', 'string', 'max:40'], 'is_active' => ['sometimes', 'boolean'],
+            'role_id' => ['nullable', 'integer', 'exists:roles,id'], 'role_ids' => ['nullable', 'array'],
+            'role_ids.*' => ['integer', 'exists:roles,id'],
+            'scope_type' => ['nullable', Rule::in(['platform', 'organization', 'project', 'facility', 'site'])], 'scope_id' => ['nullable', 'uuid'],
+        ]);
+        $user->update(collect($data)->only(['name', 'email', 'phone', 'is_active'])->all());
+        if (array_key_exists('role_id', $data) || array_key_exists('role_ids', $data)) {
+            [$scopeType, $scopeId] = $this->scope($data['scope_type'] ?? 'platform', $data['scope_id'] ?? null);
+            abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
+            $roleIds = isset($data['role_id']) ? [$data['role_id']] : ($data['role_ids'] ?? []);
+            abort_unless($this->scopes->assignableRoles($request->user())->whereIn('id', $roleIds)->count() === count($roleIds), 403);
+            $user->roles()->sync(collect($roleIds)->mapWithKeys(fn ($id) => [$id => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]));
+        }
+        $this->audit->record($request, 'user.updated', $user, $old, $user->only(['name', 'email', 'phone', 'is_active']));
+        return response()->json(['user' => $user->load('roles:id,code,name')]);
+    }
+
+    public function resetPassword(Request $request, User $user): JsonResponse
+    {
+        abort_unless($this->scopes->canAccess($request->user(), $user), 404);
+        $temporary = Str::password(16, symbols: true);
+        $user->update(['password' => Hash::make($temporary), 'must_change_password' => true]);
+        $user->tokens()->delete();
+        $this->audit->record($request, 'user.password_reset', $user);
+        return response()->json(['temporary_password' => $temporary]);
+    }
+
+    public function destroy(Request $request, User $user): JsonResponse
+    {
+        abort_unless($this->scopes->canAccess($request->user(), $user), 404);
+        abort_if($request->user()->is($user), 422, 'Vous ne pouvez pas archiver votre propre compte.');
+        if ($user->roles()->where('code', 'platform_owner')->exists()) {
+            $otherOwners = User::where('is_active', true)->whereKeyNot($user->id)
+                ->whereHas('roles', fn ($query) => $query->where('code', 'platform_owner'))->exists();
+            abort_unless($otherOwners, 422, 'Le dernier propriétaire actif ne peut pas être archivé.');
+        }
+        $user->tokens()->delete();
+        $user->devices()->update(['revoked_at' => now()]);
+        $user->update(['is_active' => false]);
+        $user->delete();
+        $this->audit->record($request, 'user.archived', $user);
+        return response()->json(status: 204);
+    }
+
+    public function roles(): JsonResponse
+    {
+        return response()->json(['roles' => $this->scopes->assignableRoles(request()->user())->orderBy('name')->get(['id', 'code', 'name', 'scope_type', 'scope_id'])]);
+    }
+
+    private function scope(string $type, ?string $id): array
+    {
+        if ($type === 'platform') return [$type, null];
+        abort_unless($id, 422, 'Le périmètre doit être renseigné.');
+        $exists = match ($type) {
+            'organization' => Organization::whereKey($id)->exists(),
+            'project' => Project::whereKey($id)->exists(),
+            'facility' => HealthFacility::whereKey($id)->exists(),
+            'site' => Site::whereKey($id)->exists(),
+            default => false,
+        };
+        abort_unless($exists, 422, 'Périmètre introuvable.');
+        return [$type, $id];
+    }
 }

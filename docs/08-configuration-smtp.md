@@ -1,6 +1,6 @@
-﻿# Configuration SMTP
+# Configuration SMTP
 
-SAGASTOCK ne stocke aucun mot de passe SMTP dans Git. En développement, le
+PharmaCare ne stocke aucun mot de passe SMTP dans Git. En développement, le
 transport `log` écrit les liens de réinitialisation dans `storage/logs`.
 
 Pour activer les e-mails réels, renseigner uniquement dans `backend/.env` :
@@ -13,7 +13,7 @@ MAIL_USERNAME=adresse@example.org
 MAIL_PASSWORD=secret-fourni-par-le-service
 MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS=adresse@example.org
-MAIL_FROM_NAME="SAGASTOCK"
+MAIL_FROM_NAME="PharmaCare"
 ```
 
 Tester ensuite sans exposer le secret :

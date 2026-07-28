@@ -5,26 +5,43 @@ import '../../auth/data/auth_service.dart';
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
-  static const _modules = <({IconData icon, String label})>[
-    (icon: Icons.inventory_2_outlined, label: 'Stocks'),
-    (icon: Icons.move_to_inbox_outlined, label: 'R\u00e9ceptions'),
-    (icon: Icons.medication_outlined, label: 'Dispensation'),
-    (icon: Icons.fact_check_outlined, label: 'Inventaires'),
-    (icon: Icons.shopping_cart_outlined, label: 'Commandes'),
-    (icon: Icons.assessment_outlined, label: 'Rapports'),
+  static const _modules = <({IconData icon, String label, String? route})>[
+    (
+      icon: Icons.business_outlined,
+      label: 'Organisations / ONG',
+      route: '/organizations',
+    ),
+    (icon: Icons.inventory_2_outlined, label: 'Stocks', route: '/stocks'),
+    (icon: Icons.move_to_inbox_outlined, label: 'R\u00e9ceptions', route: null),
+    (icon: Icons.medication_outlined, label: 'Dispensation', route: null),
+    (icon: Icons.fact_check_outlined, label: 'Inventaires', route: null),
+    (icon: Icons.shopping_cart_outlined, label: 'Commandes', route: null),
+    (icon: Icons.assessment_outlined, label: 'Rapports', route: null),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(7),
+          child: ClipOval(
+            child: Image.asset(
+              'assets/images/pharmacare-logo.png',
+              fit: BoxFit.cover,
+              semanticLabel: 'Logo PharmaCare',
+            ),
+          ),
+        ),
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('SAGASTOCK'),
+            Text('PharmaCare'),
             Text(
-              'Gestion m\u00e9dico-logistique',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
+              'Putting Patients at the Heart of Every Supply.',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w400),
             ),
           ],
         ),
@@ -73,7 +90,11 @@ class HomePage extends StatelessWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
                     for (final module in _modules)
-                      _ModuleCard(icon: module.icon, label: module.label),
+                      _ModuleCard(
+                        icon: module.icon,
+                        label: module.label,
+                        route: module.route,
+                      ),
                   ],
                 );
               },
@@ -119,17 +140,18 @@ class _OfflineBanner extends StatelessWidget {
 }
 
 class _ModuleCard extends StatelessWidget {
-  const _ModuleCard({required this.icon, required this.label});
+  const _ModuleCard({required this.icon, required this.label, this.route});
 
   final IconData icon;
   final String label;
+  final String? route;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {},
+        onTap: route == null ? null : () => context.push(route!),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

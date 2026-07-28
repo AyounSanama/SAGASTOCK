@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Organization extends Model
@@ -18,4 +19,35 @@ class Organization extends Model
     {
         return ['is_active' => 'boolean'];
     }
+
+    public function missions(): HasMany
+    {
+        return $this->hasMany(Mission::class);
+    }
+
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class);
+    }
+
+    public function donors(): HasMany
+    {
+        return $this->hasMany(Donor::class);
+    }
+
+    public function programs(): HasMany
+    {
+        return $this->hasMany(Program::class);
+    }
+
+    public function healthFacilities(): HasMany
+    {
+        return $this->hasMany(HealthFacility::class);
+    }
+    public function catalogReferences(): HasMany { return $this->hasMany(CatalogReference::class); }
+    public function suppliers(): HasMany { return $this->hasMany(Supplier::class); }
+    public function products(): HasMany { return $this->hasMany(Product::class); }
+    public function batches(): HasMany { return $this->hasMany(Batch::class); }
+    public function kits(): HasMany { return $this->hasMany(Kit::class); }
+    public function standardLists(): HasMany { return $this->hasMany(StandardList::class); }
 }

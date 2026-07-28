@@ -36,15 +36,25 @@ class _SplashPageState extends State<SplashPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.local_pharmacy,
-            size: 72,
-            color: Theme.of(context).colorScheme.primary,
+          Image.asset(
+            'assets/images/pharmacare-logo.png',
+            height: 132,
+            fit: BoxFit.contain,
+            semanticLabel: 'Logo PharmaCare',
           ),
           const SizedBox(height: 16),
           const Text(
-            'SAGASTOCK',
+            'PharmaCare',
             style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'Putting Patients at the Heart of Every Supply.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13),
+            ),
           ),
           const SizedBox(height: 20),
           const CircularProgressIndicator(),

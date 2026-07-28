@@ -1,0 +1,4 @@
+<?php
+namespace App\Models;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;use Illuminate\Database\Eloquent\Model;use Illuminate\Database\Eloquent\Relations\BelongsTo;use Illuminate\Database\Eloquent\Relations\HasMany;use Illuminate\Database\Eloquent\SoftDeletes;
+class StandardList extends Model {use HasUuids,SoftDeletes;public $incrementing=false;protected $keyType='string';protected $fillable=['organization_id','code','name','description','scope_type','scope_id','allow_outside_list','is_active'];protected function casts():array{return ['allow_outside_list'=>'boolean','is_active'=>'boolean'];}public function organization():BelongsTo{return $this->belongsTo(Organization::class);}public function versions():HasMany{return $this->hasMany(StandardListVersion::class);}public function latestVersion(){return $this->hasOne(StandardListVersion::class)->latestOfMany('version_number');}}

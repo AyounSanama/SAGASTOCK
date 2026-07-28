@@ -2,7 +2,7 @@
 
 ## Vision
 
-SAGASTOCK centralise la gestion des produits médicaux depuis leur réception
+PharmaCare centralise la gestion des produits médicaux depuis leur réception
 jusqu'à leur dispensation. La solution doit réduire les ruptures, les
 péremptions et les erreurs, tout en produisant des données fiables pour les ONG,
 les autorités sanitaires et les bailleurs.

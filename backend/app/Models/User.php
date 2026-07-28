@@ -9,13 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, HasUuids, Notifiable;
+    use HasApiTokens, HasFactory, HasUuids, Notifiable, SoftDeletes;
 
-    protected $fillable = ['name', 'email', 'phone', 'password', 'is_active', 'must_change_password', 'last_login_at', 'password_changed_at', 'failed_login_attempts', 'locked_until'];
+    protected $fillable = ['name', 'first_name', 'last_name', 'username', 'email', 'phone', 'password', 'is_active', 'must_change_password', 'last_login_at', 'password_changed_at', 'failed_login_attempts', 'locked_until'];
     protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array

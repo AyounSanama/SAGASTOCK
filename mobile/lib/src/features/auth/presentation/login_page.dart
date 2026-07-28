@@ -15,6 +15,7 @@ class _LoginPageState extends State<LoginPage> {
   final _password = TextEditingController();
   final _auth = AuthService();
   bool _loading = false;
+  bool _passwordVisible = false;
   String? _error;
 
   @override
@@ -61,20 +62,21 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.local_pharmacy,
-                      size: 72,
-                      color: Theme.of(context).colorScheme.primary,
+                    Image.asset(
+                      'assets/images/pharmacare-logo.png',
+                      height: 112,
+                      fit: BoxFit.contain,
+                      semanticLabel: 'Logo PharmaCare',
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'SAGASTOCK',
+                      'PharmaCare',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     const Text(
-                      'Gestion pharmaceutique et m\u00e9dico-logistique',
+                      'Putting Patients at the Heart of Every Supply.',
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 32),
@@ -82,23 +84,35 @@ class _LoginPageState extends State<LoginPage> {
                       controller: _email,
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
-                        labelText: 'Adresse e-mail',
+                        labelText: 'Adresse e-mail ou identifiant',
                         prefixIcon: Icon(Icons.email_outlined),
                         border: OutlineInputBorder(),
                       ),
-                      validator: (value) =>
-                          value == null || !value.contains('@')
-                          ? 'Adresse e-mail invalide'
+                      validator: (value) => value == null || value.trim().isEmpty
+                          ? 'Adresse e-mail ou identifiant requis'
                           : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _password,
-                      obscureText: true,
-                      decoration: const InputDecoration(
+                      obscureText: !_passwordVisible,
+                      decoration: InputDecoration(
                         labelText: 'Mot de passe',
-                        prefixIcon: Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          tooltip: _passwordVisible
+                              ? 'Masquer le mot de passe'
+                              : 'Afficher le mot de passe',
+                          onPressed: () => setState(
+                            () => _passwordVisible = !_passwordVisible,
+                          ),
+                          icon: Icon(
+                            _passwordVisible
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                          ),
+                        ),
+                        border: const OutlineInputBorder(),
                       ),
                       validator: (value) => value == null || value.isEmpty
                           ? 'Mot de passe requis'

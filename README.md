@@ -1,4 +1,4 @@
-# SAGASTOCK
+# PharmaCare
 
 Plateforme professionnelle de gestion pharmaceutique et médico-logistique pour
 les ONG, programmes de santé et formations sanitaires.

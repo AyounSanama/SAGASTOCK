@@ -49,11 +49,11 @@ class AuthService {
     final response = await _client.dio.post<Map<String, dynamic>>(
       '/auth/login',
       data: {
-        'email': email,
+        'login': email,
         'password': password,
         'device_name': Platform.isIOS
-            ? 'iPhone SAGASTOCK'
-            : 'Android SAGASTOCK',
+            ? 'iPhone PharmaCare'
+            : 'Android PharmaCare',
         'device_id': deviceId,
         'platform': Platform.isIOS ? 'ios' : 'android',
       },
@@ -65,6 +65,10 @@ class AuthService {
     }
     await _storage.write(key: _tokenKey, value: token);
     await _storage.write(key: _userKey, value: jsonEncode(user));
+    await _storage.write(
+      key: _authenticatedAtKey,
+      value: DateTime.now().toIso8601String(),
+    );
     return user;
   }
 
