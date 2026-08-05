@@ -2,7 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/app_button.dart';
 import '../data/organization_service.dart';
+import 'mission_form_sheet.dart';
 
 class MissionsPage extends StatefulWidget {
   const MissionsPage({
@@ -10,6 +12,7 @@ class MissionsPage extends StatefulWidget {
     required this.organizationName,
     super.key,
   });
+
   final String organizationId;
   final String organizationName;
 
@@ -40,12 +43,11 @@ class _MissionsPageState extends State<MissionsPage> {
         _service.missions(widget.organizationId),
         _service.countries(),
       ]);
-      if (mounted) {
-        setState(() {
-          _missions = values[0];
-          _countries = values[1];
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _missions = values[0];
+        _countries = values[1];
+      });
     } on DioException catch (error) {
       if (mounted) {
         setState(
@@ -59,7 +61,7 @@ class _MissionsPageState extends State<MissionsPage> {
     }
   }
 
-  Future<void> _create() async {
+  Future<void> _openForm([Map<String, dynamic>? mission]) async {
     if (_countries.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -68,99 +70,68 @@ class _MissionsPageState extends State<MissionsPage> {
       );
       return;
     }
-    final code = TextEditingController();
-    final name = TextEditingController();
-    var countryId = _countries.first['id'] as String;
-    final key = GlobalKey<FormState>();
-    final created = await showDialog<bool>(
+
+    final editing = mission != null;
+    final saved = await showMissionFormSheet(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Nouvelle mission'),
-          content: Form(
-            key: key,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: code,
-                  decoration: const InputDecoration(labelText: 'Code mission'),
-                  validator: (value) => value?.trim().isEmpty == true
-                      ? 'Champ obligatoire'
-                      : null,
-                ),
-                TextFormField(
-                  controller: name,
-                  decoration: const InputDecoration(labelText: 'Nom'),
-                  validator: (value) => value?.trim().isEmpty == true
-                      ? 'Champ obligatoire'
-                      : null,
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: countryId,
-                  decoration: const InputDecoration(labelText: 'Pays'),
-                  items: [
-                    for (final country in _countries)
-                      DropdownMenuItem(
-                        value: country['id'] as String,
-                        child: Text('${country['name']} (${country['iso2']})'),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) setDialogState(() => countryId = value);
-                  },
-                ),
-              ],
+      organizationId: widget.organizationId,
+      organizationName: widget.organizationName,
+      countries: _countries,
+      mode: editing ? MissionFormMode.edit : MissionFormMode.create,
+      mission: mission,
+      onSave: (data) => editing
+          ? _service.updateMission(
+              organizationId: widget.organizationId,
+              missionId: '${mission['id']}',
+              countryId: data.countryId,
+              code: data.code,
+              name: data.name,
+              startsOn: data.startsOn,
+              endsOn: data.endsOn,
+              address: data.address,
+              managerName: data.managerName,
+              phone: data.phone,
+              email: data.email,
+              description: data.description,
+              isActive: data.isActive,
+            )
+          : _service.createMission(
+              organizationId: widget.organizationId,
+              countryId: data.countryId,
+              code: data.code,
+              name: data.name,
+              startsOn: data.startsOn,
+              endsOn: data.endsOn,
+              address: data.address,
+              managerName: data.managerName,
+              phone: data.phone,
+              email: data.email,
+              description: data.description,
+              isActive: data.isActive,
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annuler'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                if (!(key.currentState?.validate() ?? false)) return;
-                try {
-                  await _service.createMission(
-                    organizationId: widget.organizationId,
-                    countryId: countryId,
-                    code: code.text.trim(),
-                    name: name.text.trim(),
-                  );
-                  if (context.mounted) Navigator.pop(context, true);
-                } on DioException catch (error) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        error.response?.statusCode == 403
-                            ? 'Vous n’avez pas la permission de créer une mission.'
-                            : 'Création impossible. Vérifiez les informations.',
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Créer'),
-            ),
-          ],
+    );
+    if (saved != true || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          editing
+              ? 'Mission modifiée avec succès.'
+              : 'Mission ajoutée avec succès.',
         ),
       ),
     );
-    code.dispose();
-    name.dispose();
-    if (created == true) await _load();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.organizationName)),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _create,
-        icon: const Icon(Icons.add_location_alt_outlined),
-        label: const Text('Mission'),
+      floatingActionButton: AppFab(
+        onPressed: _loading ? null : _openForm,
+        icon: Icons.add_location_alt_outlined,
+        tooltip: 'Ajouter une mission',
       ),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -171,46 +142,93 @@ class _MissionsPageState extends State<MissionsPage> {
               'Missions et pays d’intervention',
               style: Theme.of(context).textTheme.titleLarge,
             ),
+            const SizedBox(height: 6),
+            Text(
+              'Ajoutez, consultez et modifiez les missions de cette organisation.',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 16),
             if (_loading)
-              const Center(child: CircularProgressIndicator())
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator(),
+                ),
+              )
             else if (_error != null)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Text(_error!),
+                  child: Column(
+                    children: [
+                      Text(_error!),
+                      const SizedBox(height: 12),
+                      AppButton.text(
+                        label: 'Réessayer',
+                        icon: Icons.refresh_rounded,
+                        onPressed: _load,
+                      ),
+                    ],
+                  ),
                 ),
               )
             else if (_missions.isEmpty)
-              const Card(
+              Card(
                 child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Text('Aucune mission enregistrée.'),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      const Text('Aucune mission enregistrée.'),
+                      const SizedBox(height: 14),
+                      AppButton.add(
+                        label: 'Ajouter une mission',
+                        onPressed: _openForm,
+                      ),
+                    ],
+                  ),
                 ),
               )
             else
-              for (final mission in _missions)
+              for (final mission in _missions) ...[
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.public),
-                    title: Text(mission['name'] as String),
+                    title: Text('${mission['name']}'),
                     subtitle: Text(
-                      '${mission['code']} · ${(mission['country'] as Map<String, dynamic>)['name']}',
+                      '${mission['code']} · '
+                      '${(mission['country'] as Map<String, dynamic>?)?['name'] ?? 'Pays non renseigné'}',
                     ),
-                    trailing: Icon(
-                      mission['is_active'] == true
-                          ? Icons.check_circle
-                          : Icons.pause_circle,
-                      color: mission['is_active'] == true
-                          ? Colors.green
-                          : Colors.grey,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIconAction(
+                          icon: Icons.edit_outlined,
+                          tooltip: 'Modifier la mission',
+                          color: AppActionColor.orange,
+                          onPressed: () => _openForm(mission),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          mission['is_active'] == true
+                              ? Icons.check_circle
+                              : Icons.pause_circle,
+                          color: mission['is_active'] == true
+                              ? Colors.green
+                              : Colors.grey,
+                        ),
+                      ],
                     ),
                     onTap: () => context.push(
-                      '/organizations/${widget.organizationId}/missions/${mission['id']}/projects',
-                      extra: mission['name'] as String,
+                      '/organizations/${widget.organizationId}/missions/'
+                      '${mission['id']}/projects',
+                      extra: '${mission['name']}',
                     ),
                   ),
                 ),
+                const SizedBox(height: 10),
+              ],
           ],
         ),
       ),

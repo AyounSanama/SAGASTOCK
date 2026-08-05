@@ -132,7 +132,10 @@ class StructureController extends Controller
     public function storeSite(Request $request, Organization $organization, HealthFacility $facility): JsonResponse
     {
         $this->facility($request, $organization, $facility);
-        $site = $facility->sites()->create($this->siteData($request, $facility));
+        $site = $facility->sites()->create([
+            ...$this->siteData($request, $facility),
+            'organization_id' => $organization->id,
+        ]);
         return $this->created($request, 'site.created', $site, 'site');
     }
 

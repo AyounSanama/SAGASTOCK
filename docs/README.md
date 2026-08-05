@@ -1,33 +1,32 @@
-﻿# Documentation du projet
+# Documentation officielle PharmaCare
 
-Cette documentation consolide les quatre sources remises par le porteur du
-projet :
+La source métier unique est le cahier des charges validé. Les clarifications
+écrites du porteur prévalent sur les documents historiques. La matrice des
+permissions, le modèle de données, les formules validées et les critères
+d'acceptation constituent sa traduction technique exécutable.
 
-1. le cahier des charges initial ;
-2. le cahier des charges restructurÃ© ;
-3. le plan directeur d'architecture ;
-4. le document de rÃ©partition du dÃ©veloppement.
+## Références de Phase 1
 
-En cas de divergence, une dÃ©cision explicite du porteur du projet prÃ©vaut. La
-premiÃ¨re dÃ©cision enregistrÃ©e est la livraison simultanÃ©e d'Android et iOS.
-
-## Livrables de phase 1
-
-- [Exigences consolidÃ©es](01-exigences-consolidees.md)
+- [Exigences consolidées](01-exigences-consolidees.md)
 - [Architecture cible](02-architecture.md)
-- [ModÃ¨le de donnÃ©es](03-modele-donnees.md)
-- [RÃ´les et permissions](04-roles-permissions.md)
+- [Modèle conceptuel et dictionnaire](03-modele-donnees.md)
+- [Matrice officielle des rôles et permissions](04-roles-permissions.md)
 - [MVP et feuille de route](05-mvp-roadmap.md)
-- [DÃ©cisions Ã  valider](06-decisions-ouvertes.md)
-- [DÃ©marrage du dÃ©veloppement](07-demarrage-developpement.md)
+- [Décisions à valider](06-decisions-ouvertes.md)
+- [Workflow officiel de configuration](15-workflow-configuration-officiel.md)
+- [Formules métier](16-formules-metier-officielles.md)
+- [Critères d'acceptation](17-criteres-acceptation-officiels.md)
+- [Modules et phasage officiels](18-modules-et-phasage-officiels.md)
+- [Audit de conformité Phase 2](19-audit-conformite-phase2.md)
 
-## Principes non nÃ©gociables
+## Principes non négociables
 
-- Offline-First conÃ§u dÃ¨s le socle.
-- Registre des mouvements comme source de vÃ©ritÃ© du stock.
-- Isolation multi-organisation appliquÃ©e cÃ´tÃ© serveur.
-- Aucune rÃ¨gle mÃ©dicale ou pharmaceutique inventÃ©e par l'Ã©quipe technique.
-- TraÃ§abilitÃ© des opÃ©rations sensibles.
-- SÃ©curitÃ© et tests intÃ©grÃ©s Ã  chaque tranche fonctionnelle.
-- Android et iOS couverts par les mÃªmes critÃ¨res d'acceptation.
-
+- Flutter, Laravel, PostgreSQL, SQLite, REST et Offline-First.
+- Cinq rôles uniquement : Owner, Coordination, Projet, Admin Site, Utilisateur.
+- Autorisation dérivée de `rôle + permission + scope`.
+- Un seul Login et un seul Dashboard Flutter.
+- Stock géré au niveau du site.
+- Registre immuable des mouvements comme source de vérité.
+- Aucune règle médicale ou formule métier inventée ou codée en dur.
+- Une étape doit être terminée, testée et validée avant la suivante.
+- Android et iOS partagent le même code et les mêmes critères.

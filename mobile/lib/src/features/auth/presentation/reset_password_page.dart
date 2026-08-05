@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/app_button.dart';
 import 'package:go_router/go_router.dart';
 import '../data/auth_service.dart';
 
@@ -114,12 +115,12 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     ),
                   ),
                 const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: _loading ? null : _submit,
-                  child: const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: Text('Réinitialiser'),
-                  ),
+                AppButton.validate(
+                  label: 'Réinitialiser le mot de passe',
+                  icon: Icons.restart_alt_rounded,
+                  loading: _loading,
+                  expanded: true,
+                  onPressed: _submit,
                 ),
               ],
             ),

@@ -15,67 +15,146 @@ class UserScopeService
 {
     public function isPlatform(User $user): bool
     {
-        return $user->roles()->wherePivot('scope_type', 'platform')->exists();
+        return $user->roles()
+            ->wherePivot('scope_type', 'platform')
+            ->exists();
     }
 
     public function organizationIds(User $user): Collection
     {
-        return $user->roles()->wherePivot('scope_type', 'organization')->pluck('role_user.scope_id')->filter()->values();
+        if ($this->isPlatform($user)) return Organization::pluck('id');
+        if (app(GovernanceService::class)->roleCode($user) === GovernanceService::COORDINATION_ADMIN
+            && $user->hasPermission('organizations.manage')) {
+            return Organization::pluck('id');
+        }
+        $direct = $user->roles()
+            ->wherePivot('scope_type', 'organization')
+            ->pluck('role_user.scope_id');
+        if ($user->organization_id) {
+            $direct->push($user->organization_id);
+        }
+        $projectOrganizations = Project::whereIn('id', $this->directProjectIds($user))
+            ->pluck('organization_id');
+        $siteOrganizations = HealthFacility::whereHas(
+            'sites',
+            fn (Builder $query) => $query->whereIn('sites.id', $this->directSiteIds($user)),
+        )->pluck('organization_id');
+
+        return $direct->merge($projectOrganizations)->merge($siteOrganizations)
+            ->filter()->unique()->values();
     }
 
     public function directProjectIds(User $user): Collection
     {
-        return $user->roles()->wherePivot('scope_type', 'project')->pluck('role_user.scope_id')->filter()->values();
+        return $user->roles()
+            ->wherePivot('scope_type', 'project')
+            ->pluck('role_user.scope_id')->filter()->values();
     }
 
     public function projectIds(User $user): Collection
     {
         if ($this->isPlatform($user)) return Project::pluck('id');
-        return $this->directProjectIds($user)->merge(
-            Project::whereIn('organization_id', $this->organizationIds($user))->pluck('id'),
-        )->unique()->values();
+        $role = app(GovernanceService::class)->roleCode($user);
+        if ($role === GovernanceService::COORDINATION_ADMIN) {
+            return Project::whereIn('organization_id', $this->coordinationOrganizationIds($user))
+                ->pluck('id')->unique()->values();
+        }
+        if ($role === GovernanceService::PROJECT_ADMIN) {
+            return $this->directProjectIds($user)->unique()->values();
+        }
+        if ($role === null) {
+            return $this->directProjectIds($user)->merge(
+                Project::whereIn('organization_id', $this->organizationIds($user))->pluck('id'),
+            )->unique()->values();
+        }
+        return collect();
     }
 
     public function facilityIds(User $user): Collection
     {
         if ($this->isPlatform($user)) return HealthFacility::pluck('id');
-        $direct = $user->roles()->wherePivot('scope_type', 'facility')->pluck('role_user.scope_id');
-        return $direct->merge(
-            HealthFacility::whereIn('organization_id', $this->organizationIds($user))
-                ->orWhereHas('projects', fn (Builder $q) => $q->whereIn('projects.id', $this->projectIds($user)))
-                ->pluck('id')
-        )->filter()->unique()->values();
+        $role = app(GovernanceService::class)->roleCode($user);
+        if ($role === GovernanceService::COORDINATION_ADMIN) {
+            return HealthFacility::whereIn('organization_id', $this->coordinationOrganizationIds($user))
+                ->pluck('id')->unique()->values();
+        }
+        if ($role === GovernanceService::PROJECT_ADMIN) {
+            return HealthFacility::whereHas('projects', fn (Builder $q) =>
+                $q->whereIn('projects.id', $this->directProjectIds($user)))
+                ->pluck('id')->unique()->values();
+        }
+        if (in_array($role, [GovernanceService::SITE_ADMIN, GovernanceService::SITE_USER], true)) {
+            return Site::whereIn('id', $this->directSiteIds($user))
+                ->pluck('health_facility_id')->filter()->unique()->values();
+        }
+        return HealthFacility::whereIn('organization_id', $this->organizationIds($user))
+            ->orWhereHas('projects', fn (Builder $q) => $q->whereIn('projects.id', $this->directProjectIds($user)))
+            ->orWhereHas('sites', fn (Builder $q) => $q->whereIn('sites.id', $this->directSiteIds($user)))
+            ->pluck('id')->filter()->unique()->values();
+    }
+
+    public function directSiteIds(User $user): Collection
+    {
+        return $user->roles()
+            ->wherePivot('scope_type', 'site')
+            ->pluck('role_user.scope_id')->filter()->values();
+    }
+
+    private function coordinationOrganizationIds(User $user): Collection
+    {
+        return $user->roles()
+            ->whereIn('roles.code', ['coordination_admin', 'organization_admin'])
+            ->wherePivot('scope_type', 'organization')
+            ->pluck('role_user.scope_id')->filter()->values();
     }
 
     public function siteIds(User $user): Collection
     {
         if ($this->isPlatform($user)) return Site::pluck('id');
-        return $user->roles()->wherePivot('scope_type', 'site')->pluck('role_user.scope_id')
-            ->merge(Site::whereIn('health_facility_id', $this->facilityIds($user))->pluck('id'))
-            ->filter()->unique()->values();
+        $role = app(GovernanceService::class)->roleCode($user);
+        if ($role === GovernanceService::COORDINATION_ADMIN) {
+            return Site::whereIn('organization_id', $this->coordinationOrganizationIds($user))
+                ->pluck('id')->unique()->values();
+        }
+        if ($role === GovernanceService::PROJECT_ADMIN) {
+            return Site::whereIn('health_facility_id', $this->facilityIds($user))
+                ->pluck('id')->unique()->values();
+        }
+        if (in_array($role, [GovernanceService::SITE_ADMIN, GovernanceService::SITE_USER], true)) {
+            return $this->directSiteIds($user)->unique()->values();
+        }
+        return $this->directSiteIds($user)->merge(
+            Site::whereIn('organization_id', $this->organizationIds($user))
+                ->orWhereIn('health_facility_id', $this->facilityIds($user))->pluck('id'),
+        )->filter()->unique()->values();
     }
 
     public function users(User $actor, ?Builder $query = null): Builder
     {
         $query ??= User::query();
         if ($this->isPlatform($actor)) return $query;
-        $organizations = $this->organizationIds($actor);
-        $projects = $this->projectIds($actor);
-        $facilities = $this->facilityIds($actor);
+        $role = app(GovernanceService::class)->roleCode($actor);
+        if ($role === GovernanceService::SITE_USER || $role === null) {
+            return $query->whereKey($actor->id);
+        }
+        $organizations = $role === GovernanceService::COORDINATION_ADMIN
+            ? $this->coordinationOrganizationIds($actor) : collect();
+        $projects = in_array($role, [GovernanceService::COORDINATION_ADMIN, GovernanceService::PROJECT_ADMIN], true)
+            ? $this->projectIds($actor) : collect();
         $sites = $this->siteIds($actor);
-        return $query->where(function (Builder $users) use ($actor, $organizations, $projects, $facilities, $sites) {
+        return $query->where(function (Builder $users) use ($actor, $organizations, $projects, $sites) {
             $users->whereKey($actor->id);
-            if ($organizations->isNotEmpty() || $projects->isNotEmpty()) {
-                $users->orWhereHas('roles', function (Builder $roles) use ($organizations, $projects, $facilities, $sites) {
-                $roles->where(function (Builder $scopes) use ($organizations, $projects, $facilities, $sites) {
+            if ($organizations->isNotEmpty()) {
+                $users->orWhereIn('organization_id', $organizations);
+            }
+            if ($organizations->isNotEmpty() || $projects->isNotEmpty() || $sites->isNotEmpty()) {
+                $users->orWhereHas('roles', function (Builder $roles) use ($organizations, $projects, $sites) {
+                $roles->where(function (Builder $scopes) use ($organizations, $projects, $sites) {
                     if ($organizations->isNotEmpty()) {
                         $scopes->orWhere(fn (Builder $q) => $q->where('role_user.scope_type', 'organization')->whereIn('role_user.scope_id', $organizations));
                     }
                     if ($projects->isNotEmpty()) {
                         $scopes->orWhere(fn (Builder $q) => $q->where('role_user.scope_type', 'project')->whereIn('role_user.scope_id', $projects));
-                    }
-                    if ($facilities->isNotEmpty()) {
-                        $scopes->orWhere(fn (Builder $q) => $q->where('role_user.scope_type', 'facility')->whereIn('role_user.scope_id', $facilities));
                     }
                     if ($sites->isNotEmpty()) {
                         $scopes->orWhere(fn (Builder $q) => $q->where('role_user.scope_type', 'site')->whereIn('role_user.scope_id', $sites));
@@ -152,8 +231,22 @@ class UserScopeService
 
     public function assignableRoles(User $actor): Builder
     {
-        if ($this->isPlatform($actor)) {
-            return Role::query();
+        // Les anciens rôles administratifs personnalisés restent pilotés par
+        // leurs permissions explicites, sans contourner le périmètre plateforme.
+        if ($this->isPlatform($actor) && $actor->hasPermission('users.manage')) {
+            return Role::query()->where('is_active', true);
+        }
+
+        $assignableCodes = app(GovernanceService::class)->assignableCodes($actor);
+        if ($assignableCodes !== []) {
+            return Role::query()
+                ->where('is_system', true)
+                ->where('is_active', true)
+                ->whereIn('code', $assignableCodes);
+        }
+
+        if (app(GovernanceService::class)->roleCode($actor) !== null) {
+            return Role::query()->whereRaw('1 = 0');
         }
 
         $roleCodes = $actor->roles()->pluck('roles.code');

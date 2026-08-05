@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/widgets/app_button.dart';
 import '../data/auth_service.dart';
+import '../../../core/widgets/app_navigation_drawer.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -41,6 +43,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    drawer: const AppNavigationDrawer(),
     appBar: AppBar(title: const Text('Mon profil')),
     body: _loading
         ? const Center(child: CircularProgressIndicator())
@@ -55,10 +58,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 16),
-              FilledButton.tonalIcon(
+              AppButton.edit(
+                expanded: true,
+                label: 'Changer mon mot de passe',
+                icon: Icons.password_rounded,
                 onPressed: () => context.push('/change-password'),
-                icon: const Icon(Icons.password),
-                label: const Text('Changer mon mot de passe'),
               ),
               const SizedBox(height: 24),
               Text(
@@ -90,19 +94,21 @@ class _ProfilePageState extends State<ProfilePage> {
                         ? IconButton(
                             tooltip: 'R\u00e9voquer',
                             onPressed: () => _revoke(device['id'] as String),
-                            icon: const Icon(Icons.block),
+                            color: Theme.of(context).colorScheme.error,
+                            icon: const Icon(Icons.block_rounded),
                           )
                         : null,
                   ),
                 ),
               const SizedBox(height: 20),
-              OutlinedButton.icon(
+              AppButton.delete(
+                expanded: true,
+                label: 'Se déconnecter',
+                icon: Icons.logout_rounded,
                 onPressed: () async {
                   await _auth.logout();
                   if (context.mounted) context.go('/login');
                 },
-                icon: const Icon(Icons.logout),
-                label: const Text('Se d\u00e9connecter'),
               ),
             ],
           ),

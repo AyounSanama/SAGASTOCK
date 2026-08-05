@@ -117,7 +117,9 @@ class CatalogManagementTest extends TestCase
         $user = $this->administrator();
         $this->assertTrue(app(UserScopeService::class)->organizations($user)->whereKey($organization->id)->exists());
         $this->actingAs($user)->get("/organizations/{$organization->id}/catalog")
-            ->assertOk()->assertSee('Référentiels')->assertSee('Produits et codes')->assertSee('pharmacare-logo.png');
+            ->assertOk()->assertSee('Référentiels')->assertSee('Ajouter un médicament')->assertSee('product-create-sheet')->assertSee('pharmacare-logo.png');
+        $this->actingAs($user)->get("/organizations/{$organization->id}/catalog/products/create")
+            ->assertOk()->assertSee('Ajouter un médicament')->assertSee('DCI / nom générique')->assertSee('Classification pharmaceutique');
         $this->actingAs($user)->post("/organizations/{$organization->id}/catalog/products", [
             'code' => 'GAUZE', 'name' => 'Compresses stériles', 'product_type' => 'consumable', 'barcode' => '987654321',
             'is_active' => 1,

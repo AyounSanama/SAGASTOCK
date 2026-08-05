@@ -17,6 +17,34 @@ use Illuminate\View\View;
 
 class StockController extends Controller
 {
+    private const MOVEMENT_LABELS = [
+        'opening' => 'Stock initial',
+        'receipt' => 'Réception pharmaceutique',
+        'entry' => 'Autre entrée',
+        'issue' => 'Sortie de stock',
+        'return_in' => 'Retour entrant',
+        'return_out' => 'Retour sortant',
+        'adjustment_in' => 'Ajustement positif',
+        'adjustment_out' => 'Ajustement négatif',
+        'loss' => 'Perte',
+        'damage' => 'Détérioration',
+        'expiry' => 'Péremption',
+        'quarantine' => 'Mise en quarantaine',
+        'quarantine_release' => 'Sortie de quarantaine',
+        'destruction' => 'Destruction',
+    ];
+
+    public function home(Request $request): RedirectResponse
+    {
+        $organization = $this->scopes->organizations($request->user())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->first();
+        abort_unless($organization, 404, 'Aucune organisation accessible pour ce compte.');
+
+        return redirect()->route('organizations.stocks.index', $organization);
+    }
+
     public function __construct(private StockLedgerService $ledger, private UserScopeService $scopes, private ModuleActivationService $modules, private AuditService $audit) {}
 
     public function index(Request $request, Organization $organization): View
@@ -24,14 +52,51 @@ class StockController extends Controller
         $this->access($request, $organization, 'stocks.view');
         $siteIds = $this->siteIds($request, $organization);
         $sites = Site::with('healthFacility')->whereIn('id', $siteIds)->orderBy('name')->get();
-        $balances = StockBalance::with(['site', 'product', 'batch'])->where('organization_id', $organization->id)->whereIn('site_id', $siteIds)
+        $balanceQuery = StockBalance::where('organization_id', $organization->id)->whereIn('site_id', $siteIds)
             ->when($request->input('site_id'), fn ($q, $id) => $q->where('site_id', $id))
             ->when($request->string('search')->toString(), fn ($q, $search) => $q->whereHas('product', fn ($p) => $p->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
-            ->orderByDesc('last_movement_at')->paginate(25)->withQueryString();
-        $movements = StockMovement::with(['site', 'product', 'batch'])->where('organization_id', $organization->id)->whereIn('site_id', $siteIds)->latest('validated_at')->limit(30)->get();
-        $products = $organization->products()->with(['batches' => fn ($q) => $q->where('status', 'available')->orderBy('expires_on')])->where('is_active', true)->orderBy('name')->get();
+            ->when($request->boolean('available_only'), fn ($q) => $q->whereRaw('(theoretical_quantity - reserved_quantity) > 0'))
+            ->when($request->input('expiry'), function ($q, $expiry) {
+                $q->whereHas('batch', fn ($batch) => match ($expiry) {
+                    'expired' => $batch->whereDate('expires_on', '<', today()),
+                    'soon' => $batch->whereBetween('expires_on', [today(), today()->addMonths(3)]),
+                    default => $batch,
+                });
+            });
+        $balances = (clone $balanceQuery)->with(['site', 'product', 'batch'])->orderByDesc('last_movement_at')->paginate(25)->withQueryString();
+        $movements = StockMovement::with(['site', 'product', 'batch'])->where('organization_id', $organization->id)->whereIn('site_id', $siteIds)
+            ->when($request->input('site_id'), fn ($q, $id) => $q->where('site_id', $id))
+            ->when($request->input('movement_type'), fn ($q, $type) => $q->where('movement_type', $type))
+            ->latest('validated_at')->limit(50)->get();
+        $stats = [
+            'lines' => (clone $balanceQuery)->count(),
+            'quantity' => (float) (clone $balanceQuery)->sum('theoretical_quantity'),
+            'expiring' => (clone $balanceQuery)->whereHas('batch', fn ($q) => $q->whereBetween('expires_on', [today(), today()->addMonths(3)]))->count(),
+            'expired' => (clone $balanceQuery)->whereHas('batch', fn ($q) => $q->whereDate('expires_on', '<', today()))->count(),
+        ];
+        $fefoPriorities = StockBalance::with(['site', 'product', 'batch'])->where('stock_balances.organization_id', $organization->id)->whereIn('stock_balances.site_id', $siteIds)
+            ->whereRaw('(stock_balances.theoretical_quantity - stock_balances.reserved_quantity) > 0')
+            ->whereHas('batch', fn ($q) => $q->where('status', 'available')->whereDate('expires_on', '>=', today()))
+            ->join('batches', 'batches.id', '=', 'stock_balances.batch_id')
+            ->orderBy('batches.expires_on')->select('stock_balances.*')->limit(8)->get();
+        $movementProducts = $organization->products()->with([
+            'batches' => fn ($q) => $q->whereIn('status', ['available', 'quarantine'])->orderBy('expires_on'),
+        ])->where('is_active', true)->orderBy('name')->get();
 
-        return view('stocks.index', compact('organization', 'sites', 'balances', 'movements', 'products'));
+        return view('stocks.index', compact('organization', 'sites', 'balances', 'movements', 'stats', 'fefoPriorities', 'movementProducts') + ['movementLabels' => self::MOVEMENT_LABELS]);
+    }
+
+    public function createMovement(Request $request, Organization $organization): View
+    {
+        $this->access($request, $organization, 'stocks.manage');
+        $siteIds = $this->siteIds($request, $organization);
+
+        return view('stocks.create-movement', [
+            'organization' => $organization,
+            'sites' => Site::with('healthFacility')->whereIn('id', $siteIds)->orderBy('name')->get(),
+            'products' => $organization->products()->with(['batches' => fn ($q) => $q->whereIn('status', ['available', 'quarantine'])->orderBy('expires_on')])->where('is_active', true)->orderBy('name')->get(),
+            'movementLabels' => self::MOVEMENT_LABELS,
+        ]);
     }
 
     public function storeMovement(Request $request, Organization $organization): RedirectResponse
@@ -46,7 +111,8 @@ class StockController extends Controller
         $movement = $this->ledger->record($organization, $site, $batch, $data['movement_type'], $data['quantity'], $request->user()->id, ['reason' => $data['reason'] ?? null]);
         $this->audit->record($request, 'stock.movement.validated', $movement);
 
-        return back()->with('status', 'Mouvement validé et solde recalculé.');
+        return redirect()->route('organizations.stocks.index', $organization)
+            ->with('status', 'Mouvement validé et solde du stock recalculé avec succès.');
     }
 
     public function compensate(Request $request, Organization $organization, StockMovement $movement): RedirectResponse

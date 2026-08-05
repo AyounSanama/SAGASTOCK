@@ -29,7 +29,11 @@ class MissionController extends Controller
     {
         $this->accessible($request, $organization);
         $mission = $organization->missions()->create($this->validated($request, $organization));
-        $this->audit->record($request, 'mission.created', $mission, [], $mission->only(['organization_id', 'country_id', 'code', 'name', 'is_active']));
+        $this->audit->record($request, 'mission.created', $mission, [], $mission->only([
+            'organization_id', 'country_id', 'code', 'name', 'starts_on',
+            'ends_on', 'address', 'manager_name', 'phone', 'email',
+            'description', 'is_active',
+        ]));
         return response()->json(['mission' => $mission->load('country:id,iso2,name')], 201);
     }
 
@@ -37,7 +41,10 @@ class MissionController extends Controller
     {
         $this->accessible($request, $organization);
         abort_unless($mission->organization_id === $organization->id, 404);
-        $old = $mission->only(['country_id', 'code', 'name', 'starts_on', 'ends_on', 'is_active']);
+        $old = $mission->only([
+            'country_id', 'code', 'name', 'starts_on', 'ends_on', 'address',
+            'manager_name', 'phone', 'email', 'description', 'is_active',
+        ]);
         $mission->update($this->validated($request, $organization, $mission));
         $this->audit->record($request, 'mission.updated', $mission, $old, $mission->only(array_keys($old)));
         return response()->json(['mission' => $mission->load('country:id,iso2,name')]);
@@ -69,6 +76,11 @@ class MissionController extends Controller
             'name' => ['required', 'string', 'max:160'],
             'starts_on' => ['nullable', 'date'],
             'ends_on' => ['nullable', 'date', 'after_or_equal:starts_on'],
+            'address' => ['nullable', 'string', 'max:1000'],
+            'manager_name' => ['nullable', 'string', 'max:160'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'email' => ['nullable', 'email', 'max:190'],
+            'description' => ['nullable', 'string', 'max:3000'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
     }

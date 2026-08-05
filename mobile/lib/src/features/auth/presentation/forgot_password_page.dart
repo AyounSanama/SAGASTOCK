@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../core/widgets/app_button.dart';
 import '../data/auth_service.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
@@ -104,22 +106,24 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     ),
                   ),
                 const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: _loading ? null : _submit,
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Text(_loading ? 'Envoi...' : 'Envoyer le lien'),
-                  ),
+                AppButton.save(
+                  label: 'Envoyer le lien',
+                  icon: Icons.mark_email_read_outlined,
+                  loading: _loading,
+                  expanded: true,
+                  onPressed: _submit,
                 ),
-                TextButton(
+                AppButton.text(
+                  expanded: true,
+                  icon: Icons.key_outlined,
+                  label: "J'ai déjà un code de réinitialisation",
                   onPressed: () => context.push('/reset-password'),
-                  child: const Text(
-                    "J'ai d\u00e9j\u00e0 un code de r\u00e9initialisation",
-                  ),
                 ),
-                TextButton(
+                AppButton.text(
+                  expanded: true,
+                  icon: Icons.arrow_back,
+                  label: 'Retour à la connexion',
                   onPressed: () => context.go('/login'),
-                  child: const Text('Retour \u00e0 la connexion'),
                 ),
               ],
             ),

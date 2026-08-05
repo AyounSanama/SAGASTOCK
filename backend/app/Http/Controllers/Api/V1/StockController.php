@@ -52,6 +52,17 @@ class StockController extends Controller
             ->latest('validated_at')->paginate(50));
     }
 
+    public function options(Request $request, Organization $organization): JsonResponse
+    {
+        $this->access($request, $organization, 'stocks.manage');
+
+        return response()->json([
+            'sites' => Site::with('healthFacility:id,name')->whereIn('id', $this->siteIds($request, $organization))->orderBy('name')->get(),
+            'batches' => $organization->batches()->with('product:id,code,name')
+                ->whereIn('status', ['available', 'quarantine'])->orderBy('expires_on')->get(),
+        ]);
+    }
+
     public function storeMovement(Request $request, Organization $organization): JsonResponse
     {
         $this->access($request, $organization, 'stocks.manage');
@@ -59,13 +70,25 @@ class StockController extends Controller
             'site_id' => ['required', 'uuid'], 'batch_id' => ['required', 'uuid'],
             'movement_type' => ['required', Rule::in(['opening', 'receipt', 'entry', 'issue', 'return_in', 'return_out', 'adjustment_in', 'adjustment_out', 'loss', 'damage', 'expiry', 'quarantine', 'quarantine_release', 'destruction'])],
             'quantity' => ['required', 'numeric', 'gt:0'], 'reason' => ['nullable', 'string', 'max:2000'],
+            'client_reference' => ['nullable', 'uuid'],
         ]);
+        if (! empty($data['client_reference'])) {
+            $existing = StockMovement::where('organization_id', $organization->id)
+                ->where('client_reference', $data['client_reference'])
+                ->first();
+            if ($existing) {
+                return response()->json(['movement' => $existing->load(['site', 'product', 'batch']), 'duplicate' => true]);
+            }
+        }
         $site = $this->site($request, $organization, $data['site_id']);
         $batch = $organization->batches()->findOrFail($data['batch_id']);
         if (in_array($data['movement_type'], ['adjustment_in', 'adjustment_out', 'loss', 'damage', 'expiry', 'quarantine', 'destruction'], true)) {
             abort_unless(filled($data['reason'] ?? null), 422, 'Une justification est obligatoire.');
         }
-        $movement = $this->ledger->record($organization, $site, $batch, $data['movement_type'], $data['quantity'], $request->user()->id, ['reason' => $data['reason'] ?? null]);
+        $movement = $this->ledger->record($organization, $site, $batch, $data['movement_type'], $data['quantity'], $request->user()->id, [
+            'reason' => $data['reason'] ?? null,
+            'client_reference' => $data['client_reference'] ?? null,
+        ]);
         $this->audit->record($request, 'stock.movement.validated', $movement, [], $movement->toArray());
 
         return response()->json(['movement' => $movement], 201);

@@ -21,12 +21,47 @@ class SecurityController extends Controller
     public function index(Request $request): View
     {
         $this->allow('roles.manage');
+        $permissions = Permission::orderBy('name')->get();
+        $permissionCategories = [
+            'catalog' => 'Gestion des médicaments',
+            'stocks' => 'Gestion du stock',
+            'transfers' => 'Transferts de médicaments',
+            'receipts' => 'Réceptions pharmaceutiques',
+            'dispensing' => 'Dispensation des médicaments',
+            'patients' => 'Patients',
+            'prescriptions' => 'Prescriptions médicales',
+            'reports' => 'Rapports et statistiques',
+            'users' => 'Utilisateurs',
+            'roles' => 'Rôles et permissions',
+            'audit' => 'Journal d’audit',
+            'organizations' => 'Organisations',
+            'structures' => 'Formations sanitaires',
+            'modules' => 'Activation des modules',
+            'missions' => 'Missions',
+            'projects' => 'Projets',
+            'funding' => 'Bailleurs et programmes',
+        ];
         $logs = AuditLog::with('user:id,name,email')
             ->when($request->string('event')->toString(), fn ($query, $event) => $query->where('event', 'like', "{$event}%"))
             ->latest()->paginate(30);
+        $roles = $this->scopes->roles($request->user())
+            ->with('permissions')
+            ->withCount('users')
+            ->orderByDesc('is_system')
+            ->orderBy('name')
+            ->get();
+        $selectedRole = $roles->firstWhere('id', $request->integer('role')) ?? $roles->first();
+
         return view('security.index', [
-            'roles' => $this->scopes->roles($request->user())->with('permissions')->orderBy('name')->get(),
-            'permissions' => Permission::orderBy('name')->get(),
+            'roles' => $roles,
+            'selectedRole' => $selectedRole,
+            'permissions' => $permissions,
+            'permissionGroups' => $permissions->groupBy(fn ($permission) => explode('.', $permission->code)[0])
+                ->map(fn ($items, $prefix) => [
+                    'key' => $prefix,
+                    'name' => $permissionCategories[$prefix] ?? 'Administration',
+                    'permissions' => $items,
+                ])->values(),
             'organizations' => $this->scopes->organizations($request->user())->orderBy('name')->get(['id', 'name']),
             'projects' => $this->scopes->projects($request->user())->orderBy('name')->get(['id', 'name']),
             'facilities' => $this->scopes->facilities($request->user())->orderBy('name')->get(['id', 'name']),
@@ -40,15 +75,26 @@ class SecurityController extends Controller
         $this->allow('roles.manage');
         $data = $request->validate([
             'code' => ['required', 'alpha_dash', 'unique:roles,code'],
-            'name' => ['required', 'string', 'max:120'], 'scope' => ['required', 'string'],
+            'name' => ['required', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'is_active' => ['sometimes', 'boolean'],
+            'scope' => ['required', 'string'],
             'permission_ids' => ['array'], 'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ]);
         [$scopeType, $scopeId] = $this->parseScope($data['scope']);
         abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
-        $role = Role::create(['code' => $data['code'], 'name' => $data['name'], 'is_system' => false, 'scope_type' => $scopeType, 'scope_id' => $scopeId]);
+        $role = Role::create([
+            'code' => $data['code'],
+            'name' => $data['name'],
+            'description' => $data['description'] ?? null,
+            'is_system' => false,
+            'is_active' => $data['is_active'] ?? true,
+            'scope_type' => $scopeType,
+            'scope_id' => $scopeId,
+        ]);
         $role->permissions()->sync($data['permission_ids'] ?? []);
-        $this->audit->record($request, 'role.created', $role, [], $role->only(['code', 'name', 'scope_type', 'scope_id']));
-        return back()->with('status', 'Rôle créé.');
+        $this->audit->record($request, 'role.created', $role, [], $role->only(['code', 'name', 'description', 'is_active', 'scope_type', 'scope_id']));
+        return redirect()->route('security.index', ['role' => $role->id])->with('status', 'Le rôle a été créé avec succès.');
     }
 
     public function update(Request $request, Role $role): RedirectResponse
@@ -58,13 +104,20 @@ class SecurityController extends Controller
         $data = $request->validate([
             'code' => ['required', 'alpha_dash', Rule::unique('roles')->ignore($role->id)],
             'name' => ['required', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'is_active' => ['sometimes', 'boolean'],
             'permission_ids' => ['array'], 'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ]);
-        $old = $role->only(['code', 'name']);
-        $role->update(['code' => $data['code'], 'name' => $data['name']]);
+        $old = $role->only(['code', 'name', 'description', 'is_active']);
+        $role->update([
+            'code' => $data['code'],
+            'name' => $data['name'],
+            'description' => $data['description'] ?? null,
+            'is_active' => $data['is_active'] ?? $role->is_active,
+        ]);
         $role->permissions()->sync($data['permission_ids'] ?? []);
-        $this->audit->record($request, 'role.updated', $role, $old, $role->only(['code', 'name']));
-        return back()->with('status', 'Rôle mis à jour.');
+        $this->audit->record($request, 'role.updated', $role, $old, $role->only(['code', 'name', 'description', 'is_active']));
+        return redirect()->route('security.index', ['role' => $role->id])->with('status', 'Les modifications du rôle ont été enregistrées.');
     }
 
     public function destroy(Request $request, Role $role): RedirectResponse

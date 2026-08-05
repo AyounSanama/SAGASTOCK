@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Batch;
 use App\Models\Organization;
 use App\Models\Receipt;
 use App\Models\Site;
@@ -27,6 +28,17 @@ class ReceiptController extends Controller
         return response()->json(Receipt::with(['site', 'supplier', 'items.product', 'items.batch'])->where('organization_id', $organization->id)->whereIn('site_id', $this->siteIds($request, $organization))->latest('received_on')->paginate(30));
     }
 
+    public function options(Request $request, Organization $organization): JsonResponse
+    {
+        $this->access($request, $organization, 'receipts.manage');
+
+        return response()->json([
+            'sites' => Site::with('healthFacility:id,name')->whereIn('id', $this->siteIds($request, $organization))->orderBy('name')->get(),
+            'suppliers' => $organization->suppliers()->where('is_active', true)->orderBy('name')->get(),
+            'products' => $organization->products()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
+        ]);
+    }
+
     public function store(Request $request, Organization $organization): JsonResponse
     {
         $this->access($request, $organization, 'receipts.manage');
@@ -35,7 +47,11 @@ class ReceiptController extends Controller
             'reference' => ['required', 'alpha_dash', 'max:60', Rule::unique('receipts')->where('organization_id', $organization->id)],
             'order_reference' => ['nullable', 'string', 'max:100'], 'received_on' => ['required', 'date', 'before_or_equal:today'],
             'notes' => ['nullable', 'string', 'max:2000'], 'items' => ['required', 'array', 'min:1'],
-            'items.*.batch_id' => ['required', 'uuid'], 'items.*.quantity_ordered' => ['nullable', 'numeric', 'gte:0'],
+            'items.*.batch_id' => ['nullable', 'uuid', 'required_without:items.*.product_id'],
+            'items.*.product_id' => ['nullable', 'uuid', 'required_without:items.*.batch_id'],
+            'items.*.batch_number' => ['nullable', 'string', 'max:100', 'required_with:items.*.product_id'],
+            'items.*.expires_on' => ['nullable', 'date', 'after:today', 'required_with:items.*.product_id'],
+            'items.*.quantity_ordered' => ['nullable', 'numeric', 'gte:0'],
             'items.*.quantity_received' => ['required', 'numeric', 'gt:0'], 'items.*.quantity_accepted' => ['required', 'numeric', 'gte:0'],
             'items.*.quantity_rejected' => ['nullable', 'numeric', 'gte:0'], 'items.*.unit_cost' => ['nullable', 'numeric', 'gte:0'],
             'items.*.discrepancy_reason' => ['nullable', 'string', 'max:1000'],
@@ -47,7 +63,28 @@ class ReceiptController extends Controller
         $receipt = DB::transaction(function () use ($organization, $site, $data, $request) {
             $receipt = Receipt::create([...collect($data)->except('items')->all(), 'organization_id' => $organization->id, 'site_id' => $site->id, 'created_by' => $request->user()->id]);
             foreach ($data['items'] as $row) {
-                $batch = $organization->batches()->findOrFail($row['batch_id']);
+                if (filled($row['batch_id'] ?? null)) {
+                    $batch = $organization->batches()->findOrFail($row['batch_id']);
+                } else {
+                    $product = $organization->products()->where('is_active', true)->findOrFail($row['product_id']);
+                    $batch = Batch::withTrashed()->firstOrNew([
+                        'organization_id' => $organization->id,
+                        'product_id' => $product->id,
+                        'batch_number' => trim($row['batch_number']),
+                    ]);
+                    if ($batch->exists && $batch->trashed()) {
+                        $batch->restore();
+                    }
+                    if ($batch->exists && $batch->expires_on && $batch->expires_on->toDateString() !== $row['expires_on']) {
+                        throw ValidationException::withMessages(['items' => 'Ce numéro de lot existe déjà avec une autre date de péremption.']);
+                    }
+                    $batch->fill([
+                        'supplier_id' => $data['supplier_id'] ?? null,
+                        'expires_on' => $row['expires_on'],
+                        'unit_cost' => $row['unit_cost'] ?? null,
+                        'status' => 'available',
+                    ])->save();
+                }
                 $received = (float) $row['quantity_received'];
                 $accepted = (float) $row['quantity_accepted'];
                 $rejected = (float) ($row['quantity_rejected'] ?? 0);
@@ -57,14 +94,19 @@ class ReceiptController extends Controller
                 if (($rejected > 0 || abs((float) ($row['quantity_ordered'] ?? 0) - $received) > 0.0001) && blank($row['discrepancy_reason'] ?? null)) {
                     throw ValidationException::withMessages(['items' => 'Une justification est requise en cas d’écart ou de rejet.']);
                 }
-                $receipt->items()->create([...$row, 'product_id' => $batch->product_id, 'quantity_rejected' => $rejected]);
+                $receipt->items()->create([
+                    ...collect($row)->only(['quantity_ordered', 'quantity_received', 'quantity_accepted', 'unit_cost', 'discrepancy_reason'])->all(),
+                    'batch_id' => $batch->id,
+                    'product_id' => $batch->product_id,
+                    'quantity_rejected' => $rejected,
+                ]);
             }
 
             return $receipt;
         });
         $this->audit->record($request, 'receipt.created', $receipt);
 
-        return response()->json(['receipt' => $receipt->load('items')], 201);
+        return response()->json(['receipt' => $receipt->fresh('items')], 201);
     }
 
     public function validateReceipt(Request $request, Organization $organization, Receipt $receipt): JsonResponse

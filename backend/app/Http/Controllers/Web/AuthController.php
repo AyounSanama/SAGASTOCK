@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\HealthFacility;
+use App\Models\Mission;
 use App\Models\Organization;
 use App\Models\Project;
-use App\Models\Role;
-use App\Models\User;
-use App\Models\HealthFacility;
+use App\Models\Permission;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\AuditService;
+use App\Services\GovernanceService;
 use App\Services\UserScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,12 +24,25 @@ use Illuminate\View\View;
 
 class AuthController extends Controller
 {
-    public function __construct(private AuditService $audit, private UserScopeService $scopes) {}
+    public function __construct(
+        private AuditService $audit,
+        private UserScopeService $scopes,
+        private GovernanceService $governance,
+    ) {}
 
-    public function create(): View { return view('auth.login'); }
+    public function create(): View|RedirectResponse
+    {
+        if (Auth::check()) {
+            return redirect()->route($this->governance->landingRoute(Auth::user()));
+        }
+
+        return view('auth.login');
+    }
 
     public function store(Request $request): RedirectResponse
     {
+        $this->clearAuthenticatedSession($request);
+
         $data = $request->validate(['login' => ['required', 'string', 'max:190'], 'password' => ['required']]);
         $user = User::where('email', $data['login'])->orWhere('username', strtolower($data['login']))->first();
         if ($user?->locked_until?->isFuture()) {
@@ -38,6 +53,7 @@ class AuthController extends Controller
                 $attempts = $user->failed_login_attempts + 1;
                 $user->update(['failed_login_attempts' => $attempts, 'locked_until' => $attempts >= 5 ? now()->addMinutes(15) : null]);
             }
+
             return back()->withErrors(['login' => 'Identifiants incorrects.'])->onlyInput('login');
         }
         if (! $user->is_active) {
@@ -46,29 +62,42 @@ class AuthController extends Controller
         Auth::login($user, $request->boolean('remember'));
         $user->update(['last_login_at' => now(), 'failed_login_attempts' => 0, 'locked_until' => null]);
         $request->session()->regenerate();
-        return Auth::user()->must_change_password
-            ? redirect()->route('profile.show')->with('status', 'Vous devez remplacer le mot de passe temporaire.')
-            : redirect()->intended('/dashboard');
+
+        if (Auth::user()->must_change_password) {
+            return redirect()->route('profile.show')
+                ->with('status', 'Vous devez remplacer le mot de passe temporaire.');
+        }
+
+        // Ne pas réutiliser une ancienne URL « intended » (par exemple le
+        // profil du compte précédent) pour l'Admin Coordination.
+        if ($this->governance->roleCode(Auth::user()) === GovernanceService::COORDINATION_ADMIN) {
+            return redirect()->route($this->governance->landingRoute(Auth::user()));
+        }
+
+        return redirect()->intended(route($this->governance->landingRoute(Auth::user())));
     }
 
     public function destroy(Request $request): RedirectResponse
     {
+        $this->clearAuthenticatedSession($request);
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
         return redirect('/login');
     }
 
     public function dashboard(Request $request): View
     {
         $this->authorizeUsers('users.view');
+
         return view('dashboard.index', [
             'users' => $this->scopes->users(Auth::user(), User::with('roles'))
-                ->when($request->string('search')->toString(), fn ($query, $search) => $query
-                    ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
-                ->when($request->filled('role_id'), fn ($query) => $query->whereHas('roles', fn ($roles) => $roles->whereKey($request->integer('role_id'))))
-                ->when($request->get('status') === 'active', fn ($query) => $query->where('is_active', true))
-                ->when($request->get('status') === 'inactive', fn ($query) => $query->where('is_active', false))
+                ->when($request->string('search')->toString(), fn($query, $search) => $query
+                    ->where(fn($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
+                ->when($request->filled('role_id'), fn($query) => $query->whereHas('roles', fn($roles) => $roles->whereKey($request->integer('role_id'))))
+                ->when($request->get('status') === 'active', fn($query) => $query->where('is_active', true))
+                ->when($request->get('status') === 'inactive', fn($query) => $query->where('is_active', false))
                 ->orderBy('name')->paginate(20)->withQueryString(),
             'roles' => $this->scopes->roles(Auth::user())->orderBy('name')->get(),
             'organizations' => $this->scopes->organizations(Auth::user())->orderBy('name')->get(['id', 'name']),
@@ -78,7 +107,11 @@ class AuthController extends Controller
 
     public function createUser(Request $request): RedirectResponse
     {
-        $this->authorizeUsers('users.manage');
+        abort_unless(
+            $request->user()->hasPermission('users.manage')
+                || $request->user()->hasPermission('users.create_site_admin'),
+            403,
+        );
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:80'],
             'last_name' => ['required', 'string', 'max:80'],
@@ -87,28 +120,75 @@ class AuthController extends Controller
             'phone' => ['nullable', 'string', 'max:40'],
             'role_id' => ['required', 'integer', 'exists:roles,id'],
             'scope' => ['required', 'string', 'max:100'],
+            'organization_id' => ['nullable', 'uuid', 'exists:organizations,id'],
+            'mission_id' => ['nullable', 'uuid', 'exists:missions,id'],
+            'project_id' => ['nullable', 'uuid', 'exists:projects,id'],
+            'health_facility_id' => ['nullable', 'uuid', 'exists:health_facilities,id'],
+            'dispensing_site_id' => ['nullable', 'uuid', 'exists:sites,id'],
             'password' => ['nullable', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
             'must_change_password' => ['nullable', 'boolean'],
+            'permission_ids' => ['nullable', 'array'],
+            'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ]);
-        [$scopeType, $scopeId] = $this->parseScope($data['scope']);
-        abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
-        abort_unless($this->scopes->assignableRoles($request->user())->whereKey($data['role_id'])->exists(), 403);
+        $role = $this->scopes->assignableRoles($request->user())->findOrFail($data['role_id']);
+        $roleCode = $this->governance->canonicalCode($role->code);
+        $organization = null;
+        if (in_array($roleCode, [GovernanceService::PROJECT_ADMIN, GovernanceService::SITE_ADMIN], true)) {
+            $request->validate([
+                'organization_id' => ['required'], 'mission_id' => ['required'], 'project_id' => ['required'],
+                'health_facility_id' => [Rule::requiredIf($roleCode === GovernanceService::SITE_ADMIN)],
+                'dispensing_site_id' => [Rule::requiredIf($roleCode === GovernanceService::SITE_ADMIN)],
+            ]);
+            $organization = $this->scopes->organizations($request->user())->findOrFail($data['organization_id']);
+            $mission = Mission::whereKey($data['mission_id'])->where('organization_id', $organization->id)->firstOrFail();
+            $project = $this->scopes->projects($request->user())->whereKey($data['project_id'])
+                ->where('organization_id', $organization->id)->where('mission_id', $mission->id)->firstOrFail();
+            if ($roleCode === GovernanceService::PROJECT_ADMIN) {
+                [$scopeType, $scopeId] = ['project', $project->id];
+            } else {
+                $facility = $this->scopes->facilities($request->user())->whereKey($data['health_facility_id'])
+                    ->whereHas('projects', fn ($query) => $query->whereKey($project->id))->firstOrFail();
+                $site = $this->scopes->sites($request->user())->whereKey($data['dispensing_site_id'])
+                    ->where('health_facility_id', $facility->id)->firstOrFail();
+                [$scopeType, $scopeId] = ['site', $site->id];
+            }
+        } else {
+            [$scopeType, $scopeId] = $this->parseScope($data['scope']);
+            abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
+        }
+        abort_unless($this->governance->canAssign($request->user(), $role, $scopeType, $scopeId), 403);
         $generated = empty($data['password']);
         $password = $generated ? Str::password(16, symbols: true) : $data['password'];
         $user = User::create([
-            'name' => trim($data['first_name'].' '.$data['last_name']),
-            'first_name' => $data['first_name'], 'last_name' => $data['last_name'],
+            'name' => trim($data['first_name'] . ' ' . $data['last_name']),
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
             'username' => strtolower($data['username']),
-            'email' => $data['email'], 'phone' => $data['phone'] ?? null,
-            'password' => $password, 'is_active' => true,
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
+            'organization_id' => $organization?->id,
+            'password' => $password,
+            'is_active' => true,
             'must_change_password' => $generated || $request->boolean('must_change_password'),
         ]);
         $user->roles()->sync([$data['role_id'] => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]);
+        if ($this->governance->roleCode($request->user()) === GovernanceService::SITE_ADMIN) {
+            $allowed = Permission::whereIn('code', GovernanceService::SITE_DELEGABLE_PERMISSIONS)
+                ->whereIn('id', $data['permission_ids'] ?? [])->pluck('id');
+            abort_unless($allowed->count() === count(array_unique($data['permission_ids'] ?? [])), 403);
+            $user->directPermissions()->sync($allowed);
+        } else {
+            abort_unless(empty($data['permission_ids']), 403);
+        }
         $this->audit->record($request, 'user.created', $user, [], [
-            'name' => $user->name, 'email' => $user->email, 'role_id' => $data['role_id'],
-            'scope_type' => $scopeType, 'scope_id' => $scopeId,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role_id' => $data['role_id'],
+            'scope_type' => $scopeType,
+            'scope_id' => $scopeId,
         ]);
-        $response = redirect()->route('dashboard')->with('success', "L’utilisateur {$user->name} a été créé avec succès.");
+        $response = redirect()->route('users.index')->with('success', "L’utilisateur {$user->name} a été créé avec succès.");
+
         return $generated ? $response->with('temporary_password', $password) : $response;
     }
 
@@ -126,17 +206,23 @@ class AuthController extends Controller
         [$scopeType, $scopeId] = $this->parseScope($data['scope']);
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
         abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
-        abort_unless($this->scopes->assignableRoles($request->user())->whereKey($data['role_id'])->exists(), 403);
+        $role = $this->scopes->assignableRoles($request->user())->findOrFail($data['role_id']);
+        abort_unless($this->governance->canAssign($request->user(), $role, $scopeType, $scopeId), 403);
         $old = $user->only(['name', 'email', 'phone', 'is_active']);
         $user->update([
-            'name' => $data['name'], 'email' => $data['email'], 'phone' => $data['phone'] ?? null,
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
             'is_active' => $request->boolean('is_active'),
         ]);
         $user->roles()->sync([$data['role_id'] => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]);
         $this->audit->record($request, 'user.updated', $user, $old, [
             ...$user->only(['name', 'email', 'phone', 'is_active']),
-            'role_id' => $data['role_id'], 'scope_type' => $scopeType, 'scope_id' => $scopeId,
+            'role_id' => $data['role_id'],
+            'scope_type' => $scopeType,
+            'scope_id' => $scopeId,
         ]);
+
         return back()->with('success', 'Utilisateur mis à jour.');
     }
 
@@ -148,12 +234,15 @@ class AuthController extends Controller
         $user->update(['password' => $temporary, 'must_change_password' => true]);
         $user->tokens()->delete();
         $this->audit->record($request, 'user.password_reset', $user);
+
         return back()->with('success', 'Mot de passe réinitialisé.')->with('temporary_password', $temporary);
     }
 
     private function parseScope(string $scope): array
     {
-        if ($scope === 'platform') return ['platform', null];
+        if ($scope === 'platform') {
+            return ['platform', null];
+        }
         [$type, $id] = array_pad(explode(':', $scope, 2), 2, null);
         abort_unless($id && in_array($type, ['organization', 'project', 'facility', 'site'], true), 422, 'Périmètre invalide.');
         $exists = match ($type) {
@@ -163,11 +252,46 @@ class AuthController extends Controller
             'site' => Site::whereKey($id)->exists(),
         };
         abort_unless($exists, 422, 'Périmètre introuvable.');
+
         return [$type, $id];
     }
 
     private function authorizeUsers(string $permission): void
     {
-        abort_unless(Auth::user()?->hasPermission($permission), 403);
+        $user = Auth::user();
+        abort_unless($user instanceof User && $user->hasPermission($permission), 403);
+    }
+
+    private function clearAuthenticatedSession(Request $request): void
+    {
+        $keys = [
+            'access_token',
+            'refresh_token',
+            'currentUser',
+            'role',
+            'permissions',
+            'scope',
+            'organizationId',
+            'missionId',
+            'projectId',
+            'siteId',
+            'visibleModules',
+            'lastRoute',
+            'dashboardState',
+            'configurationState',
+            'workflowSteps',
+            'formCache',
+            'listCache',
+            'activeProvider',
+            'activeBlock',
+            'temporarySession',
+        ];
+
+        foreach ($keys as $key) {
+            $request->session()->forget($key);
+        }
+
+        $request->session()->forget('_previous');
+        $request->session()->forget('_flash');
     }
 }

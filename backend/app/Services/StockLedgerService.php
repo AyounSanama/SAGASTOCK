@@ -54,6 +54,7 @@ class StockLedgerService
                 'currency' => strtoupper($context['currency'] ?? $batch->currency ?? ''),
                 'reference_type' => $context['reference_type'] ?? null,
                 'reference_id' => $context['reference_id'] ?? null,
+                'client_reference' => $context['client_reference'] ?? null,
                 'compensates_movement_id' => $context['compensates_movement_id'] ?? null,
                 'reason' => $context['reason'] ?? null,
                 'status' => 'validated',

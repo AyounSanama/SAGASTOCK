@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport {{ $receipt->reference }} · PharmaCare</title>
+<style>
+.crumbs{display:flex;gap:8px;color:var(--pc-muted);font-size:12px;margin-bottom:16px}.crumbs a{color:var(--pc-blue)}.report-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:20px}.report-head h1{margin:0}.report-head p{color:var(--pc-muted)}.report-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}.meta-box{padding:15px;background:#fff;border:1px solid var(--pc-border);border-radius:14px}.meta-box span{display:block;color:var(--pc-muted);font-size:10px}.meta-box strong{display:block;margin-top:6px;font-size:14px}.report-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}.report-stat{padding:16px;border-radius:14px;background:#fff;border:1px solid var(--pc-border)}.report-stat span{display:block;color:var(--pc-muted);font-size:10px}.report-stat strong{display:block;margin-top:6px;font-size:22px}.rate{color:var(--pc-green)}.status{padding:7px 11px;border-radius:999px;font-size:12px;font-weight:800;background:rgba(255,122,0,.1);color:var(--pc-orange)}.status.validated{background:rgba(22,163,74,.1);color:var(--pc-green)}.table-wrap{overflow:auto}.report-table{min-width:900px}.report-table .positive{color:var(--pc-green);font-weight:800}.report-table .negative{color:var(--pc-red);font-weight:800}.report-notes{margin-top:18px;padding:16px;background:#FAFBFD;border-radius:13px}.report-notes strong{display:block;margin-bottom:6px}@media print{.app-sidebar,.app-shell-topbar,.no-print{display:none!important}body{padding:0!important}body main{max-width:none!important;padding:0!important}.card{box-shadow:none!important}}@media(max-width:850px){.report-meta,.report-stats{grid-template-columns:1fr 1fr}.report-head{display:block}.report-head .actions{margin-top:12px}}
+</style></head><body>
+@include('components.app-sidebar')
+<main>
+<nav class="crumbs no-print"><a href="{{ route('dashboard') }}">Tableau de bord</a><span>›</span><a href="{{ route('organizations.receipts.index',$organization) }}">Réceptions</a><span>›</span><span>{{ $receipt->reference }}</span></nav>
+<header class="report-head"><div><h1>Rapport de réception</h1><p>{{ $receipt->reference }} · {{ $organization->name }}</p></div><div class="actions no-print"><span class="status {{ $receipt->status }}">{{ $receipt->status === 'validated' ? 'Validée' : 'Brouillon' }}</span><button class="secondary" type="button" onclick="window.print()">Imprimer / PDF</button>@if(auth()->user()->hasPermission('receipts.manage') && $receipt->status==='draft')<form method="post" action="{{ route('organizations.receipts.validate',[$organization,$receipt]) }}" onsubmit="return confirm('Valider cette réception et créditer le stock ?')">@csrf<button class="success">Valider la réception</button></form>@endif</div></header>
+<section class="report-meta">
+<div class="meta-box"><span>Date de réception</span><strong>{{ $receipt->received_on?->format('d/m/Y') }}</strong></div>
+<div class="meta-box"><span>Site destinataire</span><strong>{{ $receipt->site?->name }}</strong></div>
+<div class="meta-box"><span>Formation sanitaire</span><strong>{{ $receipt->site?->healthFacility?->name }}</strong></div>
+<div class="meta-box"><span>Fournisseur / origine</span><strong>{{ $receipt->supplier?->name ?? 'Non renseigné' }}</strong></div>
+</section>
+<section class="report-stats">
+<div class="report-stat"><span>Quantité commandée</span><strong>{{ number_format($totals['ordered'],2,',',' ') }}</strong></div>
+<div class="report-stat"><span>Quantité reçue</span><strong>{{ number_format($totals['received'],2,',',' ') }}</strong></div>
+<div class="report-stat"><span>Quantité acceptée</span><strong>{{ number_format($totals['accepted'],2,',',' ') }}</strong></div>
+<div class="report-stat"><span>Quantité rejetée</span><strong>{{ number_format($totals['rejected'],2,',',' ') }}</strong></div>
+<div class="report-stat"><span>Taux de réception</span><strong class="rate">{{ $totals['rate'] === null ? '—' : number_format($totals['rate'],2,',',' ').' %' }}</strong></div>
+</section>
+<section class="card"><div class="table-wrap"><table class="report-table"><thead><tr><th>Produit</th><th>Lot</th><th>Péremption</th><th>Commandé</th><th>Reçu</th><th>Accepté</th><th>Rejeté</th><th>Taux</th><th>Écart / justification</th></tr></thead><tbody>
+@foreach($receipt->items as $item)
+@php $ordered=(float)$item->quantity_ordered;$received=(float)$item->quantity_received;$rate=$ordered>0?($received/$ordered)*100:null;$difference=$received-$ordered; @endphp
+<tr><td><strong>{{ $item->product?->name }}</strong><br><small>{{ $item->product?->code }}</small></td><td>{{ $item->batch?->batch_number }}</td><td>{{ $item->batch?->expires_on?->format('d/m/Y') }}</td><td>{{ number_format($ordered,2,',',' ') }}</td><td>{{ number_format($received,2,',',' ') }}</td><td class="positive">{{ number_format((float)$item->quantity_accepted,2,',',' ') }}</td><td class="{{ (float)$item->quantity_rejected>0?'negative':'' }}">{{ number_format((float)$item->quantity_rejected,2,',',' ') }}</td><td>{{ $rate===null?'—':number_format($rate,2,',',' ').' %' }}</td><td class="{{ abs($difference)>0.0001?'negative':'' }}">{{ $difference>=0?'+':'' }}{{ number_format($difference,2,',',' ') }}<br><small>{{ $item->discrepancy_reason }}</small></td></tr>
+@endforeach
+</tbody></table></div>@if($receipt->notes)<div class="report-notes"><strong>Observations</strong>{{ $receipt->notes }}</div>@endif</section>
+</main></body></html>

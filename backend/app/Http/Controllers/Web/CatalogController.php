@@ -36,6 +36,20 @@ class CatalogController extends Controller
         private ModuleActivationService $modules,
     ) {}
 
+    public function home(Request $request, string $section): RedirectResponse
+    {
+        $organization = $this->scopes->organizations($request->user())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->first();
+        abort_unless($organization, 404, 'Aucune organisation accessible pour ce compte.');
+
+        return redirect()->route('organizations.catalog.index', [
+            $organization,
+            'section' => $section,
+        ]);
+    }
+
     public function index(Request $request, Organization $organization): View
     {
         $this->allow($request, 'catalog.view');
@@ -45,6 +59,13 @@ class CatalogController extends Controller
 
         return view('catalog.index', [
             'organization' => $organization, 'referenceTypes' => self::TYPES, 'references' => $references, 'products' => $products,
+            'productOptions' => $organization->products()->orderBy('name')->get(['id', 'name', 'code']),
+            'productStats' => [
+                'total' => $organization->products()->count(),
+                'medicines' => $organization->products()->where('product_type', 'medicine')->count(),
+                'controlled' => $organization->products()->where('is_controlled', true)->count(),
+                'archived' => $organization->products()->onlyTrashed()->count(),
+            ],
             'suppliers' => $organization->suppliers()->orderBy('name')->get(),
             'batches' => $organization->batches()->with(['product', 'supplier'])->orderBy('expires_on')->get(),
             'kits' => $organization->kits()->with('products')->orderBy('name')->get(),
@@ -57,6 +78,18 @@ class CatalogController extends Controller
             'archivedLists' => $organization->standardLists()->onlyTrashed()->get(),
             'projects' => $organization->projects()->orderBy('name')->get(), 'programs' => $organization->programs()->orderBy('name')->get(),
             'donors' => $organization->donors()->orderBy('name')->get(), 'facilities' => $organization->healthFacilities()->orderBy('name')->get(),
+        ]);
+    }
+
+    public function createProduct(Request $request, Organization $o): View
+    {
+        $this->manage($request, $o);
+        $references = CatalogReference::where(fn ($query) => $query->whereNull('organization_id')->orWhere('organization_id', $o->id))
+            ->where('is_active', true)->orderBy('name')->get()->groupBy('reference_type');
+
+        return view('catalog.create-product', [
+            'organization' => $o,
+            'references' => $references,
         ]);
     }
 
@@ -123,7 +156,10 @@ class CatalogController extends Controller
             $m->codes()->create(['code_type' => 'barcode', 'value' => $barcode, 'is_primary' => true]);
         }
 
-        return $this->saved($r, $m, 'product.created', 'Produit créé.');
+        $this->audit->record($r, 'product.created', $m, [], $m->toArray());
+
+        return redirect()->route('organizations.catalog.index', [$o, 'search' => $m->code])
+            ->with('status', 'Médicament ou produit médical ajouté avec succès.');
     }
 
     public function updateProduct(Request $r, Organization $o, Product $m): RedirectResponse

@@ -14,7 +14,20 @@ class Mission extends Model
 
     public $incrementing = false;
     protected $keyType = 'string';
-    protected $fillable = ['organization_id', 'country_id', 'code', 'name', 'starts_on', 'ends_on', 'is_active'];
+    protected $fillable = [
+        'organization_id',
+        'country_id',
+        'code',
+        'name',
+        'starts_on',
+        'ends_on',
+        'address',
+        'manager_name',
+        'phone',
+        'email',
+        'description',
+        'is_active',
+    ];
 
     protected function casts(): array
     {

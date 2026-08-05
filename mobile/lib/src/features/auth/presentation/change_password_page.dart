@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/app_button.dart';
 import 'package:go_router/go_router.dart';
 import '../data/auth_service.dart';
 
@@ -109,12 +110,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     ),
                   ),
                 const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: _loading ? null : _submit,
-                  child: const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: Text('Enregistrer le nouveau mot de passe'),
-                  ),
+                AppButton.save(
+                  label: 'Enregistrer le nouveau mot de passe',
+                  icon: Icons.lock_reset_rounded,
+                  loading: _loading,
+                  expanded: true,
+                  onPressed: _submit,
                 ),
               ],
             ),

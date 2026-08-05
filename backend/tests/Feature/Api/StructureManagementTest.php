@@ -117,4 +117,25 @@ class StructureManagementTest extends TestCase
         $this->actingAs($user)->get("/organizations/{$organization->id}/structures?facility={$facility->id}")
             ->assertOk()->assertSee('Centre de santé Web')->assertSee('Départements')->assertSee('Pharmacies')->assertSee('Sites');
     }
+
+    public function test_web_has_a_dedicated_professional_facility_creation_page(): void
+    {
+        $organization = Organization::create(['code' => 'CREATE_ORG', 'name' => 'Organisation création']);
+        $user = $this->user();
+
+        $this->actingAs($user)
+            ->get("/organizations/{$organization->id}/facilities/create")
+            ->assertOk()
+            ->assertSee('Nouvelle formation sanitaire')
+            ->assertSee('Enregistrer la formation sanitaire')
+            ->assertSee('Fil d’Ariane');
+
+        $this->actingAs($user)
+            ->get("/organizations/{$organization->id}/structures")
+            ->assertOk()
+            ->assertSee('＋ Nouvelle formation sanitaire')
+            ->assertSee('Activation des modules')
+            ->assertSee('switch')
+            ->assertSee('facility-create-sheet');
+    }
 }

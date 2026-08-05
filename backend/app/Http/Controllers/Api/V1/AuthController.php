@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\User;
+use App\Services\GovernanceService;
+use App\Services\ApplicationNavigationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -64,9 +66,21 @@ class AuthController extends Controller
 
     private function userPayload(User $user): array
     {
+        $governance = app(GovernanceService::class);
+        $navigation = app(ApplicationNavigationService::class);
         return [
             'id' => $user->uuid, 'name' => $user->name, 'username' => $user->username,
             'email' => $user->email, 'roles' => $user->roles()->pluck('code')->all(),
+            'role' => $governance->roleCode($user),
+            'dashboard' => $governance->dashboard($user),
+            'permissions' => $navigation->permissions($user)->all(),
+            'scopes' => $user->roles()->get()->map(fn ($role) => [
+                'role' => $governance->canonicalCode($role->code),
+                'type' => $role->pivot->scope_type,
+                'id' => $role->pivot->scope_id,
+            ])->values()->all(),
+            'access_scope' => $navigation->scope($user),
+            'navigation' => $navigation->mobileItems($user),
             'must_change_password' => $user->must_change_password,
         ];
     }

@@ -230,6 +230,7 @@
 </head>
 
 <body>
+    @include('components.app-sidebar')
     <header><strong class="brand-lockup"><img src="{{ asset('images/pharmacare-logo.png') }}"
                 alt="">PharmaCare</strong><a href="{{ route('organizations.index') }}">Organisations</a><a
             href="{{ route('security.index') }}">Rôles et sécurité</a><a href="{{ route('profile.show') }}">Mon profil</a>
@@ -255,7 +256,11 @@
 
             </div>
             <div class="actions"><a class="button secondary" href="{{ route('users.archived') }}">Utilisateurs
-                    archivés</a><a class="button" href="{{ route('users.create') }}">Créer un utilisateur</a></div>
+                    archivés</a>
+                @if ($canCreateUsers)
+                    <button type="button" data-sheet-open="user-create-sheet">＋ Créer un utilisateur</button>
+                @endif
+            </div>
         </div>
 
         <section class="card">
@@ -324,6 +329,216 @@
                 </table>
             </div>{{ $users->links() }}
         </section>
+        @if ($canCreateUsers)
+            <style>
+                .user-form-section {
+                    padding: 4px 0 22px;
+                    margin-bottom: 20px;
+                    border-bottom: 1px solid #eaded7
+                }
+
+                .user-form-section:last-of-type {
+                    border: 0
+                }
+
+                .user-form-section h3 {
+                    margin: 0 0 15px
+                }
+
+                .user-form-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 16px
+                }
+
+                .user-form-grid label {
+                    display: block;
+                    font-weight: 750;
+                    font-size: 14px
+                }
+
+                .user-form-grid input,
+                .user-form-grid select {
+                    display: block;
+                    width: 100%;
+                    margin-top: 6px;
+                    padding: 12px;
+                    border: 1px solid #d8c6bb;
+                    border-radius: 10px;
+                    background: #fff;
+                    font: inherit
+                }
+
+                .password-wrap {
+                    position: relative
+                }
+
+                .password-wrap input {
+                    padding-right: 48px
+                }
+
+                .password-toggle {
+                    position: absolute;
+                    right: 5px;
+                    bottom: 5px;
+                    width: 39px;
+                    height: 39px;
+                    padding: 0 !important;
+                    background: transparent !important;
+                    color: #59493f !important
+                }
+
+                .field-hint {
+                    font-size: 12px;
+                    color: #78675d;
+                    margin-top: 5px
+                }
+
+                .full {
+                    grid-column: 1/-1
+                }
+
+                @media(max-width:650px) {
+                    .user-form-grid {
+                        grid-template-columns: 1fr
+                    }
+
+                    .full {
+                        grid-column: auto
+                    }
+                }
+            </style>
+            <x-form-sheet id="user-create-sheet" title="Créer un utilisateur"
+                description="Créez un compte personnel et attribuez-lui un rôle et un périmètre d’accès adaptés."
+                width="820px">
+                @if ($errors->any())
+                    <div class="form-sheet-error"><strong>La création n’a pas
+                            abouti.</strong><br>{{ $errors->first() }}</div>
+                @endif
+                <form id="user-create-form" method="post" action="{{ route('users.store') }}" novalidate>@csrf
+                    <section class="user-form-section">
+                        <h3>Informations personnelles</h3>
+                        <div class="user-form-grid">
+                            <label>Prénom *<input name="first_name" value="{{ old('first_name') }}"
+                                    autocomplete="given-name" required></label>
+                            <label>Nom *<input name="last_name" value="{{ old('last_name') }}"
+                                    autocomplete="family-name" required></label>
+                            <label>Adresse e-mail *<input name="email" type="email" value="{{ old('email') }}"
+                                    autocomplete="email" required></label>
+                            <label>Téléphone<input name="phone" type="tel" value="{{ old('phone') }}"
+                                    autocomplete="tel"></label>
+                        </div>
+                    </section>
+                    <section class="user-form-section">
+                        <h3>Identifiant et sécurité</h3>
+                        <div class="user-form-grid">
+                            <label>Identifiant *<input name="username" value="{{ old('username') }}"
+                                    autocomplete="username" placeholder="ex. jdupont" required><small
+                                    class="field-hint">Lettres, chiffres, tirets et traits de
+                                    soulignement.</small></label>
+                            <div></div>
+                            <label>Mot de passe<div class="password-wrap"><input id="sheet-password" name="password"
+                                        type="password" autocomplete="new-password"><button class="password-toggle"
+                                        type="button" data-password-toggle="sheet-password"
+                                        aria-label="Afficher le mot de passe">◉</button></div></label>
+                            <label>Confirmer le mot de passe<div class="password-wrap"><input
+                                        id="sheet-password-confirmation" name="password_confirmation" type="password"
+                                        autocomplete="new-password"><button class="password-toggle" type="button"
+                                        data-password-toggle="sheet-password-confirmation"
+                                        aria-label="Afficher le mot de passe">◉</button></div></label>
+                            <p class="field-hint full">Laissez les mots de passe vides pour générer automatiquement un
+                                mot de passe temporaire sécurisé. Un mot de passe personnalisé doit avoir au moins 12
+                                caractères avec majuscule, minuscule, chiffre et symbole.</p>
+                            <label class="full" style="display:flex;align-items:center;gap:9px"><input
+                                    style="width:auto;margin:0" type="checkbox" name="must_change_password"
+                                    value="1" @checked(old('must_change_password'))> Obliger l’utilisateur à changer son
+                                mot de passe à la première connexion</label>
+                        </div>
+                    </section>
+                    <section class="user-form-section">
+                        <h3>Rôle et niveau d’accès</h3>
+                        <div class="user-form-grid">
+                            <label>Rôle *<select id="create-role" name="role_id" required>
+                                    <option value="">Sélectionner un rôle</option>
+                                    @foreach ($assignableRoles as $role)
+                                        <option value="{{ $role->id }}" data-code="{{ $role->code }}" @selected(old('role_id') == $role->id)>
+                                            {{ $role->name }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label>Organisation *<select id="create-organization" name="organization_id" required><option value="">Sélectionner</option>@foreach($organizations as $organization)<option value="{{ $organization->id }}" @selected(old('organization_id')==$organization->id)>{{ $organization->name }}</option>@endforeach</select></label>
+                            <label>Mission *<select id="create-mission" name="mission_id" required><option value="">Sélectionner</option>@foreach($missions as $mission)<option value="{{ $mission->id }}" data-organization="{{ $mission->organization_id }}" @selected(old('mission_id')==$mission->id)>{{ $mission->name }}</option>@endforeach</select></label>
+                            <label>Projet *<select id="create-project" name="project_id" required><option value="">Sélectionner</option>@foreach($projects as $project)<option value="{{ $project->id }}" data-organization="{{ $project->organization_id }}" data-mission="{{ $project->mission_id }}" @selected(old('project_id')==$project->id)>{{ $project->name }}</option>@endforeach</select></label>
+                            <label id="create-facility-field" hidden>Formation sanitaire *<select id="create-facility" name="health_facility_id"><option value="">Sélectionner</option>@foreach($facilities as $facility)<option value="{{ $facility->id }}" data-organization="{{ $facility->organization_id }}" data-projects="{{ $facility->projects->pluck('id')->implode(',') }}" @selected(old('health_facility_id')==$facility->id)>{{ $facility->name }}</option>@endforeach</select></label>
+                            <label id="create-site-field" hidden>Site de dispensation *<select id="create-site" name="dispensing_site_id"><option value="">Sélectionner</option>@foreach($sites as $site)<option value="{{ $site->id }}" data-facility="{{ $site->health_facility_id }}" @selected(old('dispensing_site_id')==$site->id)>{{ $site->name }}</option>@endforeach</select></label>
+                            <input id="create-scope" type="hidden" name="scope" value="{{ old('scope') }}">
+                        </div>
+                    </section>
+                    @if ($delegablePermissions->isNotEmpty())
+                        <section class="user-form-section">
+                            <h3>Autorisations opérationnelles du site</h3>
+                            <p class="field-hint full">Ces droits sont limités au site sélectionné. La gestion des
+                                utilisateurs et des rôles ne peut pas être déléguée.</p>
+                            <div class="user-form-grid">
+                                @foreach ($delegablePermissions as $permission)
+                                    <label class="full" style="display:flex;align-items:center;gap:9px"><input
+                                            style="width:auto;margin:0" type="checkbox" name="permission_ids[]"
+                                            value="{{ $permission->id }}" @checked(in_array($permission->id, old('permission_ids', [])))>
+                                        {{ $permission->name }}</label>
+                                @endforeach
+                            </div>
+                        </section>
+                    @endif
+                    <div class="form-sheet-actions"><button class="secondary" type="button"
+                            data-sheet-close="user-create-sheet">Annuler</button><button type="submit">Créer
+                            l’utilisateur</button></div>
+                </form>
+            </x-form-sheet>
+            <script>
+                document.querySelectorAll('[data-password-toggle]').forEach(button => button.addEventListener('click', () => {
+                    const field = document.getElementById(button.dataset.passwordToggle);
+                    const visible = field.type === 'text';
+                    field.type = visible ? 'password' : 'text';
+                    button.textContent = visible ? '◉' : '●';
+                    button.setAttribute('aria-label', visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe');
+                    field.focus()
+                }));
+                const role = document.getElementById('create-role');
+                const organization = document.getElementById('create-organization');
+                const mission = document.getElementById('create-mission');
+                const project = document.getElementById('create-project');
+                const facility = document.getElementById('create-facility');
+                const site = document.getElementById('create-site');
+                const filterOptions = (select, predicate) => [...select.options].forEach((option, index) => {
+                    if (index === 0) return;
+                    option.hidden = !predicate(option);
+                    option.disabled = option.hidden;
+                    if (option.hidden && option.selected) select.value = '';
+                });
+                const refreshUserScope = () => {
+                    filterOptions(mission, option => option.dataset.organization === organization.value);
+                    filterOptions(project, option => option.dataset.organization === organization.value && option.dataset.mission === mission.value);
+                    filterOptions(facility, option => option.dataset.organization === organization.value && (option.dataset.projects || '').split(',').includes(project.value));
+                    filterOptions(site, option => option.dataset.facility === facility.value);
+                    const roleCode = role.selectedOptions[0]?.dataset.code;
+                    const siteRole = roleCode === 'site_admin';
+                    document.getElementById('create-facility-field').hidden = !siteRole;
+                    document.getElementById('create-site-field').hidden = !siteRole;
+                    facility.required = siteRole;
+                    site.required = siteRole;
+                    document.getElementById('create-scope').value = roleCode === 'project_admin'
+                        ? `project:${project.value}`
+                        : siteRole ? `site:${site.value}` : '';
+                };
+                [role, organization, mission, project, facility, site]
+                    .forEach(field => field.addEventListener('change', refreshUserScope));
+                refreshUserScope();
+                @if ($errors->any() || request()->boolean('create'))
+                    document.addEventListener('DOMContentLoaded', () => document.getElementById('user-create-sheet')
+                ?.showModal());
+                @endif
+            </script>
+        @endif
     </main>
 </body>
 

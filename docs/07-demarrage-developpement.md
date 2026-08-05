@@ -31,6 +31,10 @@ flutter test
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
 ```
 
-`10.0.2.2` désigne la machine hôte depuis l'émulateur Android. Une adresse
-différente sera utilisée sur iOS Simulator et sur appareils physiques.
+`10.0.2.2` désigne la machine hôte depuis l'émulateur Android. Sur un appareil
+physique, remplacez cette adresse par l'IP de l'ordinateur sur le réseau local,
+par exemple :
 
+```powershell
+flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8000/api/v1
+```

@@ -48,6 +48,8 @@ class StockManagementTest extends TestCase
     {
         $d = $this->data();
         $this->login();
+        $this->getJson("/api/v1/organizations/{$d['organization']->id}/stocks/options")
+            ->assertOk()->assertJsonPath('sites.0.name', 'Magasin central')->assertJsonCount(2, 'batches');
         foreach ([[$d['early'], 10], [$d['late'], 20]] as [$batch, $quantity]) {
             $this->postJson("/api/v1/organizations/{$d['organization']->id}/stocks/movements", [
                 'site_id' => $d['source']->id, 'batch_id' => $batch->id, 'movement_type' => 'receipt', 'quantity' => $quantity,
@@ -106,18 +108,28 @@ class StockManagementTest extends TestCase
         $d = $this->data();
         $user = $this->login();
         $this->actingAs($user)->get("/organizations/{$d['organization']->id}/stocks")
-            ->assertOk()->assertSee('Stocks et mouvements')->assertSee('registre immuable')->assertSee('pharmacare-logo.png');
+            ->assertOk()->assertSee('Gestion du stock de médicaments')->assertSee('Priorités FEFO')->assertSee('movement-create-sheet')->assertSee('pharmacare-logo.png');
+        $this->actingAs($user)->get("/organizations/{$d['organization']->id}/stocks/movements/create")
+            ->assertOk()->assertSee('Enregistrer un mouvement de stock')->assertSee('Registre pharmaceutique immuable')->assertSee('FEFO');
         $this->actingAs($user)->post("/organizations/{$d['organization']->id}/stocks/movements", [
             'site_id' => $d['source']->id, 'batch_id' => $d['early']->id, 'movement_type' => 'receipt', 'quantity' => 25,
         ])->assertRedirect()->assertSessionHas('status');
         $this->actingAs($user)->get("/organizations/{$d['organization']->id}/stocks")
             ->assertOk()->assertSee('Paracétamol')->assertSee('25.0000');
+        $this->actingAs($user)->post("/organizations/{$d['organization']->id}/stocks/movements", [
+            'site_id' => $d['source']->id, 'batch_id' => $d['early']->id,
+            'movement_type' => 'loss', 'quantity' => 1,
+        ])->assertSessionHasErrors('reason');
     }
 
     public function test_receipt_reports_discrepancies_and_credits_only_accepted_quantity(): void
     {
         $d = $this->data();
         $this->login();
+        $this->getJson("/api/v1/organizations/{$d['organization']->id}/receipts/options")
+            ->assertOk()
+            ->assertJsonPath('sites.0.name', 'Magasin central')
+            ->assertJsonPath('products.0.code', 'PARA');
         $receipt = $this->postJson("/api/v1/organizations/{$d['organization']->id}/receipts", [
             'site_id' => $d['source']->id, 'reference' => 'REC_001', 'order_reference' => 'CMD_001',
             'received_on' => now()->toDateString(), 'items' => [[
@@ -130,5 +142,47 @@ class StockManagementTest extends TestCase
         $this->assertDatabaseHas('stock_balances', ['site_id' => $d['source']->id, 'batch_id' => $d['early']->id, 'theoretical_quantity' => 17]);
         $this->assertDatabaseHas('stock_movements', ['reference_type' => 'receipt', 'reference_id' => $receipt['id'], 'quantity' => 17]);
         $this->postJson("/api/v1/organizations/{$d['organization']->id}/receipts/{$receipt['id']}/validate")->assertUnprocessable();
+    }
+
+    public function test_web_receipt_creates_batch_reports_discrepancy_and_updates_stock_after_validation(): void
+    {
+        $d = $this->data();
+        $user = $this->login();
+        $this->actingAs($user)->get("/organizations/{$d['organization']->id}/receipts")
+            ->assertOk()
+            ->assertSee('Réceptions pharmaceutiques')
+            ->assertSee('Nouvelle réception')
+            ->assertSee('receipt-create-sheet');
+
+        $this->actingAs($user)->post("/organizations/{$d['organization']->id}/receipts", [
+            'site_id' => $d['source']->id,
+            'reference' => 'REC_WEB_001',
+            'order_reference' => 'CMD_WEB_001',
+            'received_on' => now()->toDateString(),
+            'items' => [[
+                'product_id' => $d['product']->id,
+                'batch_number' => 'WEB-LOT-01',
+                'expires_on' => now()->addYear()->toDateString(),
+                'quantity_ordered' => 20,
+                'quantity_received' => 18,
+                'quantity_accepted' => 17,
+                'quantity_rejected' => 1,
+                'discrepancy_reason' => 'Deux manquants et une boîte endommagée',
+            ]],
+        ])->assertRedirect()->assertSessionHas('status');
+
+        $receipt = \App\Models\Receipt::where('reference', 'REC_WEB_001')->firstOrFail();
+        $batch = Batch::where('batch_number', 'WEB-LOT-01')->firstOrFail();
+        $this->actingAs($user)->get("/organizations/{$d['organization']->id}/receipts/{$receipt->id}")
+            ->assertOk()->assertSee('Rapport de réception')->assertSee('90,00 %')->assertSee('WEB-LOT-01');
+        $this->assertDatabaseMissing('stock_balances', ['site_id' => $d['source']->id, 'batch_id' => $batch->id]);
+
+        $this->actingAs($user)->post("/organizations/{$d['organization']->id}/receipts/{$receipt->id}/validate")
+            ->assertRedirect()->assertSessionHas('status');
+        $this->assertDatabaseHas('stock_balances', [
+            'site_id' => $d['source']->id,
+            'batch_id' => $batch->id,
+            'theoretical_quantity' => 17,
+        ]);
     }
 }

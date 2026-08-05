@@ -8,13 +8,24 @@ use App\Http\Controllers\Web\OrganizationController;
 use App\Http\Controllers\Web\PasswordResetController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\ProjectController;
+use App\Http\Controllers\Web\ReceiptController;
 use App\Http\Controllers\Web\SecurityController;
+use App\Http\Controllers\Web\ModulePlaceholderController;
+use App\Http\Controllers\Web\MissionConfigurationController;
+use App\Http\Controllers\Web\ConfigurationWizardController;
+use App\Http\Controllers\Web\ControlCenterController;
+use App\Http\Controllers\Web\OrganizationConfigurationController;
 use App\Http\Controllers\Web\StockController;
 use App\Http\Controllers\Web\StructureController;
+use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\UserController as WebUserController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login');
+Route::get('/', function () {
+    return auth()->check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
+});
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'create'])->name('login');
     Route::post('/login', [AuthController::class, 'store'])->name('login.store');
@@ -24,11 +35,60 @@ Route::middleware('guest')->group(function () {
     Route::post('/reset-password', [PasswordResetController::class, 'reset'])->name('password.update');
 });
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', [AuthController::class, 'dashboard'])->name('dashboard');
-    Route::get('/security', [SecurityController::class, 'index'])->name('security.index');
-    Route::post('/security/roles', [SecurityController::class, 'store'])->name('security.roles.store');
-    Route::put('/security/roles/{role}', [SecurityController::class, 'update'])->name('security.roles.update');
-    Route::delete('/security/roles/{role}', [SecurityController::class, 'destroy'])->name('security.roles.destroy');
+    Route::redirect('/setup', '/configuration/organization')->name('setup.index');
+    Route::get('/configuration', [ControlCenterController::class, 'show'])
+        ->middleware('permission:configuration.view')->name('configuration.index');
+    Route::get('/configuration/start/{flowType}', [ConfigurationWizardController::class, 'start'])
+        ->whereIn('flowType', array_column(\App\Enums\ConfigurationFlowType::cases(), 'value'))
+        ->middleware('permission:configuration.view')
+        ->name('configuration.workflow.start');
+    Route::post('/configuration/workflows/{workflow}/draft', [ConfigurationWizardController::class, 'saveDraft'])
+        ->whereUuid('workflow')
+        ->middleware('permission:configuration.view')
+        ->name('configuration.workflow.draft');
+    Route::get('/configuration/organization', [OrganizationConfigurationController::class, 'show'])->middleware('permission:configuration.view')->name('configuration.organization');
+    Route::post('/configuration/organization', [OrganizationConfigurationController::class, 'save'])->middleware('permission:configuration.view')->name('configuration.organization.save');
+    Route::put('/configuration/organization/{organization}', [OrganizationConfigurationController::class, 'update'])->middleware('permission:configuration.view')->name('configuration.organization.update');
+    Route::delete('/configuration/organization/{organization}', [OrganizationConfigurationController::class, 'archive'])->middleware('permission:configuration.view')->name('configuration.organization.archive');
+    Route::get('/configuration/mission', [MissionConfigurationController::class, 'show'])->middleware('permission:configuration.view')->name('configuration.mission');
+    Route::post('/configuration/mission', [MissionConfigurationController::class, 'save'])->middleware('permission:configuration.view')->name('configuration.mission.save');
+    Route::delete('/configuration/mission/{mission}/archive', [MissionConfigurationController::class, 'archive'])->middleware('permission:configuration.view')->name('configuration.mission.archive');
+    Route::post('/configuration/mission/archived/{mission}/restore', [MissionConfigurationController::class, 'restore'])->middleware('permission:configuration.view')->name('configuration.mission.restore');
+    Route::get('/configuration/{step}', [ConfigurationWizardController::class, 'show'])
+        ->whereIn('step', array_keys(ConfigurationWizardController::STEPS))->middleware('permission:configuration.view')->name('configuration.step');
+    Route::post('/configuration/{step}', [ConfigurationWizardController::class, 'save'])
+        ->whereIn('step', array_keys(ConfigurationWizardController::STEPS))->middleware('permission:configuration.view')->name('configuration.step.save');
+    Route::delete('/configuration/{step}/archive', [ConfigurationWizardController::class, 'archive'])
+        ->whereIn('step', array_keys(ConfigurationWizardController::STEPS))->middleware('permission:configuration.view')->name('configuration.step.archive');
+    Route::post('/configuration/{step}/archived/{id}/restore', [ConfigurationWizardController::class, 'restore'])
+        ->whereIn('step', array_keys(ConfigurationWizardController::STEPS))->middleware('permission:configuration.view')->name('configuration.step.restore');
+    Route::get('/control-center', [ControlCenterController::class, 'show'])->middleware('permission:configuration.view')->name('control-center');
+
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/projects', [ModulePlaceholderController::class, 'show'])->defaults('module', 'projects')->middleware('permission:projects.view')->name('modules.projects');
+    Route::get('/missions', [ModulePlaceholderController::class, 'show'])->defaults('module', 'missions')->middleware('permission:missions.view')->name('modules.missions');
+    Route::get('/funding', [ModulePlaceholderController::class, 'show'])->defaults('module', 'funding')->middleware('permission:funding.view')->name('modules.funding');
+    Route::get('/health-facilities', [ModulePlaceholderController::class, 'show'])->defaults('module', 'health-facilities')->middleware('permission:health_facilities.view')->name('modules.health-facilities');
+    Route::get('/dispensing-sites', [ModulePlaceholderController::class, 'show'])->defaults('module', 'dispensing-sites')->middleware('permission:dispensing_sites.view')->name('modules.dispensing-sites');
+    Route::get('/users', [WebUserController::class, 'index'])->middleware('permission:users.view')->name('users.index');
+    Route::get('/standard-lists', [CatalogController::class, 'home'])->defaults('section', 'lists')->middleware('permission:standard_lists.view')->name('modules.standard-lists');
+    Route::get('/products', [CatalogController::class, 'home'])->defaults('section', 'products')->middleware('permission:products.view')->name('modules.products');
+    Route::get('/stocks', [StockController::class, 'home'])->middleware('permission:stocks.view')->name('modules.stocks');
+    Route::get('/receipts', [ModulePlaceholderController::class, 'show'])->defaults('module', 'receipts')->middleware('permission:receipts.view')->name('modules.receipts');
+    Route::get('/dispensations', [ModulePlaceholderController::class, 'show'])->defaults('module', 'dispensing')->middleware('permission:dispensing.view')->name('modules.dispensing');
+    Route::get('/inventories', [ModulePlaceholderController::class, 'show'])->defaults('module', 'inventories')->middleware('permission:inventories.view')->name('modules.inventories');
+    Route::get('/orders', [ModulePlaceholderController::class, 'show'])->defaults('module', 'orders')->middleware('permission:orders.view')->name('modules.orders');
+    Route::get('/reports', [ModulePlaceholderController::class, 'show'])->defaults('module', 'reports')->middleware('permission:reports.view')->name('modules.reports');
+    Route::get('/synchronization', [ModulePlaceholderController::class, 'show'])->defaults('module', 'synchronization')->middleware('permission:synchronization.view')->name('modules.synchronization');
+    Route::get('/settings', [ModulePlaceholderController::class, 'show'])->defaults('module', 'settings')->middleware('permission:settings.view')->name('modules.settings');
+    Route::get('/project-settings', [ModulePlaceholderController::class, 'show'])->defaults('module', 'project-settings')->middleware('permission:project_settings.view')->name('modules.project-settings');
+    Route::get('/site-settings', [ModulePlaceholderController::class, 'show'])->defaults('module', 'site-settings')->middleware('permission:site_settings.view')->name('modules.site-settings');
+    Route::get('/activity-log', [ModulePlaceholderController::class, 'show'])->defaults('module', 'activity-log')->middleware('permission:activity_logs.view')->name('modules.activity-log');
+    Route::get('/activity-log-local', [ModulePlaceholderController::class, 'show'])->defaults('module', 'activity-log-local')->middleware('permission:activity_logs.view_local')->name('modules.activity-log-local');
+    Route::get('/security', [SecurityController::class, 'index'])->middleware('permission:roles.manage')->name('security.index');
+    Route::post('/security/roles', [SecurityController::class, 'store'])->middleware('permission:roles.manage')->name('security.roles.store');
+    Route::put('/security/roles/{role}', [SecurityController::class, 'update'])->middleware('permission:roles.manage')->name('security.roles.update');
+    Route::delete('/security/roles/{role}', [SecurityController::class, 'destroy'])->middleware('permission:roles.manage')->name('security.roles.destroy');
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
@@ -77,6 +137,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/organizations/{organization}/projects/{project}/donors/{donor}', [FundingController::class, 'detachDonor'])->name('organizations.projects.donors.detach');
     Route::delete('/organizations/{organization}/projects/{project}/programs/{program}', [FundingController::class, 'detachProgram'])->name('organizations.projects.programs.detach');
     Route::get('/organizations/{organization}/structures', [StructureController::class, 'index'])->name('organizations.structures.index');
+    Route::get('/organizations/{organization}/facilities/create', [StructureController::class, 'createFacility'])->name('organizations.facilities.create');
     Route::post('/organizations/{organization}/facilities', [StructureController::class, 'storeFacility'])->name('organizations.facilities.store');
     Route::put('/organizations/{organization}/facilities/{facility}', [StructureController::class, 'updateFacility'])->name('organizations.facilities.update');
     Route::delete('/organizations/{organization}/facilities/{facility}', [StructureController::class, 'archiveFacility'])->name('organizations.facilities.destroy');
@@ -95,9 +156,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/organizations/{organization}/facilities/{facility}/sites/archived/{site}/restore', [StructureController::class, 'restoreSite'])->name('organizations.facilities.sites.restore');
     Route::put('/organizations/{organization}/module-activations', [StructureController::class, 'activation'])->name('organizations.module-activations.update');
     Route::get('/organizations/{organization}/catalog', [CatalogController::class, 'index'])->name('organizations.catalog.index');
+    Route::get('/organizations/{o}/catalog/products/create', [CatalogController::class, 'createProduct'])->name('organizations.catalog.products.create');
     Route::get('/organizations/{organization}/stocks', [StockController::class, 'index'])->name('organizations.stocks.index');
+    Route::get('/organizations/{organization}/stocks/movements/create', [StockController::class, 'createMovement'])->name('organizations.stocks.movements.create');
     Route::post('/organizations/{organization}/stocks/movements', [StockController::class, 'storeMovement'])->name('organizations.stocks.movements.store');
     Route::post('/organizations/{organization}/stocks/movements/{movement}/compensate', [StockController::class, 'compensate'])->name('organizations.stocks.movements.compensate');
+    Route::get('/organizations/{organization}/receipts', [ReceiptController::class, 'index'])->name('organizations.receipts.index');
+    Route::post('/organizations/{organization}/receipts', [ReceiptController::class, 'store'])->name('organizations.receipts.store');
+    Route::get('/organizations/{organization}/receipts/{receipt}', [ReceiptController::class, 'show'])->name('organizations.receipts.show');
+    Route::post('/organizations/{organization}/receipts/{receipt}/validate', [ReceiptController::class, 'validateReceipt'])->name('organizations.receipts.validate');
     Route::post('/organizations/{o}/catalog/references', [CatalogController::class, 'storeReference'])->name('organizations.catalog.references.store');
     Route::put('/organizations/{o}/catalog/references/{m}', [CatalogController::class, 'updateReference'])->name('organizations.catalog.references.update');
     Route::delete('/organizations/{o}/catalog/references/{m}', [CatalogController::class, 'archiveReference'])->name('organizations.catalog.references.destroy');
@@ -124,8 +191,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/organizations/{o}/catalog/lists/archived/{id}/restore', [CatalogController::class, 'restoreList'])->name('organizations.catalog.lists.restore');
     Route::post('/organizations/{o}/catalog/lists/{list}/versions', [CatalogController::class, 'newVersion'])->name('organizations.catalog.lists.versions.store');
     Route::post('/organizations/{o}/catalog/lists/{list}/versions/{version}/publish', [CatalogController::class, 'publish'])->name('organizations.catalog.lists.versions.publish');
-    Route::get('/organizations/{o}/catalog/products/export',[CatalogController::class, 'exportProducts'])->name('organizations.catalog.products.export');
-    Route::post('/organizations/{o}/catalog/products/import',[CatalogController::class, 'importProducts'])->name('organizations.catalog.products.import');
-    Route::get('/organizations/{o}/catalog/products/export-xlsx',[CatalogController::class, 'exportProductsExcel'])->name('organizations.catalog.products.export-xlsx');
-    Route::post('/organizations/{o}/catalog/products/import-xlsx',[CatalogController::class, 'importProductsExcel'])->name('organizations.catalog.products.import-xlsx');
+    Route::get('/organizations/{o}/catalog/products/export', [CatalogController::class, 'exportProducts'])->name('organizations.catalog.products.export');
+    Route::post('/organizations/{o}/catalog/products/import', [CatalogController::class, 'importProducts'])->name('organizations.catalog.products.import');
+    Route::get('/organizations/{o}/catalog/products/export-xlsx', [CatalogController::class, 'exportProductsExcel'])->name('organizations.catalog.products.export-xlsx');
+    Route::post('/organizations/{o}/catalog/products/import-xlsx', [CatalogController::class, 'importProductsExcel'])->name('organizations.catalog.products.import-xlsx');
 });

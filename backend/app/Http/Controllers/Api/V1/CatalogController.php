@@ -29,7 +29,11 @@ class CatalogController extends Controller
     {
         $this->access($request, $organization);
 
-        return response()->json(CatalogReference::where(fn ($q) => $q->whereNull('organization_id')->orWhere('organization_id', $organization->id))
+        $query = $request->string('status')->toString() === 'archived'
+            ? CatalogReference::onlyTrashed()->where('organization_id', $organization->id)
+            : CatalogReference::where(fn ($q) => $q->whereNull('organization_id')->orWhere('organization_id', $organization->id));
+
+        return response()->json($query
             ->when($request->string('type')->toString(), fn ($q, $type) => $q->where('reference_type', $type))
             ->when($request->string('search')->toString(), fn ($q, $s) => $q->where(fn ($n) => $n->where('name', 'like', "%$s%")->orWhere('code', 'like', "%$s%")))
             ->orderBy('reference_type')->orderBy('name')->paginate(50));
@@ -102,11 +106,18 @@ class CatalogController extends Controller
     {
         $this->access($request, $organization);
 
-        return response()->json($organization->products()->with(['category', 'therapeuticFamily', 'baseUnit', 'dosageForm', 'administrationRoute', 'codes'])
+        $query = $request->string('status')->toString() === 'archived'
+            ? Product::onlyTrashed()->where('organization_id', $organization->id)
+            : $organization->products();
+
+        return response()->json($query->with(['category', 'therapeuticFamily', 'baseUnit', 'dosageForm', 'administrationRoute', 'codes'])
             ->when($request->string('search')->toString(), fn ($q, $s) => $q->where(fn ($n) => $n
                 ->where('name', 'like', "%$s%")->orWhere('generic_name', 'like', "%$s%")->orWhere('code', 'like', "%$s%")
                 ->orWhereHas('codes', fn ($c) => $c->where('value', 'like', "%$s%"))))
-            ->when($request->string('type')->toString(), fn ($q, $type) => $q->where('product_type', $type))->orderBy('name')->paginate(30));
+            ->when($request->string('type')->toString(), fn ($q, $type) => $q->where('product_type', $type))
+            ->when($request->string('status')->toString() === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->when($request->string('status')->toString() === 'active', fn ($q) => $q->where('is_active', true))
+            ->orderBy('name')->paginate(30));
     }
 
     public function storeProduct(Request $request, Organization $organization): JsonResponse
@@ -162,7 +173,17 @@ class CatalogController extends Controller
     {
         $this->access($request, $organization);
 
-        return response()->json($organization->batches()->with(['product:id,code,name', 'supplier:id,code,name'])->when($request->string('search')->toString(), fn ($q, $s) => $q->where('batch_number', 'like', "%$s%")->orWhereHas('product', fn ($p) => $p->where('name', 'like', "%$s%")))->orderBy('expires_on')->paginate(30));
+        $query = $request->string('status')->toString() === 'archived'
+            ? Batch::onlyTrashed()->where('organization_id', $organization->id)
+            : $organization->batches();
+
+        return response()->json($query->with(['product:id,code,name', 'supplier:id,code,name'])
+            ->when($request->string('search')->toString(), fn ($q, $s) => $q
+                ->where(fn ($nested) => $nested->where('batch_number', 'like', "%$s%")
+                    ->orWhereHas('product', fn ($p) => $p->where('name', 'like', "%$s%"))))
+            ->when(in_array($request->string('status')->toString(), ['available', 'quarantine', 'expired', 'destroyed'], true),
+                fn ($q) => $q->where('status', $request->string('status')->toString()))
+            ->orderBy('expires_on')->paginate(30));
     }
 
     public function updateBatch(Request $request, Organization $organization, Batch $batch): JsonResponse
@@ -229,7 +250,15 @@ class CatalogController extends Controller
     {
         $this->access($request, $organization);
 
-        return response()->json($organization->standardLists()->with(['versions.products:id,code,name', 'latestVersion'])->orderBy('name')->paginate(30));
+        $query = $request->string('status')->toString() === 'archived'
+            ? StandardList::onlyTrashed()->where('organization_id', $organization->id)
+            : $organization->standardLists();
+
+        return response()->json($query->with(['versions.products:id,code,name', 'latestVersion'])
+            ->when($request->string('search')->toString(), fn ($q, $search) => $q->where(fn ($nested) => $nested
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('code', 'like', "%{$search}%")))
+            ->orderBy('name')->paginate(30));
     }
 
     public function storeList(Request $request, Organization $organization): JsonResponse

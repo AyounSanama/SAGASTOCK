@@ -34,6 +34,8 @@ class RoleController extends Controller
         $data = $request->validate([
             'code' => ['required', 'alpha_dash', 'max:80', 'unique:roles,code'],
             'name' => ['required', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'is_active' => ['sometimes', 'boolean'],
             'scope_type' => ['sometimes', Rule::in(['platform', 'organization', 'project', 'facility', 'site'])],
             'scope_id' => ['nullable', 'uuid'],
             'permission_ids' => ['array'],
@@ -49,13 +51,15 @@ class RoleController extends Controller
         $role = Role::create([
             'code' => $data['code'],
             'name' => $data['name'],
+            'description' => $data['description'] ?? null,
             'is_system' => false,
+            'is_active' => $data['is_active'] ?? true,
             'scope_type' => $scopeType,
             'scope_id' => $scopeId,
         ]);
         $role->permissions()->sync($data['permission_ids'] ?? []);
         $this->audit->record($request, 'role.created', $role, [], $role->only([
-            'code', 'name', 'scope_type', 'scope_id',
+            'code', 'name', 'description', 'is_active', 'scope_type', 'scope_id',
         ]));
 
         return response()->json(['role' => $role->load('permissions:id,code,name')], 201);
@@ -71,15 +75,17 @@ class RoleController extends Controller
         $data = $request->validate([
             'code' => ['sometimes', 'required', 'alpha_dash', 'max:80', Rule::unique('roles')->ignore($role->id)],
             'name' => ['sometimes', 'required', 'string', 'max:120'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'is_active' => ['sometimes', 'boolean'],
             'permission_ids' => ['sometimes', 'array'],
             'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ]);
-        $old = $role->only(['code', 'name']);
+        $old = $role->only(['code', 'name', 'description', 'is_active']);
         $role->update(collect($data)->except('permission_ids')->all());
         if (array_key_exists('permission_ids', $data)) {
             $role->permissions()->sync($data['permission_ids']);
         }
-        $this->audit->record($request, 'role.updated', $role, $old, $role->only(['code', 'name']));
+        $this->audit->record($request, 'role.updated', $role, $old, $role->only(['code', 'name', 'description', 'is_active']));
 
         return response()->json(['role' => $role->load('permissions:id,code,name')]);
     }

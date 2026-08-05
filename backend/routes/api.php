@@ -3,8 +3,11 @@
 use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CatalogController;
+use App\Http\Controllers\Api\V1\ConfigurationWorkflowController;
 use App\Http\Controllers\Api\V1\CountryController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DeviceController;
+use App\Http\Controllers\Api\V1\DispensationController;
 use App\Http\Controllers\Api\V1\FundingController;
 use App\Http\Controllers\Api\V1\MissionController;
 use App\Http\Controllers\Api\V1\OrganizationController;
@@ -27,26 +30,59 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/auth/reset-password', [PasswordResetController::class, 'reset']);
     });
     Route::middleware('auth:sanctum')->group(function (): void {
-        Route::get('/organizations/{organization}/stocks/balances', [StockController::class, 'balances']);
-        Route::get('/organizations/{organization}/stocks/movements', [StockController::class, 'movements']);
-        Route::post('/organizations/{organization}/stocks/movements', [StockController::class, 'storeMovement']);
-        Route::post('/organizations/{organization}/stocks/movements/{movement}/compensate', [StockController::class, 'compensate']);
-        Route::get('/organizations/{organization}/stocks/fefo', [StockController::class, 'fefo']);
-        Route::get('/organizations/{organization}/stocks/transfers', [StockController::class, 'transfers']);
-        Route::post('/organizations/{organization}/stocks/transfers', [StockController::class, 'storeTransfer']);
-        Route::post('/organizations/{organization}/stocks/transfers/{transfer}/dispatch', [StockController::class, 'dispatch']);
-        Route::post('/organizations/{organization}/stocks/transfers/{transfer}/receive', [StockController::class, 'receive']);
-        Route::get('/organizations/{organization}/stocks/holds', [StockController::class, 'holds']);
-        Route::post('/organizations/{organization}/stocks/holds', [StockController::class, 'storeHold']);
-        Route::get('/organizations/{organization}/receipts', [ReceiptController::class, 'index']);
-        Route::post('/organizations/{organization}/receipts', [ReceiptController::class, 'store']);
-        Route::post('/organizations/{organization}/receipts/{receipt}/validate', [ReceiptController::class, 'validateReceipt']);
+        Route::get('/configuration/workflows', [ConfigurationWorkflowController::class, 'index'])->middleware('permission:configuration.view');
+        Route::post('/configuration/workflows', [ConfigurationWorkflowController::class, 'store'])->middleware('permission:configuration.view');
+        Route::get('/configuration/workflows/{workflow}', [ConfigurationWorkflowController::class, 'show'])->middleware('permission:configuration.view');
+        Route::put('/configuration/workflows/{workflow}/draft', [ConfigurationWorkflowController::class, 'draft'])->middleware('permission:configuration.view');
+        Route::get('/dashboard', [DashboardController::class, 'index']);
+        Route::middleware('permission:stocks.view')->group(function (): void {
+            Route::get('/organizations/{organization}/stocks/balances', [StockController::class, 'balances']);
+            Route::get('/organizations/{organization}/stocks/movements', [StockController::class, 'movements']);
+            Route::get('/organizations/{organization}/stocks/fefo', [StockController::class, 'fefo']);
+            Route::get('/organizations/{organization}/stocks/transfers', [StockController::class, 'transfers']);
+            Route::get('/organizations/{organization}/stocks/holds', [StockController::class, 'holds']);
+        });
+        Route::middleware('permission:stocks.manage')->group(function (): void {
+            Route::get('/organizations/{organization}/stocks/options', [StockController::class, 'options']);
+            Route::post('/organizations/{organization}/stocks/movements', [StockController::class, 'storeMovement']);
+        });
+        Route::middleware('permission:stocks.adjust')->group(function (): void {
+            Route::post('/organizations/{organization}/stocks/movements/{movement}/compensate', [StockController::class, 'compensate']);
+            Route::post('/organizations/{organization}/stocks/holds', [StockController::class, 'storeHold']);
+        });
+        Route::middleware('permission:transfers.manage')->group(function (): void {
+            Route::post('/organizations/{organization}/stocks/transfers', [StockController::class, 'storeTransfer']);
+            Route::post('/organizations/{organization}/stocks/transfers/{transfer}/dispatch', [StockController::class, 'dispatch']);
+            Route::post('/organizations/{organization}/stocks/transfers/{transfer}/receive', [StockController::class, 'receive']);
+        });
+        Route::get('/organizations/{organization}/receipts', [ReceiptController::class, 'index'])->middleware('permission:stocks.view');
+        Route::middleware('permission:receipts.manage')->group(function (): void {
+            Route::get('/organizations/{organization}/receipts/options', [ReceiptController::class, 'options']);
+            Route::post('/organizations/{organization}/receipts', [ReceiptController::class, 'store']);
+            Route::post('/organizations/{organization}/receipts/{receipt}/validate', [ReceiptController::class, 'validateReceipt']);
+        });
+        Route::get('/organizations/{organization}/patients', [DispensationController::class, 'patients'])->middleware('permission:patients.view');
+        Route::middleware('permission:patients.manage')->group(function (): void {
+            Route::post('/organizations/{organization}/patients', [DispensationController::class, 'storePatient']);
+            Route::put('/organizations/{organization}/patients/{patient}', [DispensationController::class, 'updatePatient']);
+            Route::delete('/organizations/{organization}/patients/{patient}', [DispensationController::class, 'archivePatient']);
+            Route::post('/organizations/{organization}/patients/archived/{patient}/restore', [DispensationController::class, 'restorePatient']);
+        });
+        Route::get('/organizations/{organization}/prescriptions', [DispensationController::class, 'prescriptions'])->middleware('permission:prescriptions.view');
+        Route::post('/organizations/{organization}/prescriptions', [DispensationController::class, 'storePrescription'])->middleware('permission:prescriptions.manage');
+        Route::post('/organizations/{organization}/prescriptions/{prescription}/validate', [DispensationController::class, 'validatePrescription'])->middleware('permission:prescriptions.validate');
+        Route::get('/organizations/{organization}/dispensations', [DispensationController::class, 'dispensations'])->middleware('permission:dispensations.view');
+        Route::middleware('permission:dispensations.manage')->group(function (): void {
+            Route::get('/organizations/{organization}/dispensations/options', [DispensationController::class, 'options']);
+            Route::post('/organizations/{organization}/dispensations', [DispensationController::class, 'storeDispensation']);
+        });
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::put('/auth/password', [PasswordController::class, 'update']);
         Route::get('/auth/devices', [DeviceController::class, 'index']);
         Route::delete('/auth/devices/{device}', [DeviceController::class, 'revoke']);
         Route::get('/roles', [UserController::class, 'roles'])->middleware('permission:users.view');
+        Route::get('/assignable-roles', [UserController::class, 'assignableRoles']);
         Route::get('/security/roles', [RoleController::class, 'index'])->middleware('permission:roles.manage');
         Route::post('/security/roles', [RoleController::class, 'store'])->middleware('permission:roles.manage');
         Route::put('/security/roles/{role}', [RoleController::class, 'update'])->middleware('permission:roles.manage');
@@ -56,7 +92,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/users/archived', [UserController::class, 'archived'])->middleware('permission:users.view');
         Route::get('/users/archived/{user}', [UserController::class, 'showArchived'])->middleware('permission:users.view');
         Route::post('/users/archived/{user}/restore', [UserController::class, 'restore'])->middleware('permission:users.manage');
-        Route::post('/users', [UserController::class, 'store'])->middleware('permission:users.manage');
+        Route::post('/users', [UserController::class, 'store']);
         Route::get('/users/{user}', [UserController::class, 'show'])->middleware('permission:users.view');
         Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:users.manage');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.manage');
@@ -121,10 +157,10 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/organizations/{organization}/catalog/suppliers/{supplier}', [CatalogController::class, 'archiveSupplier'])->middleware('permission:catalog.manage');
         Route::post('/organizations/{organization}/catalog/suppliers/archived/{supplier}/restore', [CatalogController::class, 'restoreSupplier'])->middleware('permission:catalog.manage');
         Route::get('/organizations/{organization}/catalog/products', [CatalogController::class, 'products'])->middleware('permission:catalog.view');
-        Route::post('/organizations/{organization}/catalog/products', [CatalogController::class, 'storeProduct'])->middleware('permission:catalog.manage');
-        Route::put('/organizations/{organization}/catalog/products/{product}', [CatalogController::class, 'updateProduct'])->middleware('permission:catalog.manage');
-        Route::delete('/organizations/{organization}/catalog/products/{product}', [CatalogController::class, 'archiveProduct'])->middleware('permission:catalog.manage');
-        Route::post('/organizations/{organization}/catalog/products/archived/{product}/restore', [CatalogController::class, 'restoreProduct'])->middleware('permission:catalog.manage');
+        Route::post('/organizations/{organization}/catalog/products', [CatalogController::class, 'storeProduct'])->middleware('permission:products.manage|catalog.manage');
+        Route::put('/organizations/{organization}/catalog/products/{product}', [CatalogController::class, 'updateProduct'])->middleware('permission:products.manage|catalog.manage');
+        Route::delete('/organizations/{organization}/catalog/products/{product}', [CatalogController::class, 'archiveProduct'])->middleware('permission:products.manage|catalog.manage');
+        Route::post('/organizations/{organization}/catalog/products/archived/{product}/restore', [CatalogController::class, 'restoreProduct'])->middleware('permission:products.manage|catalog.manage');
         Route::get('/organizations/{organization}/catalog/batches', [CatalogController::class, 'batches'])->middleware('permission:catalog.view');
         Route::post('/organizations/{organization}/catalog/batches', [CatalogController::class, 'storeBatch'])->middleware('permission:batches.manage');
         Route::put('/organizations/{organization}/catalog/batches/{batch}', [CatalogController::class, 'updateBatch'])->middleware('permission:batches.manage');
@@ -135,11 +171,11 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/organizations/{organization}/catalog/kits/{kit}', [CatalogController::class, 'archiveKit'])->middleware('permission:catalog.manage');
         Route::post('/organizations/{organization}/catalog/kits/archived/{kit}/restore', [CatalogController::class, 'restoreKit'])->middleware('permission:catalog.manage');
         Route::get('/organizations/{organization}/catalog/lists', [CatalogController::class, 'lists'])->middleware('permission:catalog.view');
-        Route::post('/organizations/{organization}/catalog/lists', [CatalogController::class, 'storeList'])->middleware('permission:catalog.manage');
-        Route::put('/organizations/{organization}/catalog/lists/{standardList}',[CatalogController::class, 'updateList'])->middleware('permission:catalog.manage');
-        Route::delete('/organizations/{organization}/catalog/lists/{standardList}',[CatalogController::class, 'archiveList'])->middleware('permission:catalog.manage');
-        Route::post('/organizations/{organization}/catalog/lists/archived/{standardList}/restore',[CatalogController::class, 'restoreList'])->middleware('permission:catalog.manage');
-        Route::post('/organizations/{organization}/catalog/lists/{standardList}/versions',[CatalogController::class, 'newListVersion'])->middleware('permission:catalog.manage');
-        Route::post('/organizations/{organization}/catalog/lists/{standardList}/versions/{version}/publish',[CatalogController::class, 'publishListVersion'])->middleware('permission:catalog.publish');
+        Route::post('/organizations/{organization}/catalog/lists', [CatalogController::class, 'storeList'])->middleware('permission:standard_lists.manage|catalog.manage');
+        Route::put('/organizations/{organization}/catalog/lists/{standardList}', [CatalogController::class, 'updateList'])->middleware('permission:standard_lists.manage|catalog.manage');
+        Route::delete('/organizations/{organization}/catalog/lists/{standardList}', [CatalogController::class, 'archiveList'])->middleware('permission:standard_lists.manage|catalog.manage');
+        Route::post('/organizations/{organization}/catalog/lists/archived/{standardList}/restore', [CatalogController::class, 'restoreList'])->middleware('permission:standard_lists.manage|catalog.manage');
+        Route::post('/organizations/{organization}/catalog/lists/{standardList}/versions', [CatalogController::class, 'newListVersion'])->middleware('permission:standard_lists.manage|catalog.manage');
+        Route::post('/organizations/{organization}/catalog/lists/{standardList}/versions/{version}/publish', [CatalogController::class, 'publishListVersion'])->middleware('permission:catalog.publish');
     });
 });

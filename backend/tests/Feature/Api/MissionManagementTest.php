@@ -19,7 +19,7 @@ class MissionManagementTest extends TestCase
     {
         $view = Permission::create(['code' => 'missions.view', 'name' => 'Consulter les missions']);
         $manage = Permission::create(['code' => 'missions.manage', 'name' => 'Gérer les missions']);
-        $role = Role::create(['code' => 'mission_admin', 'name' => 'Administrateur missions']);
+        $role = Role::create(['code' => 'platform_owner', 'name' => 'Administrateur missions']);
         $role->permissions()->attach([$view->id, $manage->id]);
         $user = User::factory()->create(['is_active' => true]);
         $user->roles()->attach($role->id, ['scope_type' => 'platform']);
@@ -38,10 +38,21 @@ class MissionManagementTest extends TestCase
             'code' => 'CM_YDE',
             'name' => 'Mission Yaoundé',
             'starts_on' => '2026-01-01',
+            'address' => 'Yaoundé',
+            'manager_name' => 'Responsable mission',
+            'phone' => '+237600000000',
+            'email' => 'mission@example.org',
+            'description' => 'Programme national',
             'is_active' => true,
         ])->assertCreated()->assertJsonPath('mission.country.iso2', 'CM');
 
         $missionId = $created->json('mission.id');
+        $this->assertDatabaseHas('missions', [
+            'id' => $missionId,
+            'address' => 'Yaoundé',
+            'manager_name' => 'Responsable mission',
+            'email' => 'mission@example.org',
+        ]);
         $this->getJson("/api/v1/organizations/{$organization->id}/missions")
             ->assertOk()->assertJsonCount(1, 'data');
         $this->getJson("/api/v1/organizations/{$other->id}/missions")

@@ -17,7 +17,7 @@ class OrganizationManagementTest extends TestCase
     {
         $view = Permission::create(['code' => 'organizations.view', 'name' => 'Consulter les organisations']);
         $manage = Permission::create(['code' => 'organizations.manage', 'name' => 'Gérer les organisations']);
-        $role = Role::create(['code' => 'organization_admin', 'name' => 'Administrateur ONG']);
+        $role = Role::create(['code' => 'owner', 'name' => 'Propriétaire plateforme']);
         $role->permissions()->attach([$view->id, $manage->id]);
         $user = User::factory()->create(['is_active' => true]);
         $user->roles()->attach($role->id, ['scope_type' => 'platform']);

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\HealthFacility;
 use App\Models\Site;
 use App\Services\AuditService;
+use App\Services\GovernanceService;
 use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,11 @@ use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
-    public function __construct(private AuditService $audit, private UserScopeService $scopes) {}
+    public function __construct(
+        private AuditService $audit,
+        private UserScopeService $scopes,
+        private GovernanceService $governance,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -63,17 +68,24 @@ class UserController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        abort_unless(
+            $request->user()->hasPermission('users.manage')
+                || $request->user()->hasPermission('users.create_site_admin'),
+            403,
+        );
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:190', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:40'],
-            'role_id' => ['nullable', 'integer', 'exists:roles,id'],
+            'role_id' => ['nullable', 'required_without:role_ids', 'integer', 'exists:roles,id'],
             'role_ids' => ['nullable', 'array'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
             'scope_type' => ['nullable', Rule::in(['platform', 'organization', 'project', 'facility', 'site'])],
             'scope_id' => ['nullable', 'uuid'],
             'password' => ['nullable', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
             'must_change_password' => ['nullable', 'boolean'],
+            'permission_ids' => ['nullable', 'array'],
+            'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ]);
         $generated = empty($data['password']);
         $password = $generated ? Str::password(16, symbols: true) : $data['password'];
@@ -81,12 +93,20 @@ class UserController extends Controller
         abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
         $roleIds = isset($data['role_id']) ? [$data['role_id']] : ($data['role_ids'] ?? []);
         abort_unless($this->scopes->assignableRoles($request->user())->whereIn('id', $roleIds)->count() === count($roleIds), 403);
+        abort_unless(collect($roleIds)->every(fn ($id) => $this->governance->canAssign(
+            $request->user(),
+            Role::findOrFail($id),
+            $scopeType,
+            $scopeId,
+        )), 403);
         $user = User::create([
             'name' => $data['name'], 'email' => $data['email'], 'phone' => $data['phone'] ?? null,
+            'organization_id' => $this->organizationIdForScope($scopeType, $scopeId),
             'password' => $password, 'is_active' => true,
             'must_change_password' => $generated || ($data['must_change_password'] ?? false),
         ]);
         $user->roles()->sync(collect($roleIds)->mapWithKeys(fn ($id) => [$id => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]));
+        $this->syncDelegatedPermissions($request, $user, $data['permission_ids'] ?? []);
         $this->audit->record($request, 'user.created', $user, [], ['name' => $user->name, 'email' => $user->email, 'scope_type' => $scopeType, 'scope_id' => $scopeId]);
         $response = ['user' => $user->load('roles:id,code,name')];
         if ($generated) $response['temporary_password'] = $password;
@@ -104,6 +124,7 @@ class UserController extends Controller
             'role_id' => ['nullable', 'integer', 'exists:roles,id'], 'role_ids' => ['nullable', 'array'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
             'scope_type' => ['nullable', Rule::in(['platform', 'organization', 'project', 'facility', 'site'])], 'scope_id' => ['nullable', 'uuid'],
+            'permission_ids' => ['nullable', 'array'], 'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ]);
         $user->update(collect($data)->only(['name', 'email', 'phone', 'is_active'])->all());
         if (array_key_exists('role_id', $data) || array_key_exists('role_ids', $data)) {
@@ -111,7 +132,17 @@ class UserController extends Controller
             abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
             $roleIds = isset($data['role_id']) ? [$data['role_id']] : ($data['role_ids'] ?? []);
             abort_unless($this->scopes->assignableRoles($request->user())->whereIn('id', $roleIds)->count() === count($roleIds), 403);
+            abort_unless(collect($roleIds)->every(fn ($id) => $this->governance->canAssign(
+                $request->user(),
+                Role::findOrFail($id),
+                $scopeType,
+                $scopeId,
+            )), 403);
             $user->roles()->sync(collect($roleIds)->mapWithKeys(fn ($id) => [$id => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]));
+            $user->update(['organization_id' => $this->organizationIdForScope($scopeType, $scopeId)]);
+        }
+        if (array_key_exists('permission_ids', $data)) {
+            $this->syncDelegatedPermissions($request, $user, $data['permission_ids']);
         }
         $this->audit->record($request, 'user.updated', $user, $old, $user->only(['name', 'email', 'phone', 'is_active']));
         return response()->json(['user' => $user->load('roles:id,code,name')]);
@@ -131,9 +162,9 @@ class UserController extends Controller
     {
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
         abort_if($request->user()->is($user), 422, 'Vous ne pouvez pas archiver votre propre compte.');
-        if ($user->roles()->where('code', 'platform_owner')->exists()) {
+        if ($user->roles()->whereIn('code', ['owner', 'platform_owner'])->exists()) {
             $otherOwners = User::where('is_active', true)->whereKeyNot($user->id)
-                ->whereHas('roles', fn ($query) => $query->where('code', 'platform_owner'))->exists();
+                ->whereHas('roles', fn ($query) => $query->whereIn('code', ['owner', 'platform_owner']))->exists();
             abort_unless($otherOwners, 422, 'Le dernier propriétaire actif ne peut pas être archivé.');
         }
         $user->tokens()->delete();
@@ -149,6 +180,15 @@ class UserController extends Controller
         return response()->json(['roles' => $this->scopes->assignableRoles(request()->user())->orderBy('name')->get(['id', 'code', 'name', 'scope_type', 'scope_id'])]);
     }
 
+    public function assignableRoles(Request $request): JsonResponse
+    {
+        $roles = $this->scopes->assignableRoles($request->user())
+            ->orderByRaw("case code when 'project_admin' then 1 when 'site_admin' then 2 else 99 end")
+            ->get(['id', 'code', 'name', 'scope_type']);
+
+        return response()->json(['roles' => $roles]);
+    }
+
     private function scope(string $type, ?string $id): array
     {
         if ($type === 'platform') return [$type, null];
@@ -162,5 +202,34 @@ class UserController extends Controller
         };
         abort_unless($exists, 422, 'Périmètre introuvable.');
         return [$type, $id];
+    }
+
+    private function organizationIdForScope(string $type, ?string $id): ?string
+    {
+        return match ($type) {
+            'organization' => $id,
+            'project' => Project::whereKey($id)->value('organization_id'),
+            'facility' => HealthFacility::whereKey($id)->value('organization_id'),
+            'site' => Site::whereKey($id)->value('organization_id'),
+            default => null,
+        };
+    }
+
+    private function syncDelegatedPermissions(Request $request, User $user, array $permissionIds): void
+    {
+        $actorRole = $this->governance->roleCode($request->user());
+        if ($actorRole !== GovernanceService::SITE_ADMIN) {
+            abort_unless($permissionIds === [], 403);
+            $user->directPermissions()->sync([]);
+            return;
+        }
+        $targetRole = $this->governance->roleCode($user);
+        abort_unless($targetRole === GovernanceService::SITE_USER, 403);
+        $allowed = \App\Models\Permission::whereIn(
+            'code',
+            GovernanceService::SITE_DELEGABLE_PERMISSIONS,
+        )->whereIn('id', $permissionIds)->pluck('id');
+        abort_unless($allowed->count() === count(array_unique($permissionIds)), 403);
+        $user->directPermissions()->sync($allowed);
     }
 }

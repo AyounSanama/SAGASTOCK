@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_form_sheet.dart';
 import '../data/organization_service.dart';
 
 class FundingPage extends StatefulWidget {
@@ -59,7 +61,7 @@ class _FundingPageState extends State<FundingPage> {
     final code = TextEditingController();
     final name = TextEditingController();
     final key = GlobalKey<FormState>();
-    final saved = await showDialog<bool>(
+    final saved = await showAppDialogAsFormSheet<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(donor ? 'Nouveau bailleur' : 'Nouveau programme'),
@@ -84,11 +86,13 @@ class _FundingPageState extends State<FundingPage> {
           ),
         ),
         actions: [
-          TextButton(
+          AppButton.cancel(
+            label: 'Annuler',
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
           ),
-          FilledButton(
+          AppButton.add(
+            label: 'Créer et associer',
+            icon: Icons.link_rounded,
             onPressed: () async {
               if (!(key.currentState?.validate() ?? false)) return;
               try {
@@ -121,7 +125,6 @@ class _FundingPageState extends State<FundingPage> {
                 );
               }
             },
-            child: const Text('Créer et associer'),
           ),
         ],
       ),
@@ -152,18 +155,20 @@ class _FundingPageState extends State<FundingPage> {
             Row(
               children: [
                 Expanded(
-                  child: FilledButton.icon(
+                  child: AppButton.add(
+                    expanded: true,
+                    label: 'Bailleur',
+                    icon: Icons.account_balance_outlined,
                     onPressed: () => _create(donor: true),
-                    icon: const Icon(Icons.account_balance_outlined),
-                    label: const Text('Bailleur'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: AppButton.duplicate(
+                    expanded: true,
+                    label: 'Programme',
+                    icon: Icons.category_outlined,
                     onPressed: () => _create(donor: false),
-                    icon: const Icon(Icons.category_outlined),
-                    label: const Text('Programme'),
                   ),
                 ),
               ],

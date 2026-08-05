@@ -41,7 +41,27 @@ class StructureController extends Controller
             'archivedFacilities' => $archivedFacilities, 'activations' => $activations,
             'missions' => $organization->missions()->with('country')->orderBy('name')->get(),
             'projects' => $organization->projects()->orderBy('name')->get(),
-            'moduleCodes' => ['references' => 'Référentiels', 'stocks' => 'Stocks', 'receptions' => 'Réceptions', 'dispensing' => 'Dispensation', 'inventories' => 'Inventaires', 'orders' => 'Commandes', 'alerts' => 'Alertes', 'reports' => 'Rapports'],
+            'moduleCodes' => [
+                'references' => ['name' => 'Gestion des médicaments', 'icon' => '💊', 'description' => 'Catalogue, référentiels et produits médicaux.'],
+                'stocks' => ['name' => 'Stock de médicaments', 'icon' => '▤', 'description' => 'Lots, mouvements, niveaux et traçabilité.'],
+                'receptions' => ['name' => 'Réceptions pharmaceutiques', 'icon' => '↓', 'description' => 'Contrôle et enregistrement des réceptions.'],
+                'dispensing' => ['name' => 'Dispensation des médicaments', 'icon' => '✚', 'description' => 'Remise sécurisée des traitements aux patients.'],
+                'inventories' => ['name' => 'Inventaires de pharmacie', 'icon' => '✓', 'description' => 'Comptages physiques et rapprochements.'],
+                'orders' => ['name' => 'Commandes de réapprovisionnement', 'icon' => '🛒', 'description' => 'Besoins, commandes et circuits d’approbation.'],
+                'alerts' => ['name' => 'Alertes et notifications', 'icon' => '!', 'description' => 'Stock faible, péremptions et événements critiques.'],
+                'reports' => ['name' => 'Rapports et statistiques', 'icon' => '↗', 'description' => 'Indicateurs, analyses et rapports opérationnels.'],
+            ],
+        ]);
+    }
+
+    public function createFacility(Request $request, Organization $organization): View
+    {
+        $this->manage($request, $organization);
+
+        return view('structures.create', [
+            'organization' => $organization,
+            'missions' => $organization->missions()->with('country')->orderBy('name')->get(),
+            'projects' => $organization->projects()->orderBy('name')->get(),
         ]);
     }
 
@@ -53,7 +73,8 @@ class StructureController extends Controller
         $facility = $organization->healthFacilities()->create($data);
         $facility->projects()->sync($projects);
         $this->audit->record($request, 'facility.created', $facility, [], $facility->toArray());
-        return back()->with('status', 'Formation sanitaire créée.');
+        return redirect()->route('organizations.structures.index', [$organization, 'facility' => $facility->id])
+            ->with('status', 'Formation sanitaire créée avec succès.');
     }
 
     public function updateFacility(Request $request, Organization $organization, HealthFacility $facility): RedirectResponse
@@ -120,7 +141,10 @@ class StructureController extends Controller
     public function storeSite(Request $request, Organization $organization, HealthFacility $facility): RedirectResponse
     {
         $this->manageFacility($request, $organization, $facility);
-        $model = $facility->sites()->create($this->siteData($request, $facility));
+        $model = $facility->sites()->create([
+            ...$this->siteData($request, $facility),
+            'organization_id' => $organization->id,
+        ]);
         return $this->saved($request, $model, 'site.created', 'Site créé.');
     }
     public function updateSite(Request $request, Organization $organization, HealthFacility $facility, Site $site): RedirectResponse

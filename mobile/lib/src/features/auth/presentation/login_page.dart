@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/access/application_access.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/pharmacare_wordmark.dart';
 import '../data/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
@@ -37,9 +40,7 @@ class _LoginPageState extends State<LoginPage> {
         password: _password.text,
       );
       if (mounted) {
-        context.go(
-          user['must_change_password'] == true ? '/change-password' : '/home',
-        );
+        context.go(ApplicationAccess.landingPath(user));
       }
     } catch (error) {
       if (mounted) setState(() => _error = AuthService.messageFor(error));
@@ -54,9 +55,9 @@ class _LoginPageState extends State<LoginPage> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
+              constraints: const BoxConstraints(maxWidth: 400),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -64,22 +65,17 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     Image.asset(
                       'assets/images/pharmacare-logo.png',
-                      height: 112,
+                      height: 52,
                       fit: BoxFit.contain,
                       semanticLabel: 'Logo PharmaCare',
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'PharmaCare',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w800),
-                    ),
+                    const SizedBox(height: 2),
+                    const PharmaCareWordmark(fontSize: 26),
                     const Text(
                       'Putting Patients at the Heart of Every Supply.',
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 8),
                     TextFormField(
                       controller: _email,
                       keyboardType: TextInputType.emailAddress,
@@ -87,12 +83,15 @@ class _LoginPageState extends State<LoginPage> {
                         labelText: 'Adresse e-mail ou identifiant',
                         prefixIcon: Icon(Icons.email_outlined),
                         border: OutlineInputBorder(),
+                        constraints: BoxConstraints(minHeight: 48),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14),
                       ),
-                      validator: (value) => value == null || value.trim().isEmpty
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
                           ? 'Adresse e-mail ou identifiant requis'
                           : null,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     TextFormField(
                       controller: _password,
                       obscureText: !_passwordVisible,
@@ -113,6 +112,10 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         border: const OutlineInputBorder(),
+                        constraints: const BoxConstraints(minHeight: 48),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                        ),
                       ),
                       validator: (value) => value == null || value.isEmpty
                           ? 'Mot de passe requis'
@@ -121,7 +124,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     if (_error != null)
                       Padding(
-                        padding: const EdgeInsets.only(top: 12),
+                        padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           _error!,
                           style: TextStyle(
@@ -131,26 +134,22 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton(
+                      child: AppButton.text(
+                        compact: true,
+                        label: 'Mot de passe oublié ?',
+                        icon: Icons.help_outline_rounded,
                         onPressed: () => context.push('/forgot-password'),
-                        child: const Text('Mot de passe oubli\u00e9 ?'),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    FilledButton.icon(
-                      onPressed: _loading ? null : _submit,
-                      icon: _loading
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.login),
-                      label: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        child: Text('Se connecter'),
-                      ),
+                    const SizedBox(height: 4),
+                    AppButton.primary(
+                      label: 'Se connecter',
+                      icon: Icons.login_rounded,
+                      loading: _loading,
+                      expanded: true,
+                      onPressed: _submit,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 4),
                     const Text(
                       'Mode hors connexion disponible apr\u00e8s une premi\u00e8re connexion r\u00e9ussie.',
                       textAlign: TextAlign.center,

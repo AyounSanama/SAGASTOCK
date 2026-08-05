@@ -1,102 +1,103 @@
-# Modèle conceptuel de données
+# Modèle conceptuel et dictionnaire des données
 
-Ce modèle est une base de validation. Il précède volontairement les migrations.
+Statut : **référence conceptuelle V1 à valider avant migrations correctives**.
 
-## Familles de tables
+## Principes
 
-| Domaine | Tables principales |
-|---|---|
-| Identité | `users`, `roles`, `permissions`, `role_assignments`, `devices`, `sessions` |
-| Organisation | `organizations`, `missions`, `countries`, `projects`, `donors`, `programs`, `project_donors` |
-| Structures | `facilities`, `departments`, `storage_sites`, `facility_users` |
-| Configuration | `feature_flags`, `project_settings`, `alert_thresholds`, `calculation_rule_versions` |
-| Référentiels | `product_categories`, `units`, `dosage_forms`, `routes`, `pathologies`, `target_populations`, `suppliers` |
-| Produits | `products`, `product_codes`, `kits`, `kit_items`, `batches` |
-| Listes | `standard_lists`, `standard_list_versions`, `standard_list_items`, `facility_list_assignments` |
-| Stocks | `stock_movements`, `stock_balances`, `transfers`, `quarantines`, `destructions` |
-| Réceptions | `receipts`, `receipt_items`, `receipt_documents` |
-| Patients | `patients`, `patient_identifiers`, `prescribers` |
-| Ordonnances | `prescriptions`, `prescription_items`, `prescription_files` |
-| Dispensations | `dispensations`, `dispensation_items`, `dispensation_returns` |
-| Inventaires | `inventories`, `inventory_lines`, `inventory_adjustments`, `inventory_approvals` |
-| Commandes | `orders`, `order_items`, `order_approvals`, `deliveries` |
-| Alertes | `alert_rules`, `alerts`, `alert_acknowledgements` |
-| Rapports | `report_runs`, `report_files`, `signatures`, `exports` |
-| Formation | `training_contents`, `courses`, `course_progress`, `training_assessments` |
-| Supervision | `supervisions`, `supervision_criteria`, `supervision_answers`, `recommendations` |
-| Chaîne du froid | `cold_chain_equipment`, `temperature_readings`, `temperature_alerts` |
-| Synchronisation | `sync_commands`, `sync_cursors`, `sync_conflicts`, `sync_logs`, `idempotency_keys` |
-| Audit | `audit_logs`, `file_access_logs` |
+- UUID pour toute donnée créée hors ligne.
+- PostgreSQL est central ; SQLite est une projection locale par site.
+- `site_id` est obligatoire sur toute opération locale de stock.
+- Les mouvements validés, audits et synchronisations sont append-only.
+- Le solde est une projection recalculable, jamais la source de vérité.
+- Suppression logique des référentiels et comptes ; aucune suppression physique
+  des transactions validées.
+- Montants décimaux avec devise ; quantités décimales avec unité.
 
-## Principes d'intégrité
+## Dictionnaire V1
 
-- UUID pour toute entité pouvant être créée hors ligne.
-- Clés étrangères et contraintes d'unicité appliquées en base.
-- `organization_id` obligatoire sur les données appartenant à une organisation.
-- Montants en type décimal et devise explicite.
-- Quantités en décimal avec précision adaptée à l'unité.
-- Dates métier distinctes des dates techniques.
-- Suppression logique ciblée ; aucune suppression physique d'un mouvement,
-  inventaire validé, dispensation ou audit.
-- Un mouvement validé est append-only.
-- Un solde de stock est une projection ; il ne remplace pas le registre.
-- Les règles de calcul portent un identifiant de version.
+| Entité/table | Finalité | Relations essentielles |
+|---|---|---|
+| `organizations` | ONG ou ministère | pays, missions |
+| `countries` | Pays de référence | missions, protocoles |
+| `missions` | Mission nationale | organisation, pays, projets |
+| `projects` | Projet de santé | mission, bailleurs, programmes, structures |
+| `donors` | Bailleur | organisation, projets |
+| `programs` | Programme de santé | organisation, bailleur?, projets |
+| `project_donors` | Financement | projet, bailleur, montant, devise |
+| `program_project` | Affectation programme | projet, programme |
+| `health_facilities` | Formation sanitaire | organisation, mission, soins, catégorie |
+| `health_facility_project` | Affectation structure | formation sanitaire, projet |
+| `sites` | Site stockage/dispensation | formation sanitaire |
+| `users` | Compte personnel | sécurité, statut |
+| `roles` | Cinq rôles officiels | niveau hiérarchique |
+| `permissions` | Action atomique | code unique |
+| `role_user` | Rôle et scope | utilisateur, rôle, type/id de scope |
+| `permission_user` | Délégation locale | utilisateur, permission |
+| `devices` | Appareil enregistré | utilisateur, révocation |
+| `setup_progress` | Assistant initial | étape, état, validateur |
+| `module_activations` | Modules actifs | module, scope |
+| `project_supply_settings` | Approvisionnement | projet, délais, périodicité, tampon |
+| `care_levels` | Niveaux de soins | pays, code |
+| `target_populations` | Populations cibles | code, libellé |
+| `pathologies` | Pathologies | pays, protocole/version |
+| `product_categories` | Catégories produits | code, nom |
+| `units` | Unités | code, précision |
+| `suppliers` | Fournisseurs | organisation, code |
+| `products` | Produit médical | code, DCI, dosage, conditionnement, unité, prix, GS1 |
+| `standard_lists` | Liste standard logique | critères de génération |
+| `standard_list_versions` | Version publiée | liste, version, validateur |
+| `standard_list_items` | Articles autorisés | version, produit, prix, substitution |
+| `site_standard_lists` | Affectation | site, version |
+| `product_batches` | Lot physique | produit, expiration, origine, bailleur, projet, fournisseur |
+| `receipts` | Réception | site, origine, commande?, statut |
+| `receipt_items` | Ligne reçue | produit, lot, commandé, reçu, prix |
+| `stock_movements` | Registre de stock | site, lot, type, quantité signée, source |
+| `stock_balances` | Projection de solde | site, lot, quantité |
+| `transfers` | Transfert | site origine/destination |
+| `dispensations` | Sortie autorisée | site, type, patient/service, statut |
+| `dispensation_items` | Ligne délivrée | produit, lot, quantité, substitution |
+| `inventories` | Session d'inventaire | site, type, période, statut |
+| `inventory_lines` | Comptage | lot, théorique, physique, écart |
+| `orders` | Commande | site, projet, type, période, statut |
+| `order_items` | Besoin | produit, CMM, disponible, proposé, validé |
+| `alerts` | Alerte logistique | site, type, gravité, statut |
+| `sync_operations` | File de synchronisation | appareil, site, entité, action, payload |
+| `sync_conflicts` | Conflit | versions locale/serveur, résolution |
+| `audit_logs` | Traçabilité | acteur, action, ressource, avant/après |
 
-## ERD organisationnel
+## Relations structurantes
 
 ```mermaid
 erDiagram
-  ORGANIZATION ||--o{ MISSION : possède
+  ORGANIZATION ||--o{ MISSION : possede
   MISSION ||--o{ PROJECT : porte
-  PROJECT }o--o{ DONOR : financé_par
-  PROJECT }o--o{ PROGRAM : active
-  PROJECT }o--o{ FACILITY : dessert
-  FACILITY ||--o{ STORAGE_SITE : contient
-  FACILITY }o--o{ USER : affecte
-  USER ||--o{ DEVICE : utilise
-  USER }o--o{ ROLE : reçoit
-  ROLE }o--o{ PERMISSION : contient
+  PROJECT }o--o{ DONOR : finance
+  PROJECT }o--o{ PROGRAM : applique
+  PROJECT }o--o{ HEALTH_FACILITY : dessert
+  HEALTH_FACILITY ||--o{ SITE : contient
+  SITE ||--o{ STOCK_MOVEMENT : enregistre
+  PRODUCT ||--o{ PRODUCT_BATCH : possede
+  PRODUCT_BATCH ||--o{ STOCK_MOVEMENT : concerne
+  STANDARD_LIST ||--o{ STANDARD_LIST_VERSION : versionne
+  STANDARD_LIST_VERSION ||--o{ STANDARD_LIST_ITEM : contient
+  SITE }o--o{ STANDARD_LIST_VERSION : utilise
 ```
 
-## ERD stock
+## Source de vérité du stock
 
-```mermaid
-erDiagram
-  PRODUCT ||--o{ BATCH : possède
-  PRODUCT }o--o{ STANDARD_LIST_VERSION : autorisé_dans
-  STORAGE_SITE ||--o{ STOCK_MOVEMENT : enregistre
-  BATCH ||--o{ STOCK_MOVEMENT : concerne
-  RECEIPT ||--o{ RECEIPT_ITEM : contient
-  RECEIPT_ITEM ||--o{ STOCK_MOVEMENT : génère
-  DISPENSATION ||--o{ DISPENSATION_ITEM : contient
-  DISPENSATION_ITEM ||--o{ STOCK_MOVEMENT : génère
-  INVENTORY ||--o{ INVENTORY_LINE : contient
-  INVENTORY_LINE ||--o{ INVENTORY_ADJUSTMENT : justifie
-  INVENTORY_ADJUSTMENT ||--o{ STOCK_MOVEMENT : génère
+```text
+transaction validée → mouvement immuable → projection du solde → alertes/rapports
 ```
 
-## ERD patient et dispensation
+Une correction crée un mouvement compensatoire.
 
-```mermaid
-erDiagram
-  PATIENT ||--o{ PRESCRIPTION : reçoit
-  PRESCRIBER ||--o{ PRESCRIPTION : prescrit
-  PRESCRIPTION ||--|{ PRESCRIPTION_ITEM : contient
-  PRESCRIPTION ||--o{ PRESCRIPTION_FILE : documente
-  PRESCRIPTION ||--o{ DISPENSATION : exécutée_par
-  DISPENSATION ||--|{ DISPENSATION_ITEM : contient
-  PRODUCT ||--o{ PRESCRIPTION_ITEM : demandé
-  BATCH ||--o{ DISPENSATION_ITEM : délivré
-```
+## Projection SQLite d'un site
 
-## Questions de modélisation restantes
+- profil, rôle, permissions et scope ;
+- configuration du site ;
+- référentiels et liste standard affectée ;
+- lots et soldes du site ;
+- transactions locales nécessaires ;
+- file `sync_operations`, curseurs et conflits.
 
-- Un bailleur finance-t-il directement un lot, une réception, une ligne de
-  réception ou une combinaison de ces niveaux ?
-- Une mission est-elle toujours limitée à un pays ?
-- Une formation sanitaire peut-elle appartenir à plusieurs projets simultanés ?
-- Quel identifiant patient doit être unique : plateforme, organisation, pays,
-  projet ou formation sanitaire ?
-- Une dispensation hors ligne réserve-t-elle le stock ou crée-t-elle
-  immédiatement un mouvement de sortie local ?
-
+Le mobile ne télécharge aucune donnée opérationnelle d'un autre site.

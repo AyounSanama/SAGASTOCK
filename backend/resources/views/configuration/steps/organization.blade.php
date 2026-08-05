@@ -1,0 +1,149 @@
+@php
+    $typeLabels = $organizationTypes;
+    $countryNames = $countries->pluck('name', 'iso2');
+@endphp
+<section class="wizard-step-content organization-management">
+    <header class="organization-page-head">
+        <div>
+            <span class="eyebrow">Étape 1</span>
+            <h2>Organisations</h2>
+            <p>Gérez les organisations autorisées à utiliser la plateforme.</p>
+        </div>
+        @if($canManageOrganizations)
+            <a class="button primary always-visible-add"
+               href="{{ route('configuration.workflow.start', ['flowType' => \App\Enums\ConfigurationFlowType::NewOrganization->value]) }}">
+                ＋ Ajouter une organisation
+            </a>
+        @endif
+    </header>
+
+    @if(session('success'))
+        <div class="alert success" role="status">{{ session('success') }}</div>
+    @endif
+    @if($errors->any())
+        <div class="alert error validation-summary" role="alert">
+            <strong>Le formulaire contient {{ $errors->count() }} erreur(s).</strong>
+            <ul>@foreach($errors->all() as $message)<li>{{ $message }}</li>@endforeach</ul>
+        </div>
+    @endif
+
+    <div class="organization-table-wrap">
+        <table class="organization-table">
+            <thead><tr>
+                <th>Nom de l’organisation</th>
+                <th>Type</th>
+                <th>Pays principal</th>
+                <th>Code</th>
+                <th>Missions</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr></thead>
+            <tbody>
+            @forelse($organizations as $item)
+                <tr @class(['workflow-scope-row' => $workflow->scope_id === $item->id])>
+                    <td><strong>{{ $item->name }}</strong><small>{{ $item->email ?: 'Aucun e-mail' }}</small></td>
+                    <td>{{ $typeLabels[$item->organization_type] ?? 'Autre' }}</td>
+                    <td>{{ $countryNames[$item->country_code] ?? $item->country_code ?? '—' }}</td>
+                    <td><code>{{ $item->code }}</code></td>
+                    <td><span class="count-badge">{{ $item->missions_count }}</span></td>
+                    <td><span class="status-badge {{ $item->is_active ? 'success' : 'muted' }}">{{ $item->is_active ? 'Actif' : 'Inactif' }}</span></td>
+                    <td>
+                        <div class="row-actions">
+                            <button class="action-link view" type="button" data-sheet-open="view-organization-{{ $item->id }}">Voir</button>
+                            @if($canManageOrganizations)
+                                <a class="action-link edit" href="{{ route('configuration.organization', ['_flow'=>$workflow->workflow_id, 'edit'=>$item->id]) }}">Modifier</a>
+                            @endif
+                            <a class="action-link missions" href="{{ route('organizations.missions.index', $item) }}">Voir les missions</a>
+                            @if($canManageOrganizations)
+                                <form method="post" action="{{ route('configuration.organization.archive', ['organization'=>$item, '_flow'=>$workflow->workflow_id]) }}" onsubmit="return confirm('Archiver cette organisation ? Toutes ses données seront conservées.')">
+                                    @csrf @method('DELETE')
+                                    <button class="action-link archive" type="submit">Archiver</button>
+                                </form>
+                            @endif
+                        </div>
+                    </td>
+                </tr>
+            @empty
+                <tr><td colspan="7"><div class="empty-organizations"><strong>Aucune organisation</strong><p>Ajoutez la première organisation autorisée à utiliser PharmaCare.</p></div></td></tr>
+            @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    @foreach($organizations as $item)
+        <x-form-sheet id="view-organization-{{ $item->id }}" title="{{ $item->name }}" description="Informations de l’organisation" width="680px">
+            <dl class="organization-details">
+                <div><dt>Type</dt><dd>{{ $typeLabels[$item->organization_type] ?? 'Autre' }}</dd></div>
+                <div><dt>Pays principal</dt><dd>{{ $countryNames[$item->country_code] ?? '—' }}</dd></div>
+                <div><dt>Code</dt><dd>{{ $item->code }}</dd></div>
+                <div><dt>Langue</dt><dd>{{ $item->default_language === 'en' ? 'English' : 'Français' }}</dd></div>
+                <div><dt>Téléphone</dt><dd>{{ $item->phone ?: '—' }}</dd></div>
+                <div><dt>E-mail</dt><dd>{{ $item->email ?: '—' }}</dd></div>
+                <div class="full"><dt>Adresse</dt><dd>{{ $item->address ?: '—' }}</dd></div>
+                <div><dt>Responsable</dt><dd>{{ $item->manager_name ?: '—' }}</dd></div>
+                <div><dt>Fonction</dt><dd>{{ $item->manager_title ?: '—' }}</dd></div>
+                <div class="full"><dt>Description</dt><dd>{{ $item->description ?: '—' }}</dd></div>
+            </dl>
+            <div class="form-sheet-actions">
+                <button class="button secondary" type="button" data-sheet-close="view-organization-{{ $item->id }}">Fermer</button>
+            </div>
+        </x-form-sheet>
+    @endforeach
+
+    @if($workflow->scope_id && $completedSteps->contains(1))
+        <div class="organization-next-step">
+            <div><strong>{{ $organization?->name }}</strong><p>L’organisation est enregistrée. Vous pouvez maintenant créer sa première mission.</p></div>
+            <a class="button primary" href="{{ route('configuration.workflow.start', ['flowType'=>\App\Enums\ConfigurationFlowType::NewMission->value, 'organization'=>$workflow->scope_id]) }}">Créer une mission →</a>
+        </div>
+    @endif
+</section>
+
+@if($canManageOrganizations)
+<x-form-sheet id="create-organization-sheet" title="Ajouter une organisation" description="Créez une nouvelle organisation indépendante. Le formulaire ne reprend aucune ancienne donnée." width="860px">
+    <form method="post" action="{{ route('configuration.organization.save', ['_flow'=>$workflow->workflow_id]) }}" enctype="multipart/form-data" data-organization-mode="createOrganization">
+        @csrf
+        <input type="hidden" name="_form_mode" value="createOrganization">
+        @include('configuration.components.organization-form-fields', ['item'=>null, 'mode'=>'createOrganization'])
+        <div class="form-sheet-actions">
+            <button class="button secondary" type="button" data-sheet-close="create-organization-sheet">Annuler</button>
+            <button class="button primary" type="submit">Créer l’organisation</button>
+        </div>
+    </form>
+</x-form-sheet>
+
+@if($editingOrganization)
+<x-form-sheet id="edit-organization-sheet" title="Modifier l’organisation" description="Les changements s’appliqueront uniquement à {{ $editingOrganization->name }}." width="860px">
+    <form method="post" action="{{ route('configuration.organization.update', ['organization'=>$editingOrganization, '_flow'=>$workflow->workflow_id]) }}" enctype="multipart/form-data" data-organization-mode="editOrganization">
+        @csrf @method('PUT')
+        <input type="hidden" name="_form_mode" value="editOrganization">
+        @include('configuration.components.organization-form-fields', ['item'=>$editingOrganization, 'mode'=>'editOrganization'])
+        <div class="form-sheet-actions">
+            <button class="button secondary" type="button" data-sheet-close="edit-organization-sheet">Annuler</button>
+            <button class="button primary" type="submit">Enregistrer les modifications</button>
+        </div>
+    </form>
+</x-form-sheet>
+@endif
+@endif
+
+@push('styles')
+<style>
+.organization-page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:26px 28px;border-bottom:1px solid #e7ebf1}.organization-page-head h2{margin:4px 0 6px}.organization-page-head p{margin:0;color:#667085}.always-visible-add{white-space:nowrap}.organization-table-wrap{margin:24px 28px;overflow:auto;border:1px solid #e2e8f0;border-radius:16px}.organization-table{width:100%;min-width:1100px;border-collapse:collapse}.organization-table th{padding:13px 15px;background:#f8fafc;color:#475467;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.03em}.organization-table td{padding:15px;border-top:1px solid #edf0f4;vertical-align:middle}.organization-table td>strong,.organization-table td>small{display:block}.organization-table td>small{margin-top:4px;color:#7b8493}.organization-table code{padding:4px 8px;border-radius:7px;background:#f3f5f8;color:#26364d}.workflow-scope-row{background:#fff9f2}.count-badge{display:inline-grid;place-items:center;min-width:30px;height:30px;border-radius:10px;background:#eef4ff;color:#2563eb;font-weight:800}.row-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.row-actions form{margin:0}.action-link{border:1px solid transparent!important;background:transparent!important;box-shadow:none!important;padding:7px 9px!important;border-radius:9px!important;font-size:12px!important;font-weight:750!important;text-decoration:none;white-space:nowrap}.action-link.view{color:#16a34a!important;border-color:#bbf7d0!important}.action-link.edit{color:#f47a20!important;border-color:#fed7aa!important}.action-link.missions{color:#2563eb!important;border-color:#bfdbfe!important}.action-link.archive{color:#dc2626!important;border-color:#fecaca!important}.organization-next-step{margin:0 28px 28px;padding:18px 20px;border:1px solid #fed7aa;border-radius:15px;background:#fff8f1;display:flex;align-items:center;justify-content:space-between;gap:20px}.organization-next-step p{margin:4px 0 0;color:#667085}.empty-organizations{text-align:center;padding:35px;color:#667085}.organization-details{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0}.organization-details div{padding:13px;border-radius:12px;background:#f8fafc}.organization-details .full{grid-column:1/-1}.organization-details dt{font-size:12px;color:#667085}.organization-details dd{margin:5px 0 0;font-weight:700}.organization-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.organization-form-grid .full{grid-column:1/-1}.organization-form-grid label{display:block;margin-bottom:6px;font-weight:700;color:#344054}.organization-form-grid input,.organization-form-grid select,.organization-form-grid textarea{width:100%;min-height:46px;padding:10px 12px;border:1px solid #d0d5dd;border-radius:11px;background:#fff;font:inherit}.organization-form-grid textarea{min-height:90px;resize:vertical}.form-sheet{border:0;padding:0;background:transparent;max-width:none;width:100%;height:100%;margin:0}.form-sheet::backdrop{background:rgba(8,21,43,.62)}.form-sheet-panel{position:absolute;right:0;top:0;height:100%;width:min(var(--sheet-width,760px),calc(100% - 20px));background:#fff;display:flex;flex-direction:column;box-shadow:-18px 0 48px rgba(9,29,58,.2);border-radius:22px 0 0 22px}.form-sheet-header{display:flex;justify-content:space-between;padding:22px 26px;border-bottom:1px solid #e2e8f0}.form-sheet-header h2{margin:0}.form-sheet-header p{margin:5px 0 0;color:#667085}.form-sheet-close{width:42px;height:42px;padding:0!important;border:1px solid #e2e8f0!important;background:#f8fafc!important;color:#172b4d!important;box-shadow:none!important}.form-sheet-body{padding:24px 26px 30px;overflow:auto}.form-sheet-actions{position:sticky;bottom:-30px;margin:24px -26px -30px;padding:17px 26px;background:#fff;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:10px}.field-error{display:block;color:#dc2626;margin-top:5px}@media(max-width:760px){.organization-page-head,.organization-next-step{flex-direction:column}.organization-form-grid,.organization-details{grid-template-columns:1fr}.organization-form-grid .full,.organization-details .full{grid-column:auto}.form-sheet-panel{top:auto;bottom:0;width:100%;height:94%;border-radius:22px 22px 0 0}.form-sheet-actions{flex-direction:column-reverse}}
+</style>
+@endpush
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+    const openSheet=id=>{const sheet=document.getElementById(id);if(sheet&&!sheet.open)sheet.showModal()};
+    document.querySelectorAll('[data-sheet-open]').forEach(button=>button.addEventListener('click',()=>openSheet(button.dataset.sheetOpen)));
+    document.querySelectorAll('[data-sheet-close]').forEach(button=>button.addEventListener('click',()=>document.getElementById(button.dataset.sheetClose)?.close()));
+    document.querySelectorAll('.form-sheet').forEach(sheet=>{
+        sheet.addEventListener('cancel',event=>{event.preventDefault();sheet.close()});
+        sheet.addEventListener('click',event=>{if(event.target===sheet)sheet.close()});
+    });
+    @if(request()->boolean('create') || old('_form_mode') === 'createOrganization') openSheet('create-organization-sheet'); @endif
+    @if($editingOrganization || old('_form_mode') === 'editOrganization') openSheet('edit-organization-sheet'); @endif
+});
+</script>
+@endpush

@@ -13,7 +13,11 @@ class Organization extends Model
 
     public $incrementing = false;
     protected $keyType = 'string';
-    protected $fillable = ['code', 'name', 'legal_name', 'email', 'phone', 'country_code', 'address', 'is_active'];
+    protected $fillable = [
+        'code', 'name', 'legal_name', 'organization_type', 'logo_path',
+        'email', 'phone', 'country_code', 'default_language', 'address',
+        'manager_name', 'manager_title', 'description', 'is_active',
+    ];
 
     protected function casts(): array
     {
@@ -44,6 +48,8 @@ class Organization extends Model
     {
         return $this->hasMany(HealthFacility::class);
     }
+    public function sites(): HasMany { return $this->hasMany(Site::class); }
+    public function users(): HasMany { return $this->hasMany(User::class); }
     public function catalogReferences(): HasMany { return $this->hasMany(CatalogReference::class); }
     public function suppliers(): HasMany { return $this->hasMany(Supplier::class); }
     public function products(): HasMany { return $this->hasMany(Product::class); }

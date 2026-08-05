@@ -14,7 +14,7 @@ class StockMovement extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['organization_id', 'site_id', 'product_id', 'batch_id', 'movement_type', 'quantity', 'unit_cost', 'currency', 'reference_type', 'reference_id', 'compensates_movement_id', 'reason', 'status', 'created_by', 'validated_by', 'validated_at'];
+    protected $fillable = ['organization_id', 'site_id', 'product_id', 'batch_id', 'movement_type', 'quantity', 'unit_cost', 'currency', 'reference_type', 'reference_id', 'client_reference', 'compensates_movement_id', 'reason', 'status', 'created_by', 'validated_by', 'validated_at'];
 
     protected function casts(): array
     {

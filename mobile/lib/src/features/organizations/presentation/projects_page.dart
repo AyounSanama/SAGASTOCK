@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_form_sheet.dart';
 
 import '../data/organization_service.dart';
 
@@ -61,7 +63,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     final name = TextEditingController();
     final description = TextEditingController();
     final key = GlobalKey<FormState>();
-    final created = await showDialog<bool>(
+    final created = await showAppDialogAsFormSheet<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Nouveau projet'),
@@ -91,11 +93,13 @@ class _ProjectsPageState extends State<ProjectsPage> {
           ),
         ),
         actions: [
-          TextButton(
+          AppButton.cancel(
+            label: 'Annuler',
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
           ),
-          FilledButton(
+          AppButton.add(
+            label: 'Créer',
+            icon: Icons.create_new_folder_outlined,
             onPressed: () async {
               if (!(key.currentState?.validate() ?? false)) return;
               try {
@@ -120,7 +124,6 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 );
               }
             },
-            child: const Text('Créer'),
           ),
         ],
       ),
@@ -135,10 +138,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.missionName)),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: AppFab(
         onPressed: _create,
-        icon: const Icon(Icons.add),
-        label: const Text('Projet'),
+        tooltip: 'Ajouter un projet',
       ),
       body: RefreshIndicator(
         onRefresh: _load,

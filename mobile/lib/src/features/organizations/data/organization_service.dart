@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -17,13 +19,34 @@ class OrganizationService {
   }
 
   Future<List<Map<String, dynamic>>> list({String search = ''}) async {
-    final response = await _client.dio.get<Map<String, dynamic>>(
-      '/organizations',
-      queryParameters: search.isEmpty ? null : {'search': search},
-      options: await _authorized(),
-    );
-    return (response.data?['data'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>();
+    const cacheKey = 'offline_organizations';
+    try {
+      final response = await _client.dio.get<Map<String, dynamic>>(
+        '/organizations',
+        queryParameters: search.isEmpty ? null : {'search': search},
+        options: await _authorized(),
+      );
+      final values = (response.data?['data'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>();
+      if (search.isEmpty) {
+        await _storage.write(key: cacheKey, value: jsonEncode(values));
+      }
+      return values;
+    } on DioException catch (error) {
+      if (error.response != null) rethrow;
+      final cached = await _storage.read(key: cacheKey);
+      final values = (cached == null ? <dynamic>[] : jsonDecode(cached) as List)
+          .cast<Map<String, dynamic>>();
+      final query = search.trim().toLowerCase();
+      if (query.isEmpty) return values;
+      return values
+          .where(
+            (item) =>
+                '${item['name']}'.toLowerCase().contains(query) ||
+                '${item['code']}'.toLowerCase().contains(query),
+          )
+          .toList();
+    }
   }
 
   Future<void> create({
@@ -67,6 +90,14 @@ class OrganizationService {
     required String countryId,
     required String code,
     required String name,
+    DateTime? startsOn,
+    DateTime? endsOn,
+    String? address,
+    String? managerName,
+    String? phone,
+    String? email,
+    String? description,
+    bool isActive = true,
   }) async {
     await _client.dio.post<void>(
       '/organizations/$organizationId/missions',
@@ -74,11 +105,55 @@ class OrganizationService {
         'country_id': countryId,
         'code': code,
         'name': name,
-        'is_active': true,
+        'starts_on': _date(startsOn),
+        'ends_on': _date(endsOn),
+        'address': address,
+        'manager_name': managerName,
+        'phone': phone,
+        'email': email,
+        'description': description,
+        'is_active': isActive,
       },
       options: await _authorized(),
     );
   }
+
+  Future<void> updateMission({
+    required String organizationId,
+    required String missionId,
+    required String countryId,
+    required String code,
+    required String name,
+    DateTime? startsOn,
+    DateTime? endsOn,
+    String? address,
+    String? managerName,
+    String? phone,
+    String? email,
+    String? description,
+    required bool isActive,
+  }) async {
+    await _client.dio.put<void>(
+      '/organizations/$organizationId/missions/$missionId',
+      data: {
+        'country_id': countryId,
+        'code': code,
+        'name': name,
+        'starts_on': _date(startsOn),
+        'ends_on': _date(endsOn),
+        'address': address,
+        'manager_name': managerName,
+        'phone': phone,
+        'email': email,
+        'description': description,
+        'is_active': isActive,
+      },
+      options: await _authorized(),
+    );
+  }
+
+  String? _date(DateTime? value) =>
+      value?.toIso8601String().split('T').first;
 
   Future<List<Map<String, dynamic>>> projects({
     required String organizationId,
