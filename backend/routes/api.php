@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\DispensationController;
 use App\Http\Controllers\Api\V1\FundingController;
+use App\Http\Controllers\Api\V1\InventoryController;
+use App\Http\Controllers\Api\V1\SupplyOrderController;
 use App\Http\Controllers\Api\V1\MissionController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\PasswordController;
@@ -49,12 +51,30 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware('permission:stocks.adjust')->group(function (): void {
             Route::post('/organizations/{organization}/stocks/movements/{movement}/compensate', [StockController::class, 'compensate']);
             Route::post('/organizations/{organization}/stocks/holds', [StockController::class, 'storeHold']);
+            Route::post('/organizations/{organization}/stocks/holds/{hold}/release', [StockController::class, 'releaseHold']);
         });
         Route::middleware('permission:transfers.manage')->group(function (): void {
             Route::post('/organizations/{organization}/stocks/transfers', [StockController::class, 'storeTransfer']);
             Route::post('/organizations/{organization}/stocks/transfers/{transfer}/dispatch', [StockController::class, 'dispatch']);
             Route::post('/organizations/{organization}/stocks/transfers/{transfer}/receive', [StockController::class, 'receive']);
         });
+        Route::get('/organizations/{organization}/inventories', [InventoryController::class, 'index'])->middleware('permission:inventories.view');
+        Route::middleware('permission:inventories.manage')->group(function (): void {
+            Route::get('/organizations/{organization}/inventories/options', [InventoryController::class, 'options']);
+            Route::post('/organizations/{organization}/inventories', [InventoryController::class, 'store']);
+            Route::post('/organizations/{organization}/inventories/{inventory}/start', [InventoryController::class, 'start']);
+            Route::put('/organizations/{organization}/inventories/{inventory}/count', [InventoryController::class, 'count']);
+            Route::post('/organizations/{organization}/inventories/{inventory}/submit', [InventoryController::class, 'submit']);
+        });
+        Route::post('/organizations/{organization}/inventories/{inventory}/validate', [InventoryController::class, 'validateInventory'])->middleware('permission:inventories.validate');
+        Route::get('/organizations/{organization}/orders', [SupplyOrderController::class, 'index'])->middleware('permission:orders.view');
+        Route::middleware('permission:orders.manage')->group(function (): void {
+            Route::get('/organizations/{organization}/orders/options', [SupplyOrderController::class, 'options']);
+            Route::post('/organizations/{organization}/orders', [SupplyOrderController::class, 'store']);
+            Route::post('/organizations/{organization}/orders/{order}/submit', [SupplyOrderController::class, 'submit']);
+        });
+        Route::post('/organizations/{organization}/orders/{order}/decision', [SupplyOrderController::class, 'decide'])->middleware('permission:orders.approve');
+        Route::post('/organizations/{organization}/orders/{order}/prepare', [SupplyOrderController::class, 'prepare'])->middleware('permission:orders.prepare');
         Route::get('/organizations/{organization}/receipts', [ReceiptController::class, 'index'])->middleware('permission:stocks.view');
         Route::middleware('permission:receipts.manage')->group(function (): void {
             Route::get('/organizations/{organization}/receipts/options', [ReceiptController::class, 'options']);
@@ -62,6 +82,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/organizations/{organization}/receipts/{receipt}/validate', [ReceiptController::class, 'validateReceipt']);
         });
         Route::get('/organizations/{organization}/patients', [DispensationController::class, 'patients'])->middleware('permission:patients.view');
+        Route::get('/organizations/{organization}/patients/{patient}/history', [DispensationController::class, 'patientHistory'])->middleware('permission:patients.view');
         Route::middleware('permission:patients.manage')->group(function (): void {
             Route::post('/organizations/{organization}/patients', [DispensationController::class, 'storePatient']);
             Route::put('/organizations/{organization}/patients/{patient}', [DispensationController::class, 'updatePatient']);
@@ -74,7 +95,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/organizations/{organization}/dispensations', [DispensationController::class, 'dispensations'])->middleware('permission:dispensations.view');
         Route::middleware('permission:dispensations.manage')->group(function (): void {
             Route::get('/organizations/{organization}/dispensations/options', [DispensationController::class, 'options']);
+            Route::get('/organizations/{organization}/dispensations/fefo', [DispensationController::class, 'fefoSuggestion']);
             Route::post('/organizations/{organization}/dispensations', [DispensationController::class, 'storeDispensation']);
+            Route::post('/organizations/{organization}/dispensations/{dispensation}/return', [DispensationController::class, 'returnDispensation']);
         });
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -92,7 +115,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/users/archived', [UserController::class, 'archived'])->middleware('permission:users.view');
         Route::get('/users/archived/{user}', [UserController::class, 'showArchived'])->middleware('permission:users.view');
         Route::post('/users/archived/{user}/restore', [UserController::class, 'restore'])->middleware('permission:users.manage');
-        Route::post('/users', [UserController::class, 'store']);
+        Route::post('/users', [UserController::class, 'store'])->middleware('permission:users.manage|users.create_site_admin');
         Route::get('/users/{user}', [UserController::class, 'show'])->middleware('permission:users.view');
         Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:users.manage');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.manage');

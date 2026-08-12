@@ -197,6 +197,63 @@ class ConfigurationWizardController extends Controller
             ->with('success', 'Étape enregistrée avec succès.');
     }
 
+    public function storeUserAccount(Request $request): RedirectResponse
+    {
+        $progress = $this->workflows->resolve($request);
+        abort_unless(collect($progress->completed_steps ?? [])->map(fn ($v) => (int) $v)->contains(10), 403);
+        $organization = $this->organization($request);
+        $this->authorizeStep($request, 11);
+        $data = $request->validate([
+            'first_name'=>['required','string','max:80'], 'last_name'=>['required','string','max:80'],
+            'username'=>['required','alpha_dash','max:80','unique:users,username'],
+            'email'=>['required','email','unique:users,email'], 'phone'=>['nullable','string','max:40'],
+            'role_id'=>['required','integer','exists:roles,id'],
+            'password'=>['required','confirmed',Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+        ]);
+        $role = $this->scopes->assignableRoles($request->user())->findOrFail($data['role_id']);
+        [$scopeType,$scopeId] = $this->scopeForRole($role, $organization);
+        abort_unless($this->governance->canAssign($request->user(), $role, $scopeType, $scopeId), 403);
+        $user = User::create([
+            'organization_id'=>$organization->id, 'first_name'=>$data['first_name'], 'last_name'=>$data['last_name'],
+            'name'=>trim($data['first_name'].' '.$data['last_name']), 'username'=>strtolower($data['username']),
+            'email'=>strtolower($data['email']), 'phone'=>$data['phone'] ?? null, 'password'=>$data['password'],
+            'is_active'=>true, 'must_change_password'=>true,
+        ]);
+        $user->roles()->attach($role, ['scope_type'=>$scopeType,'scope_id'=>$scopeId]);
+        $this->audit->record($request, 'configuration.user.created', $user);
+        return redirect()->route('configuration.step', $this->workflows->requestParameters($request, $progress, ['step'=>'users-access']))
+            ->with('success', 'Utilisateur créé avec succès');
+    }
+
+    public function loadUserAccount(Request $request, User $user): RedirectResponse
+    {
+        $progress = $this->workflows->resolve($request);
+        abort_unless(collect($progress->completed_steps ?? [])->map(fn ($v) => (int) $v)->contains(10), 403);
+        $organization = $this->organization($request);
+        $this->authorizeStep($request, 11);
+        $user = $this->scopes->users($request->user(), User::with('roles'))
+            ->where('organization_id', $organization->id)->findOrFail($user->id);
+        abort_unless($user->is_active && $user->roles->isNotEmpty(), 422, 'Le compte doit être actif et posséder un rôle.');
+        $role = $user->roles->first();
+        $scopeType = $role->pivot->scope_type;
+        $scopeId = $role->pivot->scope_id;
+        $validScope = match ($scopeType) {
+            'organization' => $scopeId === $organization->id,
+            'project' => $organization->projects()->whereKey($scopeId)->exists(),
+            'site' => Site::whereKey($scopeId)->whereHas('healthFacility', fn ($q) => $q->where('organization_id', $organization->id))->exists(),
+            default => false,
+        };
+        abort_unless($validScope, 422, 'Le périmètre du compte est incomplet ou invalide.');
+        $this->workflows->remember($progress, 'user_id', $user->id);
+        $this->workflows->complete($progress, 11);
+        $this->audit->record($request, 'configuration.user.loaded', $user, [], [
+            'workflow_id'=>$progress->workflow_id, 'scope_type'=>$scopeType, 'scope_id'=>$scopeId,
+        ]);
+
+        return redirect()->route('configuration.step', $this->workflows->requestParameters($request, $progress, ['step'=>'summary']))
+            ->with('success', 'Compte chargé et étape Utilisateurs et accès validée.');
+    }
+
     public function archive(Request $request, string $step): RedirectResponse
     {
         $number = self::STEPS[$step] ?? abort(404);
@@ -458,8 +515,11 @@ class ConfigurationWizardController extends Controller
             'standardList' => $o->standardLists()->oldest()->first(),
             'facility' => $facility, 'facilities' => $o->healthFacilities()->where('is_active', true)->get(),
             'site' => $site,
+            'sites' => $o->healthFacilities()->with('sites')->get()->pluck('sites')->flatten(),
             'roles' => $this->scopes->assignableRoles($r->user())->orderBy('name')->get(),
             'configuredUser' => $configuredUser,
+            'configuredUsers' => $this->scopes->users($r->user(), User::with(['roles', 'organization']))
+                ->where('organization_id', $o->id)->orderBy('name')->get(),
             'archivedEntities' => collect([
                 3 => $o->projects()->onlyTrashed()->latest('deleted_at')->first(),
                 4 => $o->donors()->onlyTrashed()->latest('deleted_at')->first(),

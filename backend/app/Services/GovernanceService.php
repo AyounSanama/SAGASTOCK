@@ -14,14 +14,16 @@ class GovernanceService
         'dispensations.view', 'dispensations.manage', 'inventories.manage',
         'orders.manage', 'reports.view', 'synchronization.manage',
     ];
-    public const OWNER = 'owner';
+    public const SAGO_ADMIN = 'sago_admin';
+    /** @deprecated Utiliser SAGO_ADMIN. */
+    public const OWNER = self::SAGO_ADMIN;
     public const COORDINATION_ADMIN = 'coordination_admin';
     public const PROJECT_ADMIN = 'project_admin';
     public const SITE_ADMIN = 'site_admin';
     public const SITE_USER = 'site_user';
 
     public const OFFICIAL_ROLES = [
-        self::OWNER,
+        self::SAGO_ADMIN,
         self::COORDINATION_ADMIN,
         self::PROJECT_ADMIN,
         self::SITE_ADMIN,
@@ -29,7 +31,8 @@ class GovernanceService
     ];
 
     private const LEGACY_ALIASES = [
-        'platform_owner' => self::OWNER,
+        'owner' => self::SAGO_ADMIN,
+        'platform_owner' => self::SAGO_ADMIN,
         'organization_admin' => self::COORDINATION_ADMIN,
         'project_coordinator' => self::PROJECT_ADMIN,
         'facility_manager' => self::SITE_ADMIN,
@@ -58,7 +61,8 @@ class GovernanceService
     public function dashboard(User $user): string
     {
         return match ($this->roleCode($user)) {
-            self::OWNER, self::COORDINATION_ADMIN => 'coordination',
+            self::SAGO_ADMIN => 'platform',
+            self::COORDINATION_ADMIN => 'coordination',
             self::PROJECT_ADMIN => 'project',
             self::SITE_ADMIN, self::SITE_USER => 'site',
             default => 'site',
@@ -73,16 +77,14 @@ class GovernanceService
      */
     public function landingRoute(User $user): string
     {
-        return $this->roleCode($user) === self::COORDINATION_ADMIN
-            ? 'configuration.index'
-            : 'dashboard';
+        return $this->roleCode($user) === self::SAGO_ADMIN ? 'sago.dashboard' : 'dashboard';
     }
 
     /** @return list<string> */
     public function assignableCodes(User $actor): array
     {
         return match ($this->roleCode($actor)) {
-            self::OWNER => [self::COORDINATION_ADMIN],
+            self::SAGO_ADMIN => [self::COORDINATION_ADMIN],
             self::COORDINATION_ADMIN => [self::PROJECT_ADMIN, self::SITE_ADMIN],
             self::PROJECT_ADMIN => [self::SITE_ADMIN],
             default => [],

@@ -15,7 +15,9 @@ class UserScopeService
 {
     public function isPlatform(User $user): bool
     {
-        return $user->roles()
+        $officialRole = app(GovernanceService::class)->roleCode($user);
+        return in_array($officialRole, [GovernanceService::SAGO_ADMIN, null], true)
+            && $user->roles()
             ->wherePivot('scope_type', 'platform')
             ->exists();
     }
@@ -23,10 +25,6 @@ class UserScopeService
     public function organizationIds(User $user): Collection
     {
         if ($this->isPlatform($user)) return Organization::pluck('id');
-        if (app(GovernanceService::class)->roleCode($user) === GovernanceService::COORDINATION_ADMIN
-            && $user->hasPermission('organizations.manage')) {
-            return Organization::pluck('id');
-        }
         $direct = $user->roles()
             ->wherePivot('scope_type', 'organization')
             ->pluck('role_user.scope_id');
@@ -231,22 +229,26 @@ class UserScopeService
 
     public function assignableRoles(User $actor): Builder
     {
+        // Les rôles administratifs officiels obéissent toujours à la matrice
+        // de gouvernance, même si une ancienne affectation leur a attribué par
+        // erreur un périmètre plateforme.
+        $governance = app(GovernanceService::class);
+        $officialRole = $governance->roleCode($actor);
+        if ($officialRole !== null) {
+            $assignableCodes = $governance->assignableCodes($actor);
+
+            return $assignableCodes === []
+                ? Role::query()->whereRaw('1 = 0')
+                : Role::query()
+                    ->where('is_system', true)
+                    ->where('is_active', true)
+                    ->whereIn('code', $assignableCodes);
+        }
+
         // Les anciens rôles administratifs personnalisés restent pilotés par
         // leurs permissions explicites, sans contourner le périmètre plateforme.
         if ($this->isPlatform($actor) && $actor->hasPermission('users.manage')) {
             return Role::query()->where('is_active', true);
-        }
-
-        $assignableCodes = app(GovernanceService::class)->assignableCodes($actor);
-        if ($assignableCodes !== []) {
-            return Role::query()
-                ->where('is_system', true)
-                ->where('is_active', true)
-                ->whereIn('code', $assignableCodes);
-        }
-
-        if (app(GovernanceService::class)->roleCode($actor) !== null) {
-            return Role::query()->whereRaw('1 = 0');
         }
 
         $roleCodes = $actor->roles()->pluck('roles.code');

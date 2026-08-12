@@ -86,4 +86,57 @@ class FundingManagementTest extends TestCase
             'donor_id' => $donor['id'],
         ])->assertUnprocessable();
     }
+
+    public function test_sidebar_funding_module_opens_real_workspace_and_persists_web_forms(): void
+    {
+        $admin = $this->administrator();
+        [$organization, $project] = $this->context();
+
+        $this->actingAs($admin)->get('/funding')
+            ->assertOk()
+            ->assertSee('Bailleurs et programmes')
+            ->assertSee('donor-create-sheet')
+            ->assertSee('overflow-x:clip', false)
+            ->assertSee('grid-template-columns:minmax(0,1fr) minmax(0,1fr)', false)
+            ->assertSee($project->name);
+
+        $this->actingAs($admin)->from('/funding')->post("/organizations/{$organization->id}/donors", [
+            'code' => 'GAVI', 'name' => 'Alliance Gavi', 'email' => 'contact@gavi.test',
+        ])->assertRedirect('/funding')->assertSessionHas('status');
+        $donor = $organization->donors()->where('code', 'GAVI')->firstOrFail();
+
+        $this->actingAs($admin)->from('/funding')->post("/organizations/{$organization->id}/programs", [
+            'donor_id' => $donor->id, 'code' => 'VACCINS', 'name' => 'Programme Vaccins',
+            'starts_on' => '2026-01-01', 'ends_on' => '2026-12-31',
+        ])->assertRedirect('/funding')->assertSessionHas('status');
+        $program = $organization->programs()->where('code', 'VACCINS')->firstOrFail();
+
+        $this->actingAs($admin)->from('/funding')->post("/organizations/{$organization->id}/projects/{$project->id}/donors", [
+            'donor_id' => $donor->id, 'funding_amount' => 250000, 'currency' => 'xaf',
+            'agreement_reference' => 'CONV-2026',
+        ])->assertRedirect('/funding');
+        $this->actingAs($admin)->from('/funding')->post("/organizations/{$organization->id}/projects/{$project->id}/programs", [
+            'program_id' => $program->id,
+        ])->assertRedirect('/funding');
+
+        $this->actingAs($admin)->get('/funding?organization_id='.$organization->id.'&project_id='.$project->id)
+            ->assertOk()->assertSee('Alliance Gavi')->assertSee('Programme Vaccins')->assertSee('CONV-2026');
+        $this->assertDatabaseHas('project_donors', [
+            'project_id' => $project->id, 'donor_id' => $donor->id, 'currency' => 'XAF',
+        ]);
+    }
+
+    public function test_sidebar_funding_workspace_rejects_an_organization_outside_user_scope(): void
+    {
+        [$organization] = $this->context();
+        $other = Organization::create(['code' => 'OTHER-SCOPE', 'name' => 'Organisation hors périmètre']);
+        $role = Role::create(['code' => 'scoped_funding', 'name' => 'Financement organisation']);
+        $role->permissions()->attach([
+            Permission::firstOrCreate(['code' => 'funding.view'], ['name' => 'Consulter les financements'])->id,
+        ]);
+        $user = User::factory()->create();
+        $user->roles()->attach($role->id, ['scope_type' => 'organization', 'scope_id' => $organization->id]);
+
+        $this->actingAs($user)->get('/funding?organization_id='.$other->id)->assertNotFound();
+    }
 }

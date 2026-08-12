@@ -117,16 +117,21 @@
                 </div>
                 @break
             @case(11)
-                <h3>Premier administrateur inférieur</h3>
-                @if($configuredUser)<div class="alert success">Compte configuré : {{ $configuredUser->name }} — {{ $configuredUser->email }}</div>@else
-                <div class="form-grid two-columns">
-                    <label class="field">Rôle / fonction <b>*</b><select name="role_id" required><option value="">Sélectionner</option>@foreach($roles as $item)<option value="{{ $item->id }}" @selected(old('role_id')==$item->id)>{{ $item->name }}</option>@endforeach</select></label>
-                    <label class="field">Nom complet <b>*</b><input name="name" value="{{ old('name') }}" required></label>
-                    <label class="field">E-mail <b>*</b><input type="email" name="email" value="{{ old('email') }}" required></label>
-                    <label class="field">Téléphone<input name="phone" value="{{ old('phone') }}"></label>
-                    <label class="field">Mot de passe provisoire <b>*</b><input type="password" name="password" required></label>
-                    <label class="field">Confirmation <b>*</b><input type="password" name="password_confirmation" required></label>
-                </div>@endif
+                <div class="users-access-head"><div><h3>Utilisateurs et accès</h3><p>Créez les comptes administratifs rattachés à ce workflow.</p></div><button class="button primary" type="button" data-sheet-open="configuration-user-create-sheet">+ Ajouter un utilisateur</button></div>
+                <div class="users-access-count">{{ $configuredUsers->count() }} utilisateur{{ $configuredUsers->count() > 1 ? 's' : '' }}</div>
+                @if($configuredUsers->isEmpty())
+                    <div class="alert">Créez au moins un utilisateur pour continuer.</div>
+                @else
+                    <div class="users-access-table-wrap"><table class="users-access-table"><thead><tr><th>Nom complet</th><th>E-mail</th><th>Rôle</th><th>Périmètre</th><th>Statut</th><th>Création</th><th>Actions</th></tr></thead><tbody>
+                    @foreach($configuredUsers as $account)
+                        @php($accountRole=$account->roles->first())
+                        @php($scopeType=$accountRole?->pivot?->scope_type)
+                        @php($scopeId=$accountRole?->pivot?->scope_id)
+                        @php($scopeLabel=match($scopeType){'organization'=>$organization->name,'project'=>$projects->firstWhere('id',$scopeId)?->name ?? 'Projet indisponible','site'=>$sites->firstWhere('id',$scopeId)?->name ?? 'Site indisponible',default=>'Non défini'})
+                        <tr><td><strong>{{ $account->name }}</strong><small>{{ $account->username ? '@'.$account->username : '' }}</small></td><td>{{ $account->email }}</td><td>{{ $accountRole?->name ?? 'Sans rôle' }}</td><td><span class="scope-label">{{ ucfirst($scopeType ?? 'inconnu') }} · {{ $scopeLabel }}</span></td><td><span class="status-badge {{ $account->is_active ? 'success' : 'error' }}">{{ $account->is_active ? 'Actif' : 'Suspendu' }}</span></td><td>{{ $account->created_at?->format('d/m/Y') }}</td><td><div class="users-access-actions"><a class="button outline compact" href="{{ route('users.show',$account) }}">Voir</a><a class="button outline compact" href="{{ route('users.edit',$account) }}">Modifier</a><form method="post" action="{{ route('configuration.users.load',['user'=>$account,'_flow'=>$workflow->workflow_id]) }}">@csrf<button class="button primary compact" type="submit" @disabled(!$account->is_active || !$accountRole)>Charger ce compte et continuer</button></form></div></td></tr>
+                    @endforeach
+                    </tbody></table></div>
+                @endif
                 @break
             @case(12)
                 <h3>Contrôle final</h3>
@@ -142,7 +147,23 @@
         </div>
         <footer class="wizard-footer">
             <a class="button secondary" href="{{ $previous }}">← Précédent</a>
-            <button class="button primary" type="submit">{{ $activeStep===12 ? 'Terminer la configuration' : 'Enregistrer et continuer →' }}</button>
+            @if($activeStep!==11)<button class="button primary" type="submit">{{ $activeStep===12 ? 'Terminer la configuration' : 'Enregistrer et continuer →' }}</button>@endif
         </footer>
     </form>
+    @if($activeStep===11)
+    <x-form-sheet id="configuration-user-create-sheet" title="Ajouter un utilisateur" description="Créez un compte et attribuez-lui un rôle adapté au workflow." width="820px">
+      @if($errors->any())<div class="form-sheet-error">{{ $errors->first() }}</div>@endif
+      <form method="post" action="{{ route('configuration.users.store', ['_flow'=>$workflow->workflow_id]) }}" data-loading-form>@csrf
+        <div class="form-grid two-columns">
+          <label class="field">Prénom <b>*</b><input name="first_name" value="{{ old('first_name') }}" required></label><label class="field">Nom <b>*</b><input name="last_name" value="{{ old('last_name') }}" required></label>
+          <label class="field">Adresse e-mail <b>*</b><input type="email" name="email" value="{{ old('email') }}" required></label><label class="field">Téléphone<input name="phone" value="{{ old('phone') }}"></label>
+          <label class="field">Identifiant <b>*</b><input name="username" value="{{ old('username') }}" required></label><label class="field">Rôle <b>*</b><select name="role_id" required><option value="">Sélectionner</option>@foreach($roles as $item)<option value="{{ $item->id }}">{{ $item->name }}</option>@endforeach</select></label>
+          <label class="field">Mot de passe temporaire <b>*</b><input type="password" name="password" required></label><label class="field">Confirmation <b>*</b><input type="password" name="password_confirmation" required></label>
+        </div>
+        <div class="form-sheet-actions"><button class="button secondary" type="button" data-sheet-close="configuration-user-create-sheet">Annuler</button><button class="button primary" type="submit">Créer le compte</button></div>
+      </form>
+    </x-form-sheet>
+    <style>.users-access-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.users-access-head h3,.users-access-head p{margin:0}.users-access-head p{margin-top:6px;color:#667085}.users-access-count{margin:18px 0 10px;color:#475467;font-weight:750}.users-access-table-wrap{overflow:auto;border:1px solid #e8edf3;border-radius:14px}.users-access-table{width:100%;min-width:1080px;border-collapse:collapse}.users-access-table th{padding:12px;background:#f7f9fc;text-align:left;color:#475467;font-size:12px}.users-access-table td{padding:13px;border-top:1px solid #e8edf3;vertical-align:middle}.users-access-table td strong,.users-access-table td small{display:block}.users-access-table td small{color:#667085;margin-top:3px}.users-access-actions{display:flex;gap:6px;align-items:center}.users-access-actions form{margin:0}.compact{min-height:36px!important;padding:7px 10px!important;font-size:12px!important}.scope-label{white-space:nowrap}@media(max-width:760px){.users-access-head{flex-direction:column}.users-access-head .button{width:100%}}</style>
+    @if($errors->any())<script>document.addEventListener('DOMContentLoaded',()=>document.getElementById('configuration-user-create-sheet')?.showModal())</script>@endif
+    @endif
 </section>

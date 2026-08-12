@@ -8,7 +8,13 @@ import 'src/features/auth/data/auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final initialLocation = await _resolveInitialLocation();
+  // Android conserve l'écran natif tant que le premier frame Flutter n'est
+  // pas rendu. Une lecture du stockage sécurisé ne doit donc jamais pouvoir
+  // bloquer indéfiniment le lancement de l'application.
+  final initialLocation = await _resolveInitialLocation().timeout(
+    const Duration(seconds: 3),
+    onTimeout: () => '/login',
+  );
   final router = createAppRouter(initialLocation: initialLocation);
   runApp(ProviderScope(child: SagaStockApp(router: router)));
 }

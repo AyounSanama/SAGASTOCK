@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Organization extends Model
@@ -15,7 +16,7 @@ class Organization extends Model
     protected $keyType = 'string';
     protected $fillable = [
         'code', 'name', 'legal_name', 'organization_type', 'logo_path',
-        'email', 'phone', 'country_code', 'default_language', 'address',
+        'email', 'phone', 'country_code', 'geographic_access_type', 'default_language', 'address',
         'manager_name', 'manager_title', 'description', 'is_active',
     ];
 
@@ -27,6 +28,11 @@ class Organization extends Model
     public function missions(): HasMany
     {
         return $this->hasMany(Mission::class);
+    }
+
+    public function countries(): BelongsToMany
+    {
+        return $this->belongsToMany(Country::class)->withTimestamps();
     }
 
     public function projects(): HasMany

@@ -20,7 +20,7 @@ class ProjectManagementTest extends TestCase
     {
         $view = Permission::create(['code' => 'projects.view', 'name' => 'Consulter les projets']);
         $manage = Permission::create(['code' => 'projects.manage', 'name' => 'Gérer les projets']);
-        $role = Role::create(['code' => 'project_admin', 'name' => 'Administrateur projets']);
+        $role = Role::create(['code' => 'custom_project_manager', 'name' => 'Administrateur projets']);
         $role->permissions()->attach([$view->id, $manage->id]);
         $user = User::factory()->create(['is_active' => true]);
         $user->roles()->attach($role->id, ['scope_type' => 'platform']);

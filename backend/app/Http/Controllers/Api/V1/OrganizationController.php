@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Services\AuditService;
 use App\Services\UserScopeService;
+use App\Services\GovernanceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -107,8 +108,8 @@ class OrganizationController extends Controller
     private function owner(Request $request): void
     {
         abort_unless(
-            $this->scopes->isPlatform($request->user())
-                || $request->user()->hasPermission('organizations.manage'),
+            app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::SAGO_ADMIN
+                && $this->scopes->isPlatform($request->user()),
             403,
         );
     }

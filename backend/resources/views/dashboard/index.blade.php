@@ -466,9 +466,13 @@
                                     @endforeach
                                 </select>
                             </label>
-                            <label>Organisation *<select id="create-organization" name="organization_id" required><option value="">Sélectionner</option>@foreach($organizations as $organization)<option value="{{ $organization->id }}" @selected(old('organization_id')==$organization->id)>{{ $organization->name }}</option>@endforeach</select></label>
-                            <label>Mission *<select id="create-mission" name="mission_id" required><option value="">Sélectionner</option>@foreach($missions as $mission)<option value="{{ $mission->id }}" data-organization="{{ $mission->organization_id }}" @selected(old('mission_id')==$mission->id)>{{ $mission->name }}</option>@endforeach</select></label>
-                            <label>Projet *<select id="create-project" name="project_id" required><option value="">Sélectionner</option>@foreach($projects as $project)<option value="{{ $project->id }}" data-organization="{{ $project->organization_id }}" data-mission="{{ $project->mission_id }}" @selected(old('project_id')==$project->id)>{{ $project->name }}</option>@endforeach</select></label>
+                            @php($formLocked = (bool) ($userFormContext['locked'] ?? false))
+                            @php($selectedOrganization = old('organization_id', $userFormContext['organization_id'] ?? null))
+                            @php($selectedMission = old('mission_id', $userFormContext['mission_id'] ?? null))
+                            @php($selectedProject = old('project_id', $userFormContext['project_id'] ?? null))
+                            <label id="create-organization-field">Organisation *<select id="create-organization" name="organization_id" @disabled($formLocked)><option value="">Sélectionner</option>@foreach($organizations as $organization)<option value="{{ $organization->id }}" @selected($selectedOrganization==$organization->id)>{{ $organization->name }}</option>@endforeach</select>@if($formLocked)<input type="hidden" name="organization_id" value="{{ $selectedOrganization }}"><small class="field-hint">Organisation définie par votre périmètre.</small>@endif</label>
+                            <label id="create-mission-field" hidden>Mission *<select id="create-mission" name="mission_id" @disabled($formLocked)><option value="">Sélectionner</option>@foreach($missions as $mission)<option value="{{ $mission->id }}" data-organization="{{ $mission->organization_id }}" @selected($selectedMission==$mission->id)>{{ $mission->name }}</option>@endforeach</select>@if($formLocked)<input type="hidden" name="mission_id" value="{{ $selectedMission }}"><small class="field-hint">Mission définie par votre projet.</small>@endif</label>
+                            <label id="create-project-field" hidden>Projet *<select id="create-project" name="project_id" @disabled($formLocked)><option value="">Sélectionner</option>@foreach($projects as $project)<option value="{{ $project->id }}" data-organization="{{ $project->organization_id }}" data-mission="{{ $project->mission_id }}" @selected($selectedProject==$project->id)>{{ $project->name }}</option>@endforeach</select>@if($formLocked)<input type="hidden" name="project_id" value="{{ $selectedProject }}"><small class="field-hint">Projet défini par votre périmètre.</small>@endif</label>
                             <label id="create-facility-field" hidden>Formation sanitaire *<select id="create-facility" name="health_facility_id"><option value="">Sélectionner</option>@foreach($facilities as $facility)<option value="{{ $facility->id }}" data-organization="{{ $facility->organization_id }}" data-projects="{{ $facility->projects->pluck('id')->implode(',') }}" @selected(old('health_facility_id')==$facility->id)>{{ $facility->name }}</option>@endforeach</select></label>
                             <label id="create-site-field" hidden>Site de dispensation *<select id="create-site" name="dispensing_site_id"><option value="">Sélectionner</option>@foreach($sites as $site)<option value="{{ $site->id }}" data-facility="{{ $site->health_facility_id }}" @selected(old('dispensing_site_id')==$site->id)>{{ $site->name }}</option>@endforeach</select></label>
                             <input id="create-scope" type="hidden" name="scope" value="{{ old('scope') }}">
@@ -521,12 +525,23 @@
                     filterOptions(facility, option => option.dataset.organization === organization.value && (option.dataset.projects || '').split(',').includes(project.value));
                     filterOptions(site, option => option.dataset.facility === facility.value);
                     const roleCode = role.selectedOptions[0]?.dataset.code;
+                    const officialRole = ['coordination_admin', 'project_admin', 'site_admin'].includes(roleCode);
+                    const projectRole = roleCode === 'project_admin';
                     const siteRole = roleCode === 'site_admin';
+                    const needsProject = projectRole || siteRole;
+                    document.getElementById('create-organization-field').hidden = !officialRole;
+                    document.getElementById('create-mission-field').hidden = !needsProject;
+                    document.getElementById('create-project-field').hidden = !needsProject;
                     document.getElementById('create-facility-field').hidden = !siteRole;
                     document.getElementById('create-site-field').hidden = !siteRole;
+                    organization.required = officialRole;
+                    mission.required = needsProject;
+                    project.required = needsProject;
                     facility.required = siteRole;
                     site.required = siteRole;
-                    document.getElementById('create-scope').value = roleCode === 'project_admin'
+                    document.getElementById('create-scope').value = roleCode === 'coordination_admin'
+                        ? `organization:${organization.value}`
+                        : roleCode === 'project_admin'
                         ? `project:${project.value}`
                         : siteRole ? `site:${site.value}` : '';
                 };

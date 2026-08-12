@@ -60,6 +60,15 @@ a{text-decoration:none;color:inherit}
 @media(max-width:480px){.portal-topbar h1{font-size:16px}.portal-topbar-actions{gap:8px}.configuration-intro{display:block}.intro-icon{margin-bottom:12px}.intro-progress{margin-top:16px}.step-content-header{display:block}.status-badge{display:inline-flex;margin-top:12px}}
 @media(max-width:780px){.control-hero{align-items:flex-start;flex-wrap:wrap}.control-hero-actions{width:100%;margin-left:0;display:grid}.control-kpis,.control-grid{grid-template-columns:1fr}.control-card{min-height:auto}}
 @media(max-width:620px){.entity-actions{align-items:stretch;flex-direction:column}.entity-actions>div{margin-right:0}.entity-actions form,.entity-actions .button{width:100%}.entity-actions form .button{width:100%}}
+
+/* Alignement final du wizard dans le MainLayout partagé. */
+.configuration-page{width:100%;min-width:0;gap:20px}
+.configuration-wizard{width:100%;min-width:0;grid-template-columns:minmax(230px,260px) minmax(0,1fr)}
+.configuration-stepper,.wizard-panel{min-width:0}
+.wizard-panel{width:100%;overflow:hidden}
+.step-content-header>*{min-width:0}
+@media(max-width:1050px){.configuration-wizard{grid-template-columns:220px minmax(0,1fr)}}
+@media(max-width:780px){.configuration-wizard{display:block}.wizard-panel{overflow:visible}}
 @media(max-width:620px){.step-toolbar,.entity-list article{align-items:stretch;flex-direction:column}.step-toolbar .button,.entity-list article .button,.entity-list article form,.entity-list article form .button{width:100%}.entity-list article>div{margin-right:0;width:100%}}
 .portal-breadcrumb{display:flex;align-items:center;gap:8px;margin:0 0 18px;color:#667085;font-size:13px}
 .portal-breadcrumb a{color:#2563eb;font-weight:700;text-decoration:none}

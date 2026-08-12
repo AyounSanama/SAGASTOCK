@@ -96,7 +96,7 @@ class UserManagementTest extends TestCase
 
         $this->actingAs($admin)->from('/users')->post('/users', [])
             ->assertRedirect('/users')
-            ->assertSessionHasErrors(['first_name', 'last_name', 'username', 'email', 'role_id', 'scope']);
+            ->assertSessionHasErrors(['first_name', 'last_name', 'username', 'email', 'role_id']);
     }
 
     public function test_admin_can_view_edit_and_archive_another_user_but_not_self(): void
@@ -106,7 +106,11 @@ class UserManagementTest extends TestCase
         $target = User::factory()->create(['is_active' => true]);
         $target->roles()->attach($role->id, ['scope_type' => 'platform']);
         $this->actingAs($admin)->get('/users/'.$target->id)->assertOk()->assertSee($target->email);
-        $this->actingAs($admin)->get('/users/'.$target->id.'/edit')->assertOk()->assertSee('Modifier');
+        $this->actingAs($admin)->get('/users/'.$target->id.'/edit')
+            ->assertOk()
+            ->assertSee('Modifier')
+            ->assertSee('data-global-back', false)
+            ->assertSee('Logo PharmaCare');
         $this->actingAs($admin)->delete('/users/'.$target->id)->assertRedirect('/users');
         $this->assertSoftDeleted('users', ['id' => $target->id]);
         $this->assertDatabaseHas('audit_logs', ['event' => 'user.archived', 'auditable_id' => (string) $target->id]);

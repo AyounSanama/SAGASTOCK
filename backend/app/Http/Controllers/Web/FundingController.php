@@ -19,21 +19,39 @@ class FundingController extends Controller
 {
     public function __construct(private AuditService $audit, private UserScopeService $scopes) {}
 
+    public function home(Request $request): View
+    {
+        $this->allow('funding.view');
+        $organizations = $this->scopes->organizations($request->user())->orderBy('name')->get();
+        $organization = $request->filled('organization_id')
+            ? $organizations->firstWhere('id', $request->string('organization_id')->toString())
+            : $organizations->first();
+        abort_if($request->filled('organization_id') && ! $organization, 404);
+
+        $projects = $organization
+            ? $this->scopes->projects($request->user())
+                ->where('organization_id', $organization->id)->with('mission:id,name')->orderBy('name')->get()
+            : collect();
+        $project = $request->filled('project_id')
+            ? $projects->firstWhere('id', $request->string('project_id')->toString())
+            : $projects->first();
+        abort_if($request->filled('project_id') && ! $project, 404);
+
+        return view('funding.index', $this->viewData($request, $organization, $project, $organizations, $projects));
+    }
+
     public function index(Request $request, Organization $organization, Project $project): View
     {
         $this->allow('funding.view');
         $this->accessible($request, $organization);
         $this->projectIn($organization, $project);
-        return view('funding.index', [
-            'organization' => $organization,
-            'project' => $project,
-            'donors' => $organization->donors()->orderBy('name')->get(),
-            'programs' => $organization->programs()->with('donor')->orderBy('name')->get(),
-            'assignedDonors' => $project->donors()->orderBy('name')->get(),
-            'assignedPrograms' => $project->programs()->with('donor')->orderBy('name')->get(),
-            'archivedDonors' => $organization->donors()->onlyTrashed()->latest('deleted_at')->get(),
-            'archivedPrograms' => $organization->programs()->onlyTrashed()->latest('deleted_at')->get(),
-        ]);
+        return view('funding.index', $this->viewData(
+            $request,
+            $organization,
+            $project,
+            collect([$organization]),
+            collect([$project]),
+        ));
     }
 
     public function storeDonor(Request $request, Organization $organization): RedirectResponse
@@ -104,4 +122,23 @@ class FundingController extends Controller
     private function projectIn(Organization $organization, Project $project): void { abort_unless($project->organization_id === $organization->id, 404); }
     private function allow(string $permission): void { abort_unless(Auth::user()?->hasPermission($permission), 403); }
     private function accessible(Request $request, Organization $organization): void { abort_unless($this->scopes->organizations($request->user())->whereKey($organization->id)->exists(), 404); }
+
+    private function viewData(Request $request, ?Organization $organization, ?Project $project, $organizations, $projects): array
+    {
+        $canManage = $request->user()->hasPermission('funding.manage');
+
+        return [
+            'organization' => $organization,
+            'project' => $project,
+            'organizations' => $organizations,
+            'projects' => $projects,
+            'canManage' => $canManage,
+            'donors' => $organization?->donors()->withCount(['projects', 'programs'])->orderBy('name')->get() ?? collect(),
+            'programs' => $organization?->programs()->with(['donor:id,code,name'])->withCount('projects')->orderBy('name')->get() ?? collect(),
+            'assignedDonors' => $project?->donors()->orderBy('name')->get() ?? collect(),
+            'assignedPrograms' => $project?->programs()->with('donor:id,code,name')->orderBy('name')->get() ?? collect(),
+            'archivedDonors' => $organization?->donors()->onlyTrashed()->latest('deleted_at')->get() ?? collect(),
+            'archivedPrograms' => $organization?->programs()->onlyTrashed()->latest('deleted_at')->get() ?? collect(),
+        ];
+    }
 }

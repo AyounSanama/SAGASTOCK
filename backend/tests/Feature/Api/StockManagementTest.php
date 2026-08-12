@@ -103,6 +103,34 @@ class StockManagementTest extends TestCase
         $this->getJson("/api/v1/organizations/{$other->id}/stocks/balances")->assertNotFound();
     }
 
+    public function test_api_quarantine_can_be_released_with_a_justified_trace(): void
+    {
+        $d = $this->data();
+        $this->login();
+        $this->postJson("/api/v1/organizations/{$d['organization']->id}/stocks/movements", [
+            'site_id' => $d['source']->id, 'batch_id' => $d['early']->id,
+            'movement_type' => 'opening', 'quantity' => 15,
+        ])->assertCreated();
+        $hold = $this->postJson("/api/v1/organizations/{$d['organization']->id}/stocks/holds", [
+            'site_id' => $d['source']->id, 'batch_id' => $d['early']->id,
+            'hold_type' => 'quarantine', 'quantity' => 4,
+            'reason' => 'Contrôle qualité requis avant dispensation',
+        ])->assertCreated()->assertJsonPath('hold.status', 'active')->json('hold');
+
+        $this->postJson("/api/v1/organizations/{$d['organization']->id}/stocks/holds/{$hold['id']}/release", [
+            'reason' => 'Contrôle qualité concluant et documenté',
+        ])->assertOk()->assertJsonPath('hold.status', 'released')
+            ->assertJsonPath('movement.movement_type', 'quarantine_release');
+
+        $this->assertDatabaseHas('stock_balances', [
+            'site_id' => $d['source']->id, 'batch_id' => $d['early']->id,
+            'theoretical_quantity' => 15,
+        ]);
+        $this->postJson("/api/v1/organizations/{$d['organization']->id}/stocks/holds/{$hold['id']}/release", [
+            'reason' => 'Une seconde libération doit être refusée',
+        ])->assertUnprocessable();
+    }
+
     public function test_web_stock_interface_is_connected_to_the_ledger(): void
     {
         $d = $this->data();
@@ -120,6 +148,45 @@ class StockManagementTest extends TestCase
             'site_id' => $d['source']->id, 'batch_id' => $d['early']->id,
             'movement_type' => 'loss', 'quantity' => 1,
         ])->assertSessionHasErrors('reason');
+    }
+
+    public function test_web_stock_workspace_manages_transfers_quarantine_and_destruction(): void
+    {
+        $d = $this->data();
+        $user = $this->login();
+        $this->actingAs($user)->post("/organizations/{$d['organization']->id}/stocks/movements", [
+            'site_id' => $d['source']->id, 'batch_id' => $d['early']->id,
+            'movement_type' => 'opening', 'quantity' => 40,
+        ])->assertRedirect();
+        $this->actingAs($user)->get("/organizations/{$d['organization']->id}/stocks")
+            ->assertOk()->assertSee('Transferts entre sites')->assertSee('Quarantaines et destructions')
+            ->assertSee('transfer-create-sheet')->assertSee('hold-create-sheet');
+
+        $this->actingAs($user)->post("/organizations/{$d['organization']->id}/stocks/transfers", [
+            'reference' => 'TR_WEB_001', 'source_site_id' => $d['source']->id,
+            'destination_site_id' => $d['destination']->id, 'batch_id' => $d['early']->id,
+            'quantity' => 10, 'notes' => 'Réapprovisionnement de la pharmacie',
+        ])->assertRedirect()->assertSessionHas('status');
+        $transfer = \App\Models\Transfer::where('reference', 'TR_WEB_001')->firstOrFail();
+        $this->actingAs($user)->post("/organizations/{$d['organization']->id}/stocks/transfers/{$transfer->id}/dispatch")
+            ->assertRedirect()->assertSessionHas('status');
+        $this->actingAs($user)->post("/organizations/{$d['organization']->id}/stocks/transfers/{$transfer->id}/receive")
+            ->assertRedirect()->assertSessionHas('status');
+        $this->actingAs($user)->post("/organizations/{$d['organization']->id}/stocks/holds", [
+            'site_id' => $d['source']->id, 'batch_id' => $d['early']->id,
+            'hold_type' => 'quarantine', 'quantity' => 2,
+            'reason' => 'Emballage à contrôler avant utilisation',
+        ])->assertRedirect()->assertSessionHas('status');
+        $hold = \App\Models\StockHold::where('hold_type', 'quarantine')->firstOrFail();
+        $this->actingAs($user)->post("/organizations/{$d['organization']->id}/stocks/holds/{$hold->id}/release", [
+            'reason' => 'Contrôle qualité terminé, lot déclaré conforme',
+        ])->assertRedirect()->assertSessionHas('status');
+
+        $this->assertDatabaseHas('transfers', ['id' => $transfer->id, 'status' => 'received']);
+        $this->assertDatabaseHas('stock_holds', ['id' => $hold->id, 'status' => 'released', 'quantity' => 2]);
+        $this->assertDatabaseHas('stock_movements', ['movement_type' => 'quarantine_release', 'quantity' => 2]);
+        $this->assertDatabaseHas('stock_balances', ['site_id' => $d['source']->id, 'theoretical_quantity' => 30]);
+        $this->assertDatabaseHas('stock_balances', ['site_id' => $d['destination']->id, 'theoretical_quantity' => 10]);
     }
 
     public function test_receipt_reports_discrepancies_and_credits_only_accepted_quantity(): void

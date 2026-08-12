@@ -19,7 +19,7 @@
 </head>
 <body>
 @include('components.app-sidebar')
-<header><img class="brand-logo" src="{{ asset('images/pharmacare-logo.png') }}" alt=""><a href="{{ route('users.index') }}">← Retour</a><strong>PharmaCare · Administration</strong></header>
+<header><img class="brand-logo" src="{{ asset('images/pharmacare-logo.png') }}" alt="Logo PharmaCare"><a href="{{ route('users.index') }}">← Retour</a><strong>PharmaCare · Administration</strong></header>
 <main><section class="card">
 <div class="intro"><div><h1>Création d’un utilisateur</h1><div class="muted">Créez un compte personnel et attribuez-lui le niveau d’accès approprié.</div></div></div>
 <form method="post" action="{{ route('users.store') }}" novalidate>@csrf

@@ -25,6 +25,7 @@ class ConfigurationHomeNavigationTest extends TestCase
             ->assertSee('Ajouter une organisation')
             ->assertSee('Ajouter une mission')
             ->assertSee('Entrer dans l’application')
+            ->assertSee('href="'.route('dashboard').'"', false)
             ->assertDontSee('Ajouter un projet')
             ->assertDontSee('Ajouter un site')
             ->assertDontSee('Ajouter un utilisateur');

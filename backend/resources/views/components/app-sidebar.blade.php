@@ -1,8 +1,10 @@
 @php
     $actor = auth()->user();
-    $roleCode = $actor ? app(\App\Services\GovernanceService::class)->roleCode($actor) : null;
     $navigationItems = $actor ? app(\App\Services\ApplicationNavigationService::class)->items($actor) : [];
     $materialIcons = config('pharmacare_ui.module_icons', []);
+    $activeNavigationItem = collect($navigationItems)->first(fn ($item) => $item['route'] && (request()->routeIs($item['route']) || request()->routeIs($item['route'].'*')));
+    $showGlobalBack = !request()->routeIs('dashboard') && !request()->routeIs('configuration.index');
+    $topbarContext = $activeNavigationItem['label'] ?? trim($__env->yieldContent('page-title')) ?: 'PharmaCare';
 @endphp
 <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0,0">
@@ -43,6 +45,28 @@
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
         -webkit-font-smoothing: antialiased;
         transition: padding-left .22s ease
+    }
+
+    /* Le portail et les pages historiques partagent exactement le même repère. */
+    body.portal-body {
+        margin: 0 !important;
+        padding: 76px 0 0 var(--pc-sidebar) !important;
+        background: var(--pc-surface) !important;
+        color: var(--pc-ink) !important;
+        transition: padding-left .22s ease;
+    }
+
+    body.portal-body .portal-shell,
+    body.portal-body .portal-workspace {
+        min-height: calc(100vh - 76px);
+        margin-left: 0 !important;
+    }
+
+    body.portal-body .portal-content {
+        width: 100% !important;
+        max-width: 1680px !important;
+        margin: 0 auto !important;
+        padding: 24px 28px 40px !important;
     }
 
     body>a.app-mobile-brand {
@@ -230,6 +254,33 @@
         gap: 8px;
         align-items: center;
         flex-wrap: wrap
+    }
+
+    body .actions form,
+    body .row-actions form,
+    body .sheet-actions form,
+    body td form {
+        margin: 0
+    }
+
+    body .actions form,
+    body .row-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap
+    }
+
+    body main img:not(.logo):not([class*="avatar"]):not([class*="brand"]) {
+        max-width: 100%;
+        height: auto;
+        object-fit: contain
+    }
+
+    body .item > form + form,
+    body .item > .actions,
+    body .card > .actions:last-child {
+        margin-top: 10px
     }
 
     body .badge {
@@ -503,7 +554,7 @@
         object-fit: contain;
         background: #fff;
         border-radius: 14px;
-        padding: 3px;
+        padding: 2px;
         flex: 0 0 auto
     }
 
@@ -765,6 +816,30 @@
         border: 0 !important;
         box-shadow: none !important;
         font-size: 20px !important
+    }
+
+    .topbar-back {
+        min-height: 40px !important;
+        padding: 8px 12px !important;
+        border: 1px solid var(--pc-border) !important;
+        background: #fff !important;
+        color: var(--pc-ink) !important;
+        box-shadow: none !important;
+        white-space: nowrap
+    }
+
+    .topbar-back .material-symbols-outlined {
+        font-size: 19px
+    }
+
+    .topbar-context {
+        min-width: 0;
+        color: var(--pc-ink);
+        font-size: 14px;
+        font-weight: 800;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap
     }
 
     .topbar-search {
@@ -1029,8 +1104,13 @@
     }
 
     @media(max-width:760px) {
-        body {
+        body,
+        body.portal-body {
             padding: 70px 0 0 !important
+        }
+
+        body.portal-body .portal-content {
+            padding: 16px !important
         }
 
         .app-sidebar {
@@ -1045,6 +1125,7 @@
         }
 
         .topbar-search,
+        .topbar-context,
         .topbar-profile-copy {
             display: none
         }
@@ -1148,7 +1229,8 @@
 
 <aside class="app-sidebar" aria-label="Navigation principale">
     <a class="app-brand" href="{{ route('dashboard') }}">
-        <img src="{{ asset('images/pharmacare-logo.png') }}" alt="Logo PharmaCare">
+        <img src="{{ asset('images/pharmacare-logo.png') }}?v={{ filemtime(public_path('images/pharmacare-logo.png')) }}"
+             alt="Logo PharmaCare" width="48" height="48">
         <span class="app-brand-copy">
             <strong><span class="brand-pharma">Pharma</span><span class="brand-care">Care</span></strong>
             <small>Putting Patients at the Heart of Every Supply.</small>
@@ -1187,6 +1269,12 @@
 <header class="app-shell-topbar">
     <button class="sidebar-toggle material-symbols-outlined" type="button"
         aria-label="Réduire ou ouvrir le menu">menu</button>
+    @if($showGlobalBack)
+        <button class="topbar-back" type="button" data-global-back data-fallback-url="{{ route('dashboard') }}">
+            <span class="material-symbols-outlined">arrow_back</span><span>Retour</span>
+        </button>
+    @endif
+    <span class="topbar-context">{{ $topbarContext }}</span>
     <span class="topbar-spacer"></span>
     <a class="topbar-profile" href="{{ route('profile.show') }}">
         <span class="profile-avatar">{{ mb_strtoupper(mb_substr($actor?->name ?? 'U', 0, 1)) }}</span>
@@ -1200,6 +1288,11 @@
     document.addEventListener('DOMContentLoaded', () => {
         const body = document.body,
             toggle = document.querySelector('.sidebar-toggle');
+        document.querySelector('[data-global-back]')?.addEventListener('click', event => {
+            const fallback = event.currentTarget.dataset.fallbackUrl;
+            if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) history.back();
+            else location.assign(fallback);
+        });
         if (localStorage.getItem('pc-sidebar') === 'collapsed' && innerWidth > 760) body.classList.add(
             'sidebar-collapsed');
         toggle?.addEventListener('click', () => {

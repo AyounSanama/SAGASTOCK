@@ -20,8 +20,10 @@ class StructureManagementTest extends TestCase
         $permissions = collect([
             'structures.view' => 'Consulter les structures',
             'structures.manage' => 'Gérer les structures',
+            'health_facilities.view' => 'Consulter les formations sanitaires',
+            'dispensing_sites.view' => 'Consulter les sites de dispensation',
             'modules.manage' => 'Gérer les activations',
-        ])->map(fn ($name, $code) => Permission::create(compact('code', 'name')));
+        ])->map(fn ($name, $code) => Permission::firstOrCreate(['code' => $code], ['name' => $name]));
         $role = Role::create(['code' => 'structure_admin_'.uniqid(), 'name' => 'Administrateur structures']);
         $role->permissions()->attach($permissions->pluck('id'));
         $user = User::factory()->create(['is_active' => true]);
@@ -108,7 +110,7 @@ class StructureManagementTest extends TestCase
         $user = $this->user();
 
         $this->actingAs($user)->get("/organizations/{$organization->id}/structures")
-            ->assertOk()->assertSee('Nouvelle formation sanitaire')->assertSee('pharmacare-logo.png');
+            ->assertOk()->assertSee('Ajouter une formation sanitaire')->assertSee('pharmacare-logo.png');
         $this->actingAs($user)->post("/organizations/{$organization->id}/facilities", [
             'code' => 'WEB_FOSA', 'name' => 'Centre de santé Web',
             'facility_type' => 'health_center', 'is_active' => 1,
@@ -116,6 +118,27 @@ class StructureManagementTest extends TestCase
         $facility = HealthFacility::where('code', 'WEB_FOSA')->firstOrFail();
         $this->actingAs($user)->get("/organizations/{$organization->id}/structures?facility={$facility->id}")
             ->assertOk()->assertSee('Centre de santé Web')->assertSee('Départements')->assertSee('Pharmacies')->assertSee('Sites');
+    }
+
+    public function test_sidebar_health_facilities_module_opens_the_real_scoped_workspace(): void
+    {
+        $inside = Organization::create(['code' => 'FOSA-IN', 'name' => 'Organisation autorisée']);
+        $outside = Organization::create(['code' => 'FOSA-OUT', 'name' => 'Organisation interdite']);
+        $user = $this->user('organization', $inside->id);
+        HealthFacility::create([
+            'organization_id' => $inside->id, 'code' => 'CSI-01',
+            'name' => 'Centre de santé intégré', 'facility_type' => 'health_center',
+        ]);
+
+        $this->actingAs($user)->get('/health-facilities')
+            ->assertOk()
+            ->assertSee('Formations sanitaires')
+            ->assertSee('Centre de santé intégré')
+            ->assertSee('facility-create-sheet')
+            ->assertSee('overflow-x:clip', false);
+        $this->actingAs($user)
+            ->get('/health-facilities?organization_id='.$outside->id)
+            ->assertNotFound();
     }
 
     public function test_web_has_a_dedicated_professional_facility_creation_page(): void
@@ -133,9 +156,102 @@ class StructureManagementTest extends TestCase
         $this->actingAs($user)
             ->get("/organizations/{$organization->id}/structures")
             ->assertOk()
-            ->assertSee('＋ Nouvelle formation sanitaire')
+            ->assertSee('Ajouter une formation sanitaire')
             ->assertSee('Activation des modules')
             ->assertSee('switch')
             ->assertSee('facility-create-sheet');
+    }
+
+    public function test_dispensing_sites_sidebar_opens_a_real_scoped_crud_workspace(): void
+    {
+        $inside = Organization::create(['code' => 'SITE-IN', 'name' => 'Organisation sites']);
+        $outside = Organization::create(['code' => 'SITE-OUT', 'name' => 'Organisation externe']);
+        $facility = HealthFacility::create([
+            'organization_id' => $inside->id,
+            'code' => 'FOSA-SITE',
+            'name' => 'Hôpital des sites',
+            'facility_type' => 'hospital',
+        ]);
+        $department = $facility->departments()->create([
+            'code' => 'DEP-SITE',
+            'name' => 'Service pharmacie',
+            'department_type' => 'pharmacy',
+        ]);
+        $pharmacy = $facility->pharmacies()->create([
+            'department_id' => $department->id,
+            'code' => 'PHA-SITE',
+            'name' => 'Pharmacie principale',
+            'pharmacy_type' => 'central',
+        ]);
+        $facility->sites()->create([
+            'organization_id' => $inside->id,
+            'department_id' => $department->id,
+            'pharmacy_id' => $pharmacy->id,
+            'code' => 'SITE-01',
+            'name' => 'Site de dispensation central',
+            'site_type' => 'dispensing',
+            'is_active' => true,
+        ]);
+        $user = $this->user('organization', $inside->id);
+
+        $this->actingAs($user)->get('/dispensing-sites')
+            ->assertOk()
+            ->assertSee('Sites de dispensation')
+            ->assertSee('Site de dispensation central')
+            ->assertSee('site-create-sheet')
+            ->assertSee('overflow-x:clip', false);
+
+        $this->actingAs($user)->post("/organizations/{$inside->id}/dispensing-sites", [
+            'health_facility_id' => $facility->id,
+            'department_id' => $department->id,
+            'pharmacy_id' => $pharmacy->id,
+            'code' => 'SITE-02',
+            'name' => 'Dépôt pharmaceutique annexe',
+            'site_type' => 'stock_and_dispensing',
+            'location' => 'Bâtiment B',
+            'is_active' => 1,
+        ])->assertRedirect()->assertSessionHas('status');
+
+        $this->assertDatabaseHas('sites', [
+            'organization_id' => $inside->id,
+            'health_facility_id' => $facility->id,
+            'code' => 'SITE-02',
+            'name' => 'Dépôt pharmaceutique annexe',
+        ]);
+        $this->actingAs($user)
+            ->get('/dispensing-sites?organization_id='.$outside->id)
+            ->assertNotFound();
+    }
+
+    public function test_coordination_admin_never_sees_facilities_of_another_organization(): void
+    {
+        $assigned = Organization::create(['code' => 'COORD-A', 'name' => 'Organisation assignée']);
+        $created = Organization::create(['code' => 'COORD-B', 'name' => 'Nouvelle organisation']);
+        $assignedFacility = HealthFacility::create([
+            'organization_id' => $assigned->id, 'code' => 'FOSA-A',
+            'name' => 'Formation assignée', 'facility_type' => 'hospital',
+        ]);
+        $createdFacility = HealthFacility::create([
+            'organization_id' => $created->id, 'code' => 'FOSA-B',
+            'name' => 'Formation nouvelle organisation', 'facility_type' => 'clinic',
+        ]);
+        $permissions = collect(['organizations.manage', 'dispensing_sites.view', 'structures.manage'])
+            ->map(fn (string $code) => Permission::firstOrCreate(['code' => $code], ['name' => $code]));
+        $role = Role::create([
+            'code' => 'coordination_admin', 'name' => 'Admin Coordination',
+            'is_system' => true, 'scope_type' => 'organization',
+        ]);
+        $role->permissions()->attach($permissions);
+        $user = User::factory()->create([
+            'organization_id' => $assigned->id, 'is_active' => true,
+        ]);
+        $user->roles()->attach($role, [
+            'scope_type' => 'organization', 'scope_id' => $assigned->id,
+        ]);
+
+        $this->actingAs($user)->get('/dispensing-sites')
+            ->assertOk()->assertSee($assignedFacility->name);
+        $this->actingAs($user)->get('/dispensing-sites?organization_id='.$created->id)
+            ->assertNotFound();
     }
 }

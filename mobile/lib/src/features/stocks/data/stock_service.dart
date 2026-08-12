@@ -185,7 +185,9 @@ class StockService {
     String? reason,
   }) async {
     final path = '/organizations/$organizationId/stocks/movements';
+    final clientReference = const Uuid().v4();
     final data = <String, dynamic>{
+      'client_reference': clientReference,
       'site_id': siteId,
       'batch_id': batchId,
       'movement_type': movementType,

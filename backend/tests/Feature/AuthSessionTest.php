@@ -57,6 +57,10 @@ class AuthSessionTest extends TestCase
 
         $this->actingAs($user)->get('/dashboard')
             ->assertOk()
-            ->assertSee('Tableau de bord');
+            ->assertSee('Tableau de bord')
+            ->assertSee('href="'.route('dashboard').'"', false)
+            ->assertSee('Vue d’ensemble opérationnelle')
+            ->assertSee('Alertes de stock')
+            ->assertDontSee('<button class="topbar-back"', false);
     }
 }

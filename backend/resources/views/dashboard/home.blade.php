@@ -102,6 +102,12 @@
             .dashboard-metrics{gap:10px}.dashboard-metric{min-height:150px;padding:16px}.dashboard-metric strong{font-size:25px}
             .dashboard-shortcuts{grid-template-columns:1fr}.dashboard-summary{grid-template-columns:1fr}
         }
+        .dashboard-metrics{grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+        .dashboard-metric{min-height:128px!important;padding:16px!important;background:#fff!important;color:var(--dash-ink)!important;border:1px solid var(--dash-border)!important;border-radius:14px!important;box-shadow:0 8px 22px rgba(20,39,74,.06)!important}
+        .dashboard-metric:after{display:none!important}.dashboard-metric .metric-head{justify-content:flex-start}.dashboard-metric .metric-icon{width:42px;height:42px;border:0;background:#fff3e8!important;color:var(--dash-orange)!important}.dashboard-metric .metric-label{color:var(--dash-muted)!important;font-size:11px}.dashboard-metric strong{margin-top:12px!important;color:var(--dash-ink)!important;font-size:25px!important}.dashboard-metric .metric-link{margin-top:7px;color:var(--dash-green)!important;font-size:10px}
+        .dashboard-analytics{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.7fr) minmax(260px,.65fr);gap:16px}.analytics-card{min-width:0;padding:18px;background:#fff;border:1px solid var(--dash-border);border-radius:16px;box-shadow:0 8px 24px rgba(20,39,74,.06)}.analytics-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.analytics-head h2{margin:0!important;font-size:16px!important}.analytics-head span{color:var(--dash-muted);font-size:11px}.bar-chart{height:210px;display:flex;align-items:flex-end;gap:12px;padding:18px 8px 0;border-bottom:1px solid var(--dash-border);background:repeating-linear-gradient(to top,transparent 0,transparent 48px,#eef2f7 49px)}.bar-item{height:100%;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;min-width:34px}.bar{width:min(42px,78%);min-height:5px;border-radius:8px 8px 2px 2px;background:linear-gradient(180deg,#ff9b35,var(--dash-orange))}.bar-item small{max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dash-muted);font-size:9px}.donut-wrap{display:grid;place-items:center;min-height:210px}.donut{width:150px;height:150px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--dash-green) 0 62%,var(--dash-orange) 62% 84%,var(--dash-red) 84% 96%,var(--dash-purple) 96%);position:relative}.donut:after{content:"";width:88px;height:88px;border-radius:50%;background:#fff}.donut-label{position:absolute;z-index:1;text-align:center}.donut-label strong,.donut-label small{display:block}.donut-label strong{font-size:23px}.donut-label small{font-size:10px;color:var(--dash-muted)}.alert-summary{display:grid;gap:10px}.alert-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px;border:1px solid var(--dash-border);border-radius:12px}.alert-row span{display:flex;align-items:center;gap:8px;font-size:12px}.alert-row .material-symbols-outlined{font-size:20px;color:var(--dash-orange)}.alert-row strong{font-size:18px}.alert-row.danger .material-symbols-outlined,.alert-row.danger strong{color:var(--dash-red)}
+        @media(max-width:1350px){.dashboard-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-analytics{grid-template-columns:1fr 1fr}.dashboard-analytics .analytics-card:first-child{grid-column:1/-1}}
+        @media(max-width:760px){.dashboard-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-analytics{grid-template-columns:1fr}.dashboard-analytics .analytics-card:first-child{grid-column:auto}}
     </style>
 </head>
 <body>
@@ -132,6 +138,30 @@
                 <a class="metric-link" href="{{ $widget['route'] }}">{{ $widget['caption'] }} →</a>
             </article>
         @endforeach
+    </section>
+
+    @php
+        $maximumWidgetValue = max(1, collect($widgets)->max(fn($widget) => (float) $widget['value']) ?? 1);
+    @endphp
+    <section class="dashboard-analytics" aria-label="Analyse opérationnelle">
+        <article class="analytics-card">
+            <header class="analytics-head"><div><h2>Vue d’ensemble opérationnelle</h2><span>Comparaison des indicateurs de votre périmètre</span></div><span>Valeurs actuelles</span></header>
+            <div class="bar-chart">
+                @forelse(collect($widgets)->take(7) as $widget)
+                    <div class="bar-item" title="{{ $widget['label'] }} : {{ $widget['value'] }}"><div class="bar" style="height:{{ max(5,round(((float)$widget['value']/$maximumWidgetValue)*165)) }}px"></div><small>{{ $widget['label'] }}</small></div>
+                @empty
+                    <div class="dashboard-empty">Aucun indicateur disponible pour ce périmètre.</div>
+                @endforelse
+            </div>
+        </article>
+        <article class="analytics-card">
+            <header class="analytics-head"><div><h2>État du catalogue</h2><span>Produits actifs visibles</span></div></header>
+            <div class="donut-wrap"><div class="donut"><div class="donut-label"><strong>{{ number_format($stats['products']) }}</strong><small>Produits</small></div></div></div>
+        </article>
+        <article class="analytics-card">
+            <header class="analytics-head"><div><h2>Alertes de stock</h2><span>Points nécessitant une attention</span></div></header>
+            <div class="alert-summary"><div class="alert-row danger"><span><i class="material-symbols-outlined">warning</i>Ruptures</span><strong>{{ number_format($stats['stockouts']) }}</strong></div><div class="alert-row"><span><i class="material-symbols-outlined">event_busy</i>Péremptions proches</span><strong>{{ number_format($stats['expiring_batches']) }}</strong></div><div class="alert-row"><span><i class="material-symbols-outlined">inventory_2</i>Lignes de stock</span><strong>{{ number_format($stats['stock_lines']) }}</strong></div></div>
+        </article>
     </section>
 
     <section class="dashboard-metrics legacy-dashboard-metrics" aria-hidden="true">

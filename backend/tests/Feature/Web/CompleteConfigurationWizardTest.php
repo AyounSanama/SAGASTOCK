@@ -78,11 +78,23 @@ class CompleteConfigurationWizardTest extends TestCase
             'site_type'=>'stock_and_dispensing', 'location'=>'Bâtiment principal',
         ], 'users-access');
 
-        $this->save('users-access', [
-            'role_id'=>$coordinationRole->id, 'name'=>'Admin Coordination',
-            'email'=>'coordination@example.org', 'phone'=>'+237600000000',
-            'password'=>'Secret123', 'password_confirmation'=>'Secret123',
-        ], 'summary');
+        $this->get(route('configuration.step', 'users-access'))
+            ->assertOk()
+            ->assertSee('configuration-user-create-sheet')
+            ->assertSee('Ajouter un utilisateur');
+
+        $this->post(route('configuration.users.store'), [
+            'role_id'=>$coordinationRole->id, 'first_name'=>'Admin', 'last_name'=>'Coordination',
+            'username'=>'admin_coordination', 'email'=>'coordination@example.org', 'phone'=>'+237600000000',
+            'password'=>'Secret123!AB', 'password_confirmation'=>'Secret123!AB',
+        ])->assertRedirect(route('configuration.step', 'users-access'))
+            ->assertSessionHas('success', 'Utilisateur créé avec succès');
+        $createdUser = User::where('email', 'coordination@example.org')->firstOrFail();
+        $this->get(route('configuration.step', 'users-access'))->assertOk()
+            ->assertSee('Charger ce compte et continuer')->assertSee('Admin Coordination');
+        $this->post(route('configuration.users.load', $createdUser))
+            ->assertRedirect(route('configuration.step', 'summary'));
+        $this->assertAuthenticatedAs($owner);
         $this->assertDatabaseHas('role_user', [
             'role_id'=>$coordinationRole->id, 'scope_type'=>'organization', 'scope_id'=>$organization->id,
         ]);

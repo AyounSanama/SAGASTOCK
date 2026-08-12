@@ -44,6 +44,17 @@ class GovernanceMatrixTest extends TestCase
         $this->assertSame([], $scopes->assignableRoles($siteAdmin)->pluck('code')->all());
     }
 
+    public function test_official_role_cannot_bypass_assignment_matrix_with_a_platform_pivot(): void
+    {
+        [$organization] = $this->hierarchy('PLATFORM-GUARD');
+        $coordination = $this->actor('coordination_admin', 'platform', $organization->id);
+
+        $this->assertEqualsCanonicalizing(
+            ['project_admin', 'site_admin'],
+            app(UserScopeService::class)->assignableRoles($coordination)->pluck('code')->all(),
+        );
+    }
+
     public function test_project_and_site_scopes_do_not_expand_to_siblings(): void
     {
         [$organization, $projectA, $facilityA, $siteA] = $this->hierarchy('A');
@@ -97,6 +108,32 @@ class GovernanceMatrixTest extends TestCase
             ->assertExactJson(['roles' => []]);
     }
 
+    public function test_sago_admin_can_assign_only_coordination_admin(): void
+    {
+        [$organization] = $this->hierarchy('SAGO-ASSIGNABLE');
+
+        Sanctum::actingAs($this->actor('sago_admin', 'platform', $organization->id));
+
+        $this->getJson('/api/v1/assignable-roles')
+            ->assertOk()
+            ->assertJsonCount(1, 'roles')
+            ->assertJsonPath('roles.0.code', 'coordination_admin')
+            ->assertJsonMissingPath('roles.0.scope_id');
+    }
+
+    public function test_assignable_roles_api_never_returns_an_inactive_target_role(): void
+    {
+        [$organization] = $this->hierarchy('INACTIVE-ASSIGNABLE');
+        Role::where('code', 'site_admin')->update(['is_active' => false]);
+
+        Sanctum::actingAs($this->actor('coordination_admin', 'organization', $organization->id));
+
+        $this->getJson('/api/v1/assignable-roles')
+            ->assertOk()
+            ->assertJsonCount(1, 'roles')
+            ->assertJsonPath('roles.0.code', 'project_admin');
+    }
+
     public function test_assignable_roles_api_requires_authentication(): void
     {
         $this->getJson('/api/v1/assignable-roles')->assertUnauthorized();
@@ -107,7 +144,7 @@ class GovernanceMatrixTest extends TestCase
         [$organization] = $this->hierarchy('N');
         $coordination = $this->actor('coordination_admin', 'organization', $organization->id);
 
-        $this->assertTrue($coordination->hasPermission('organizations.manage'));
+        $this->assertFalse($coordination->hasPermission('organizations.manage'));
         $items = app(\App\Services\ApplicationNavigationService::class)->mobileItems($coordination);
         $dashboard = collect($items)->firstWhere('key', 'dashboard');
         $this->assertNotNull($dashboard);
@@ -117,16 +154,14 @@ class GovernanceMatrixTest extends TestCase
         $this->postJson('/api/v1/organizations', [
             'code' => 'ORG-CREATED', 'name' => 'Organisation créée par Coordination',
             'organization_type' => 'ngo', 'is_active' => true,
-        ])->assertCreated()->assertJsonPath('organization.code', 'ORG-CREATED');
-        $this->getJson('/api/v1/organizations')
-            ->assertOk()
-            ->assertJsonFragment(['code' => 'ORG-CREATED']);
+        ])->assertForbidden();
+        $this->getJson('/api/v1/organizations')->assertForbidden();
 
         $this->actingAs($coordination)
             ->get(route('configuration.workflow.start', [
                 'flowType' => \App\Enums\ConfigurationFlowType::NewOrganization->value,
             ]))
-            ->assertRedirect();
+            ->assertForbidden();
     }
 
     public function test_dynamic_navigation_matches_each_administrative_role(): void
@@ -137,19 +172,20 @@ class GovernanceMatrixTest extends TestCase
         $coordination = collect($navigation->mobileItems(
             $this->actor('coordination_admin', 'organization', $organization->id)
         ))->pluck('key');
-        foreach (['dashboard', 'configuration', 'organizations', 'missions', 'projects', 'funding', 'facilities', 'sites', 'users', 'standard-lists', 'products', 'stocks', 'inventories', 'orders', 'reports', 'synchronization', 'settings', 'activity_logs', 'profile'] as $key) {
+        foreach (['dashboard', 'users', 'standard-lists', 'products', 'stocks', 'receipts', 'dispensing', 'inventories', 'orders', 'reports', 'synchronization', 'activity_logs', 'profile'] as $key) {
             $this->assertTrue($coordination->contains($key), "Coordination menu is missing {$key}");
         }
-        $this->assertFalse($coordination->contains('receipts'));
-        $this->assertFalse($coordination->contains('dispensing'));
+        foreach (['configuration','organizations','missions','projects','funding','facilities','sites','settings'] as $key) $this->assertFalse($coordination->contains($key));
+        $this->assertTrue($coordination->contains('receipts'));
+        $this->assertTrue($coordination->contains('dispensing'));
 
         $projectMenu = collect($navigation->mobileItems(
             $this->actor('project_admin', 'project', $project->id)
         ))->pluck('key');
-        foreach (['dashboard', 'organizations', 'missions', 'projects', 'facilities', 'sites', 'users', 'standard-lists', 'products', 'stocks', 'inventories', 'orders', 'reports', 'synchronization', 'project_settings', 'activity_logs', 'profile'] as $key) {
+        foreach (['dashboard', 'organizations', 'facilities', 'sites', 'users', 'standard-lists', 'products', 'stocks', 'inventories', 'orders', 'reports', 'synchronization', 'project_settings', 'activity_logs', 'profile'] as $key) {
             $this->assertTrue($projectMenu->contains($key), "Project menu is missing {$key}");
         }
-        foreach (['configuration', 'funding', 'settings', 'site_settings', 'receipts', 'dispensing'] as $key) {
+        foreach (['configuration', 'missions', 'projects', 'funding', 'settings', 'site_settings', 'receipts', 'dispensing'] as $key) {
             $this->assertFalse($projectMenu->contains($key), "Project menu must not contain {$key}");
         }
 
@@ -165,6 +201,7 @@ class GovernanceMatrixTest extends TestCase
 
         $icons = collect(config('pharmacare_ui.module_icons'));
         foreach ([$coordination, $projectMenu, $siteMenu] as $menu) {
+            $this->assertSame('dashboard', $menu->first());
             foreach ($menu as $key) {
                 $iconKey = match ($key) {
                     'project_settings', 'site_settings' => 'settings',
@@ -177,13 +214,34 @@ class GovernanceMatrixTest extends TestCase
         }
     }
 
+    public function test_sidebar_visibility_follows_effective_permissions_without_role_specific_markup(): void
+    {
+        [$organization] = $this->hierarchy('SIDEBAR-PERMISSION');
+        $coordination = $this->actor('coordination_admin', 'organization', $organization->id);
+        $role = Role::where('code', 'coordination_admin')->firstOrFail();
+        $usersPermission = $role->permissions()->where('code', 'users.view')->firstOrFail();
+        $role->permissions()->detach($usersPermission->id);
+
+        $keys = collect(app(\App\Services\ApplicationNavigationService::class)->items($coordination))->pluck('key');
+        $this->assertFalse($keys->contains('users'));
+        $this->assertTrue($keys->contains('stocks'));
+
+        $response = $this->actingAs($coordination)->get('/dashboard')->assertOk();
+        $response->assertSee('class="permission-navigation"', false)
+            ->assertDontSee('href="'.route('users.index').'"', false)
+            ->assertSee('href="'.route('modules.stocks').'"', false);
+
+        $sidebar = file_get_contents(resource_path('views/components/app-sidebar.blade.php'));
+        $this->assertStringNotContainsString('$roleCode', $sidebar);
+    }
+
     public function test_direct_web_routes_enforce_the_same_permissions_as_navigation(): void
     {
         [$organization, $project, , $site] = $this->hierarchy('DIRECT');
 
         $coordination = $this->actor('coordination_admin', 'organization', $organization->id);
-        $this->actingAs($coordination)->get('/configuration')->assertOk();
-        $this->actingAs($coordination)->get('/receipts')->assertForbidden();
+        $this->actingAs($coordination)->get('/configuration')->assertForbidden();
+        $this->actingAs($coordination)->get('/receipts')->assertOk();
 
         $projectAdmin = $this->actor('project_admin', 'project', $project->id);
         $this->actingAs($projectAdmin)->get('/project-settings')->assertOk();
@@ -192,6 +250,33 @@ class GovernanceMatrixTest extends TestCase
         $siteAdmin = $this->actor('site_admin', 'site', $site->id);
         $this->actingAs($siteAdmin)->get('/receipts')->assertOk();
         $this->actingAs($siteAdmin)->get('/organizations')->assertForbidden();
+        $this->actingAs($siteAdmin)->get('/users')->assertForbidden();
+
+        Sanctum::actingAs($siteAdmin);
+        $this->postJson('/api/v1/users', [
+            'name' => 'Compte interdit',
+            'email' => 'forbidden.direct@example.org',
+            'role_id' => Role::where('code', 'site_admin')->firstOrFail()->id,
+            'scope_type' => 'site',
+            'scope_id' => $site->id,
+        ])->assertForbidden();
+    }
+
+    public function test_sensitive_user_and_organization_routes_are_guarded_before_controller_execution(): void
+    {
+        [$organization, , , $site] = $this->hierarchy('ROUTE-GUARDS');
+        $siteAdmin = $this->actor('site_admin', 'site', $site->id);
+        $target = User::factory()->create(['organization_id' => $organization->id]);
+
+        $this->actingAs($siteAdmin)->get('/users/create')->assertForbidden();
+        $this->actingAs($siteAdmin)->get('/users/'.$target->id)->assertForbidden();
+        $this->actingAs($siteAdmin)->put('/users/'.$target->id, [])->assertForbidden();
+        $this->actingAs($siteAdmin)->delete('/users/'.$target->id)->assertForbidden();
+        $this->actingAs($siteAdmin)->post('/organizations', [])->assertForbidden();
+        $this->actingAs($siteAdmin)->put('/organizations/'.$organization->id, [])->assertForbidden();
+
+        Sanctum::actingAs($siteAdmin);
+        $this->postJson('/api/v1/users', [])->assertForbidden();
     }
 
     public function test_shared_dashboard_is_dynamic_and_coordination_menu_keeps_required_order(): void
@@ -199,23 +284,22 @@ class GovernanceMatrixTest extends TestCase
         [$organization, $project, , $site] = $this->hierarchy('DASH');
         $navigation = app(\App\Services\ApplicationNavigationService::class);
 
-        $owner = $this->actor('owner', 'platform', $organization->id);
+        $owner = $this->actor('sago_admin', 'platform', $organization->id);
         Sanctum::actingAs($owner);
         $ownerWidgets = collect($this->getJson('/api/v1/dashboard')->assertOk()->json('widgets'))->pluck('key');
         $this->assertTrue($ownerWidgets->contains('organizations'));
         $this->assertTrue($ownerWidgets->contains('users_active'));
         $this->assertFalse($ownerWidgets->contains('stock_quantity'));
-        $this->assertFalse(collect($navigation->mobileItems($owner))->pluck('key')->contains('configuration'));
+        $this->assertTrue(collect($navigation->mobileItems($owner))->pluck('key')->contains('configuration'));
 
         $coordination = $this->actor('coordination_admin', 'organization', $organization->id);
         $coordinationMenu = collect($navigation->mobileItems($coordination))->pluck('key')->values();
-        $this->assertSame('configuration', $coordinationMenu->get(0));
-        $this->assertSame('dashboard', $coordinationMenu->get(1));
+        $this->assertSame('dashboard', $coordinationMenu->get(0));
         Sanctum::actingAs($coordination);
         $coordinationWidgets = collect($this->getJson('/api/v1/dashboard')->assertOk()->json('widgets'))->pluck('key');
-        $this->assertTrue($coordinationWidgets->contains('missions'));
-        $this->assertTrue($coordinationWidgets->contains('projects'));
-        $this->assertTrue($coordinationWidgets->contains('sites'));
+        $this->assertFalse($coordinationWidgets->contains('missions'));
+        $this->assertFalse($coordinationWidgets->contains('projects'));
+        $this->assertFalse($coordinationWidgets->contains('sites'));
 
         Sanctum::actingAs($this->actor('project_admin', 'project', $project->id));
         $projectWidgets = collect($this->getJson('/api/v1/dashboard')->assertOk()->json('widgets'))->pluck('key');
@@ -280,7 +364,85 @@ class GovernanceMatrixTest extends TestCase
             ->assertSee('id="create-mission"', false)
             ->assertSee('id="create-project"', false)
             ->assertSee('id="create-facility"', false)
-            ->assertSee('id="create-site"', false);
+            ->assertSee('id="create-site"', false)
+            ->assertSee('id="create-organization" name="organization_id" disabled', false)
+            ->assertSee('id="create-mission" name="mission_id" disabled', false)
+            ->assertSee('id="create-project" name="project_id" disabled', false)
+            ->assertSee('Organisation définie par votre périmètre.')
+            ->assertSee('Projet défini par votre périmètre.');
+    }
+
+    public function test_coordination_admin_can_create_project_and_site_accounts_from_sidebar_module(): void
+    {
+        [$organization, $project, $facility, $site] = $this->hierarchy('WEB-COORD');
+        $mission = $project->mission;
+        $coordination = $this->actor('coordination_admin', 'organization', $organization->id);
+        $projectRole = Role::where('code', 'project_admin')->firstOrFail();
+        $siteRole = Role::where('code', 'site_admin')->firstOrFail();
+
+        $this->actingAs($coordination)->get('/users')
+            ->assertOk()
+            ->assertSee('user-create-sheet')
+            ->assertSee($projectRole->name)
+            ->assertSee($siteRole->name);
+
+        $this->actingAs($coordination)->post('/users', [
+            'first_name' => 'Alice', 'last_name' => 'Projet', 'username' => 'alice_projet',
+            'email' => 'alice.project@example.org', 'role_id' => $projectRole->id,
+            'organization_id' => $organization->id, 'mission_id' => $mission->id,
+            'project_id' => $project->id,
+        ])->assertRedirect('/users')->assertSessionHas('success');
+
+        $this->actingAs($coordination)->post('/users', [
+            'first_name' => 'Brice', 'last_name' => 'Site', 'username' => 'brice_site',
+            'email' => 'brice.site@example.org', 'role_id' => $siteRole->id,
+            'organization_id' => $organization->id, 'mission_id' => $mission->id,
+            'project_id' => $project->id, 'health_facility_id' => $facility->id,
+            'dispensing_site_id' => $site->id,
+        ])->assertRedirect('/users')->assertSessionHas('success');
+
+        $this->assertDatabaseHas('users', ['email' => 'alice.project@example.org', 'organization_id' => $organization->id]);
+        $this->assertDatabaseHas('users', ['email' => 'brice.site@example.org', 'organization_id' => $organization->id]);
+        $this->assertSame('project', User::where('email', 'alice.project@example.org')->firstOrFail()->roles()->firstOrFail()->pivot->scope_type);
+        $this->assertSame($site->id, User::where('email', 'brice.site@example.org')->firstOrFail()->roles()->firstOrFail()->pivot->scope_id);
+    }
+
+    public function test_project_admin_can_create_only_a_site_account_from_sidebar_module(): void
+    {
+        [$organization, $project, $facility, $site] = $this->hierarchy('WEB-PROJECT');
+        $projectAdmin = $this->actor('project_admin', 'project', $project->id);
+        $siteRole = Role::where('code', 'site_admin')->firstOrFail();
+
+        $this->actingAs($projectAdmin)->post('/users', [
+            'first_name' => 'Claire', 'last_name' => 'Site', 'username' => 'claire_site',
+            'email' => 'claire.site@example.org', 'role_id' => $siteRole->id,
+            'organization_id' => $organization->id, 'mission_id' => $project->mission_id,
+            'project_id' => $project->id, 'health_facility_id' => $facility->id,
+            'dispensing_site_id' => $site->id,
+        ])->assertRedirect('/users')->assertSessionHas('success');
+
+        $created = User::where('email', 'claire.site@example.org')->firstOrFail();
+        $this->assertSame('site_admin', $created->roles()->firstOrFail()->code);
+        $this->assertSame($site->id, $created->roles()->firstOrFail()->pivot->scope_id);
+    }
+
+    public function test_project_admin_cannot_create_a_site_account_outside_dependent_lists(): void
+    {
+        [$organizationA, $projectA] = $this->hierarchy('WEB-CHAIN-A');
+        [$organizationB, $projectB, $facilityB, $siteB] = $this->hierarchy('WEB-CHAIN-B');
+        $projectAdmin = $this->actor('project_admin', 'project', $projectA->id);
+        $siteRole = Role::where('code', 'site_admin')->firstOrFail();
+
+        $this->actingAs($projectAdmin)->post('/users', [
+            'first_name' => 'Hors', 'last_name' => 'Périmètre', 'username' => 'hors_perimetre',
+            'email' => 'outside.chain@example.org', 'role_id' => $siteRole->id,
+            'organization_id' => $organizationB->id, 'mission_id' => $projectB->mission_id,
+            'project_id' => $projectB->id, 'health_facility_id' => $facilityB->id,
+            'dispensing_site_id' => $siteB->id,
+        ])->assertNotFound();
+
+        $this->assertDatabaseMissing('users', ['email' => 'outside.chain@example.org']);
+        $this->assertNotSame($organizationA->id, $organizationB->id);
     }
 
     private function actor(string $roleCode, string $scopeType, string $scopeId): User

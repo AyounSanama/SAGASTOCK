@@ -73,6 +73,15 @@ class DatabaseSeeder extends Seeder
             'users.suspend_site_admin' => 'Suspendre ou reactiver un Admin Site',
             'receipts.view' => 'Consulter les receptions',
             'orders.prepare' => 'Preparer les commandes',
+            'orders.approve' => 'Approuver les commandes',
+            'inventories.validate' => 'Valider les inventaires',
+            'patients.view' => 'Consulter les patients',
+            'patients.manage' => 'Gérer les patients',
+            'prescriptions.view' => 'Consulter les ordonnances',
+            'prescriptions.manage' => 'Gérer les ordonnances',
+            'prescriptions.validate' => 'Valider les ordonnances',
+            'dispensations.view' => 'Consulter les dispensations cliniques',
+            'dispensations.manage' => 'Gérer les dispensations cliniques',
             'reports.export_local' => 'Exporter les rapports locaux',
             'project_settings.view' => 'Consulter les parametres du projet',
             'site_settings.view' => 'Consulter les parametres du site',
@@ -83,21 +92,20 @@ class DatabaseSeeder extends Seeder
         );
 
         $roleDefinitions = [
-            'owner' => ['Propriétaire de la plateforme', array_values(array_diff(
-                array_keys($permissionNames),
-                [
-                    'configuration.view',
-                    'stocks.view',
-                    'stocks.manage',
-                    'stocks.adjust',
-                    'transfers.manage',
-                    'receipts.manage',
-                    'dispensations.view',
-                    'dispensations.manage',
-                    'inventories.manage',
-                    'orders.manage',
-                ],
-            )), 'platform'],
+            'sago_admin' => ['Admin Sago', [
+                'dashboard.view', 'configuration.view', 'configuration.platform.manage',
+                'organizations.view', 'organizations.manage', 'missions.view', 'missions.manage',
+                'projects.view', 'standard_lists.view', 'standard_lists.manage', 'standards.assign',
+                'catalog.publish', 'users.view', 'users.manage', 'roles.manage', 'audit.view',
+                'activity_logs.view', 'settings.view',
+            ], 'platform'],
+            'owner' => ['Admin Sago (alias historique)', [
+                'dashboard.view', 'configuration.view', 'configuration.platform.manage',
+                'organizations.view', 'organizations.manage', 'missions.view', 'missions.manage',
+                'projects.view', 'standard_lists.view', 'standard_lists.manage', 'standards.assign',
+                'catalog.publish', 'users.view', 'users.manage', 'roles.manage', 'audit.view',
+                'activity_logs.view', 'settings.view',
+            ], 'platform'],
             'coordination_admin' => ['Admin Coordination', [
                 'dashboard.view',
                 'configuration.view',
@@ -198,16 +206,14 @@ class DatabaseSeeder extends Seeder
         }
 
         $strictMatrix = [
-            'coordination_admin' => ['dashboard.view','configuration.view','configuration.organization.manage','organizations.view','organizations.manage','missions.view','missions.manage','projects.view','projects.manage','funding.view','funding.manage','structures.view','structures.manage','health_facilities.view','health_facilities.manage','sites.view','sites.manage','dispensing_sites.view','dispensing_sites.manage','modules.manage','standard_lists.view','standard_lists.manage','catalog.view','catalog.manage','catalog.publish','products.view','products.manage','stocks.view','inventories.view','orders.view','orders.manage','reports.view','reports.export','synchronization.view','settings.view','settings.manage','users.view','users.manage','audit.view','activity_logs.view'],
+            'coordination_admin' => ['dashboard.view','standard_lists.view','catalog.view','products.view','stocks.view','receipts.view','receipts.manage','dispensing.view','dispensing.manage','patients.view','patients.manage','prescriptions.view','prescriptions.manage','prescriptions.validate','dispensations.view','dispensations.manage','inventories.view','inventories.manage','inventories.validate','orders.view','orders.manage','orders.approve','reports.view','reports.export','synchronization.view','users.view','users.manage','activity_logs.view'],
             'project_admin' => ['dashboard.view','organizations.view','missions.view','project.view','projects.view','health_facilities.view','health_facilities.manage','structures.view','structures.manage','dispensing_sites.view','dispensing_sites.manage','sites.view','sites.manage','users.view','users.create_site_admin','users.update_site_admin','users.suspend_site_admin','standard_lists.view','catalog.view','products.view','products.manage','stocks.view','inventories.view','orders.view','orders.manage','reports.view','reports.export','synchronization.view','project_settings.view','activity_logs.view'],
             'site_admin' => ['dashboard.view','catalog.view','products.view','stocks.view','stocks.manage','receipts.view','receipts.manage','dispensing.view','dispensing.manage','inventories.view','inventories.manage','orders.view','orders.prepare','reports.view','reports.export_local','synchronization.view','synchronization.manage','site_settings.view','activity_logs.view_local'],
         ];
         foreach ($strictMatrix as $roleCode => $codes) {
             Role::where('code', $roleCode)->first()?->permissions()
                 ->sync(
-                    $roleCode === 'coordination_admin'
-                        ? $permissions->pluck('id')
-                        : $permissions->only($codes)->pluck('id'),
+                    $permissions->only($codes)->pluck('id'),
                 );
         }
 
@@ -227,7 +233,7 @@ class DatabaseSeeder extends Seeder
                 ['email' => $email],
                 ['name' => 'Administrateur PharmaCare', 'password' => $password, 'is_active' => true],
             );
-            $owner = Role::where('code', 'owner')->firstOrFail();
+            $owner = Role::where('code', 'sago_admin')->firstOrFail();
             $admin->roles()->syncWithoutDetaching([
                 $owner->id => ['scope_type' => 'platform', 'scope_id' => null],
             ]);

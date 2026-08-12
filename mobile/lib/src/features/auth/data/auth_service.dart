@@ -66,7 +66,7 @@ class AuthService {
           deviceId: deviceId,
         );
       }
-      throw const ServerUnavailableException();
+      throw ServerUnavailableException.fromDio(error);
     }
     final token = response.data?['token'] as String?;
     final user = response.data?['user'] as Map<String, dynamic>?;
@@ -248,7 +248,18 @@ class AuthService {
       return 'Connexion hors ligne indisponible pour ces identifiants. Connectez-vous une première fois au serveur sur cet appareil.';
     }
     if (error is ServerUnavailableException) {
-      return 'Impossible de contacter le serveur. Vérifiez l’URL API et la connectivité de l’appareil. Sur appareil physique, utilisez l’IP de l’ordinateur et non 10.0.2.2.';
+      return switch (error.type) {
+        DioExceptionType.connectionTimeout =>
+          'Le serveur ne répond pas dans le délai prévu. Vérifiez que Laravel est démarré et que le port 8000 est autorisé par le pare-feu.',
+        DioExceptionType.receiveTimeout || DioExceptionType.sendTimeout =>
+          'La communication avec le serveur a expiré. Vérifiez la qualité du réseau puis réessayez.',
+        DioExceptionType.badCertificate =>
+          'Le certificat de sécurité du serveur n’est pas valide.',
+        DioExceptionType.connectionError =>
+          'Connexion au serveur impossible (${error.host}). Vérifiez que le téléphone et l’ordinateur utilisent le même réseau et que le port 8000 est ouvert.',
+        _ =>
+          'Impossible de contacter le serveur (${error.host}). Vérifiez l’URL API et la connectivité de l’appareil.',
+      };
     }
     if (error is DioException && error.response?.statusCode == 422) {
       return 'Adresse e-mail ou mot de passe incorrect.';
@@ -262,5 +273,21 @@ class OfflineAuthenticationException implements Exception {
 }
 
 class ServerUnavailableException implements Exception {
-  const ServerUnavailableException();
+  const ServerUnavailableException({
+    required this.type,
+    required this.host,
+    this.cause,
+  });
+
+  factory ServerUnavailableException.fromDio(DioException error) {
+    return ServerUnavailableException(
+      type: error.type,
+      host: error.requestOptions.uri.authority,
+      cause: error.error,
+    );
+  }
+
+  final DioExceptionType type;
+  final String host;
+  final Object? cause;
 }

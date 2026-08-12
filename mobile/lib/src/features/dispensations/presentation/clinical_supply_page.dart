@@ -97,13 +97,37 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
         : 'Opération impossible.';
   }
 
-  Future<void> execute(Future<void> Function() action, String success) async {
+  Future<void> execute(Future<Object?> Function() action, String success) async {
     try {
-      await action();
-      message(success);
+      final result = await action();
+      message(result == false
+          ? 'Action conservée hors connexion et à synchroniser.'
+          : success);
       await _load();
     } on DioException catch (e) {
       message(apiError(e));
+    }
+  }
+
+  Future<void> validateClinical(Map<String, dynamic> prescription) async {
+    final data = await showAppFormSheet<Map<String, dynamic>>(
+      context: context,
+      title: 'Validation clinique',
+      description:
+          'Contrôlez le protocole, la posologie, les allergies et les contre-indications.',
+      builder: (_) => const ClinicalValidationForm(),
+    );
+    if (data != null && organizationId != null) {
+      await execute(
+        () => service.validatePrescription(
+          organizationId!,
+          '${prescription['id']}',
+          data,
+        ),
+        data['decision'] == 'reject'
+            ? 'Ordonnance rejetée.'
+            : 'Ordonnance validée cliniquement.',
+      );
     }
   }
 
@@ -324,13 +348,7 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
                           label: 'Valider l’ordonnance',
                           expanded: true,
                           compact: true,
-                          onPressed: () => execute(
-                            () => service.validatePrescription(
-                              organizationId!,
-                              '${p['id']}',
-                            ),
-                            'Ordonnance validée.',
-                          ),
+                          onPressed: () => validateClinical(p),
                         ),
                       ],
                     ],
@@ -414,7 +432,8 @@ class _PatientFormState extends State<PatientForm> {
       first = TextEditingController(),
       last = TextEditingController(),
       phone = TextEditingController(),
-      birth = TextEditingController();
+      birth = TextEditingController(),
+      allergies = TextEditingController();
   String? sex;
   @override
   Widget build(BuildContext c) => FormBody(
@@ -428,6 +447,7 @@ class _PatientFormState extends State<PatientForm> {
           if (phone.text.isNotEmpty) 'phone': phone.text,
           if (birth.text.isNotEmpty) 'date_of_birth': birth.text,
           if (sex != null) 'sex': sex,
+          if (allergies.text.isNotEmpty) 'allergies': allergies.text,
         });
       }
     },
@@ -446,6 +466,7 @@ class _PatientFormState extends State<PatientForm> {
       ),
       field(birth, 'Date de naissance (AAAA-MM-JJ)', required: false),
       field(phone, 'Téléphone', required: false),
+      field(allergies, 'Allergies connues', required: false),
     ],
   );
 }
@@ -464,7 +485,9 @@ class _PrescriptionFormState extends State<PrescriptionForm> {
       ),
       doctor = TextEditingController(),
       qty = TextEditingController(),
-      dosage = TextEditingController();
+      dosage = TextEditingController(),
+      frequency = TextEditingController(),
+      duration = TextEditingController();
   String? patient, site, product;
   @override
   Widget build(BuildContext c) => FormBody(
@@ -484,6 +507,8 @@ class _PrescriptionFormState extends State<PrescriptionForm> {
                 qty.text.replaceAll(',', '.'),
               ),
               if (dosage.text.isNotEmpty) 'dosage': dosage.text,
+              'frequency': frequency.text,
+              'duration': duration.text,
             },
           ],
         });
@@ -515,6 +540,8 @@ class _PrescriptionFormState extends State<PrescriptionForm> {
       ),
       field(qty, 'Quantité prescrite'),
       field(dosage, 'Posologie', required: false),
+      field(frequency, 'Fréquence'),
+      field(duration, 'Durée du traitement'),
     ],
   );
 }
@@ -550,6 +577,7 @@ class _DispensationFormState extends State<DispensationForm> {
             'prescription_id': prescription,
             'site_id': site,
             'dispensed_at': DateTime.now().toIso8601String(),
+            'allow_partial': true,
             'items': [
               {
                 'prescription_item_id': item,
@@ -594,6 +622,89 @@ class _DispensationFormState extends State<DispensationForm> {
       ],
     );
   }
+}
+
+class ClinicalValidationForm extends StatefulWidget {
+  const ClinicalValidationForm({super.key});
+  @override
+  State<ClinicalValidationForm> createState() =>
+      _ClinicalValidationFormState();
+}
+
+class _ClinicalValidationFormState extends State<ClinicalValidationForm> {
+  final key = GlobalKey<FormState>();
+  final notes = TextEditingController();
+  final reason = TextEditingController();
+  String decision = 'approve';
+  bool protocol = false, dosage = false, contraindications = false;
+
+  @override
+  Widget build(BuildContext context) => FormBody(
+    keyForm: key,
+    onSave: () {
+      if (!key.currentState!.validate()) return;
+      if (decision == 'approve' &&
+          (!protocol || !dosage || !contraindications)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Confirmez les trois contrôles cliniques.')),
+        );
+        return;
+      }
+      Navigator.pop(context, {
+        'decision': decision,
+        'protocol_confirmed': protocol,
+        'dosage_confirmed': dosage,
+        'contraindications_checked': contraindications,
+        if (notes.text.trim().isNotEmpty)
+          'clinical_validation_notes': notes.text.trim(),
+        if (decision == 'reject') 'rejection_reason': reason.text.trim(),
+      });
+    },
+    children: [
+      DropdownButtonFormField<String>(
+        initialValue: decision,
+        decoration: const InputDecoration(labelText: 'Décision clinique'),
+        items: const [
+          DropdownMenuItem(value: 'approve', child: Text('Approuver')),
+          DropdownMenuItem(value: 'reject', child: Text('Rejeter')),
+        ],
+        onChanged: (value) => setState(() => decision = value ?? 'approve'),
+      ),
+      if (decision == 'approve') ...[
+        CheckboxListTile(
+          value: protocol,
+          title: const Text('Protocole thérapeutique vérifié'),
+          onChanged: (value) => setState(() => protocol = value ?? false),
+        ),
+        CheckboxListTile(
+          value: dosage,
+          title: const Text('Posologie et durée vérifiées'),
+          onChanged: (value) => setState(() => dosage = value ?? false),
+        ),
+        CheckboxListTile(
+          value: contraindications,
+          title: const Text('Allergies et contre-indications vérifiées'),
+          onChanged: (value) =>
+              setState(() => contraindications = value ?? false),
+        ),
+      ] else
+        TextFormField(
+          controller: reason,
+          decoration: const InputDecoration(labelText: 'Motif du rejet'),
+          minLines: 2,
+          maxLines: 4,
+          validator: (value) => value == null || value.trim().length < 5
+              ? 'Indiquez un motif précis.'
+              : null,
+        ),
+      TextFormField(
+        controller: notes,
+        decoration: const InputDecoration(labelText: 'Note clinique'),
+        minLines: 2,
+        maxLines: 4,
+      ),
+    ],
+  );
 }
 
 class FormBody extends StatelessWidget {

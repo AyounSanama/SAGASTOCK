@@ -119,7 +119,7 @@ class AuthController extends Controller
             'email' => ['required', 'email', 'max:190', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:40'],
             'role_id' => ['required', 'integer', 'exists:roles,id'],
-            'scope' => ['required', 'string', 'max:100'],
+            'scope' => ['nullable', 'string', 'max:100'],
             'organization_id' => ['nullable', 'uuid', 'exists:organizations,id'],
             'mission_id' => ['nullable', 'uuid', 'exists:missions,id'],
             'project_id' => ['nullable', 'uuid', 'exists:projects,id'],
@@ -133,7 +133,12 @@ class AuthController extends Controller
         $role = $this->scopes->assignableRoles($request->user())->findOrFail($data['role_id']);
         $roleCode = $this->governance->canonicalCode($role->code);
         $organization = null;
-        if (in_array($roleCode, [GovernanceService::PROJECT_ADMIN, GovernanceService::SITE_ADMIN], true)) {
+        if ($roleCode === GovernanceService::COORDINATION_ADMIN) {
+            $request->validate(['organization_id' => ['required']]);
+            $organization = $this->scopes->organizations($request->user())
+                ->findOrFail($data['organization_id']);
+            [$scopeType, $scopeId] = ['organization', $organization->id];
+        } elseif (in_array($roleCode, [GovernanceService::PROJECT_ADMIN, GovernanceService::SITE_ADMIN], true)) {
             $request->validate([
                 'organization_id' => ['required'], 'mission_id' => ['required'], 'project_id' => ['required'],
                 'health_facility_id' => [Rule::requiredIf($roleCode === GovernanceService::SITE_ADMIN)],
@@ -153,6 +158,7 @@ class AuthController extends Controller
                 [$scopeType, $scopeId] = ['site', $site->id];
             }
         } else {
+            $request->validate(['scope' => ['required', 'string', 'max:100']]);
             [$scopeType, $scopeId] = $this->parseScope($data['scope']);
             abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
         }

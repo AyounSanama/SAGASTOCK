@@ -9,6 +9,10 @@ void main() {
     );
     expect(ApplicationAccess.requiredPermission('/receipts'), 'receipts.view');
     expect(
+      ApplicationAccess.requiredPermission('/prescriptions'),
+      'prescriptions.view',
+    );
+    expect(
       ApplicationAccess.requiredPermission('/dispensations'),
       'dispensing.view',
     );
@@ -54,19 +58,61 @@ void main() {
     expect(keys, isNot(contains('users')));
   });
 
-  test('Admin Coordination entre directement dans Configuration', () {
+  test('la navigation conserve le même ordre et le tableau de bord en premier', () {
+    final user = <String, dynamic>{
+      'permissions': <String>[
+        'configuration.view',
+        'organizations.view',
+        'products.view',
+        'stocks.view',
+      ],
+    };
+
+    final keys = ApplicationAccess.navigation(user)
+        .map((item) => item.key)
+        .toList(growable: false);
+
+    expect(keys.first, 'dashboard');
+    expect(
+      keys,
+      <String>[
+        'dashboard',
+        'configuration',
+        'organizations',
+        'products',
+        'stocks',
+        'profile',
+      ],
+    );
+  });
+
+  test('une permission retirée supprime immédiatement le module concerné', () {
+    final withUsers = ApplicationAccess.navigation(<String, dynamic>{
+      'permissions': <String>['users.view', 'stocks.view'],
+    }).map((item) => item.key);
+    final withoutUsers = ApplicationAccess.navigation(<String, dynamic>{
+      'permissions': <String>['stocks.view'],
+    }).map((item) => item.key);
+
+    expect(withUsers, contains('users'));
+    expect(withoutUsers, isNot(contains('users')));
+    expect(withoutUsers, contains('stocks'));
+  });
+
+  test('Admin Coordination entre directement sur le tableau de bord', () {
     final user = <String, dynamic>{
       'role': 'coordination_admin',
       'roles': <String>['coordination_admin'],
       'permissions': <String>['configuration.view', 'dashboard.view'],
     };
 
-    expect(ApplicationAccess.landingPath(user), '/configuration');
+    expect(ApplicationAccess.landingPath(user), '/home');
   });
 
   test('les autres rôles entrent sur le tableau de bord', () {
     for (final role in <String>[
       'owner',
+      'sago_admin',
       'project_admin',
       'site_admin',
       'site_user',

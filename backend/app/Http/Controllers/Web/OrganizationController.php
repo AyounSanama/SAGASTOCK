@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Services\AuditService;
 use App\Services\UserScopeService;
+use App\Services\GovernanceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,7 +30,7 @@ class OrganizationController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $this->allow('organizations.manage');
+        $this->platformAdmin($request);
         $organization = Organization::create($this->validated($request));
         $this->audit->record($request, 'organization.created', $organization, [], $organization->only(['code', 'name', 'is_active']));
         return back()->with('status', 'Organisation créée.');
@@ -37,7 +38,7 @@ class OrganizationController extends Controller
 
     public function update(Request $request, Organization $organization): RedirectResponse
     {
-        $this->allow('organizations.manage');
+        $this->platformAdmin($request);
         $this->accessible($request, $organization);
         $old = $organization->only(['code', 'name', 'legal_name', 'email', 'phone', 'country_code', 'address', 'is_active']);
         $organization->update($this->validated($request, $organization));
@@ -47,7 +48,7 @@ class OrganizationController extends Controller
 
     public function destroy(Request $request, Organization $organization): RedirectResponse
     {
-        $this->allow('organizations.manage');
+        $this->platformAdmin($request);
         $this->accessible($request, $organization);
         $organization->update(['is_active' => false]);
         $organization->delete();
@@ -57,7 +58,7 @@ class OrganizationController extends Controller
 
     public function restore(Request $request, string $organization): RedirectResponse
     {
-        $this->allow('organizations.manage');
+        $this->platformAdmin($request);
         $model = $this->scopes->archivedOrganizations($request->user())->findOrFail($organization);
         $model->restore();
         $model->update(['is_active' => true]);
@@ -84,6 +85,15 @@ class OrganizationController extends Controller
     private function allow(string $permission): void
     {
         abort_unless(Auth::user()?->hasPermission($permission), 403);
+    }
+
+    private function platformAdmin(Request $request): void
+    {
+        abort_unless(
+            app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::SAGO_ADMIN
+                && $this->scopes->isPlatform($request->user()),
+            403,
+        );
     }
 
     private function accessible(Request $request, Organization $organization): void

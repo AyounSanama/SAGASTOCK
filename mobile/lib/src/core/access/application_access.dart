@@ -19,7 +19,6 @@ class ApplicationNavigationItem {
 }
 
 abstract final class ApplicationAccess {
-  static const coordinationAdmin = 'coordination_admin';
   static const _fallbackManifest = <Map<String, String?>>[
     {
       'key': 'dashboard',
@@ -41,20 +40,6 @@ abstract final class ApplicationAccess {
       'path': '/organizations',
       'icon': 'organizations',
       'permission': 'organizations.view',
-    },
-    {
-      'key': 'missions',
-      'label': 'Missions',
-      'path': '/missions',
-      'icon': 'missions',
-      'permission': 'missions.view',
-    },
-    {
-      'key': 'projects',
-      'label': 'Projets',
-      'path': '/projects',
-      'icon': 'projects',
-      'permission': 'projects.view',
     },
     {
       'key': 'funding',
@@ -202,20 +187,8 @@ abstract final class ApplicationAccess {
   /// Route d'accueil unique, calculée depuis l'identité authentifiée.
   static String landingPath(Map<String, dynamic>? user) {
     if (user?['must_change_password'] == true) return '/change-password';
-
-    final role = user?['role']?.toString();
-    final roles = (user?['roles'] as List<dynamic>? ?? const <dynamic>[])
-        .map((value) => value.toString())
-        .toSet();
-    final isCoordination =
-        role == coordinationAdmin ||
-        role == 'organization_admin' ||
-        roles.contains(coordinationAdmin) ||
-        roles.contains('organization_admin');
-
-    return isCoordination && allows(user, 'configuration.view')
-        ? '/configuration'
-        : '/home';
+    final role = '${user?['role'] ?? ''}'.toLowerCase();
+    return role == 'sago_admin' ? '/sago/dashboard' : '/home';
   }
 
   static List<ApplicationNavigationItem> navigation(
@@ -226,13 +199,20 @@ abstract final class ApplicationAccess {
         ? _fallbackManifest
         : remote.cast<Map<String, dynamic>>();
 
-    return source
+    final role = '${user?['role'] ?? ''}'.toLowerCase();
+    final filteredSource = role == 'sago_admin'
+        ? source.where((raw) => const {'dashboard', 'configuration', 'profile'}.contains(raw['key']))
+        : source;
+
+    return filteredSource
         .where((raw) => allows(user, raw['permission']?.toString()))
         .map(
           (raw) => ApplicationNavigationItem(
             key: raw['key']?.toString() ?? '',
             label: raw['label']?.toString() ?? '',
-            path: raw['path']?.toString() ?? '/home',
+            path: role == 'sago_admin' && raw['key'] == 'dashboard'
+                ? '/sago/dashboard'
+                : raw['path']?.toString() ?? '/home',
             icon: ModuleIconRegistry.resolve(raw['icon']?.toString()),
             permission: raw['permission']?.toString(),
           ),
@@ -254,6 +234,7 @@ abstract final class ApplicationAccess {
       '/products': 'products.view',
       '/stocks': 'stocks.view',
       '/receipts': 'receipts.view',
+      '/prescriptions': 'prescriptions.view',
       '/dispensations': 'dispensing.view',
       '/inventories': 'inventories.view',
       '/orders': 'orders.view',

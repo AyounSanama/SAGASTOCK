@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Country extends Model
 {
@@ -22,5 +23,10 @@ class Country extends Model
     public function missions(): HasMany
     {
         return $this->hasMany(Mission::class);
+    }
+
+    public function organizations(): BelongsToMany
+    {
+        return $this->belongsToMany(Organization::class)->withTimestamps();
     }
 }

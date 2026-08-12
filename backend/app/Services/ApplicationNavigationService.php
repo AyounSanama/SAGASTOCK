@@ -10,11 +10,9 @@ class ApplicationNavigationService
 {
     /** Manifeste unique : chaque entrée dépend exclusivement d'une permission. */
     private const ITEMS = [
+        ['key'=>'dashboard','label'=>'Tableau de bord','route'=>'dashboard','path'=>'/dashboard','icon'=>'dashboard','permission'=>null],
         ['key'=>'configuration','label'=>'Configuration','route'=>'configuration.index','path'=>'/configuration','icon'=>'configuration','permission'=>'configuration.view'],
-        ['key'=>'dashboard','label'=>'Tableau de bord','route'=>'dashboard','path'=>'/dashboard','icon'=>'dashboard','permission'=>'dashboard.view'],
         ['key'=>'organizations','label'=>'Organisations','route'=>'organizations.index','path'=>'/organizations','icon'=>'organizations','permission'=>'organizations.view'],
-        ['key'=>'missions','label'=>'Missions','route'=>'modules.missions','path'=>'/missions','icon'=>'missions','permission'=>'missions.view'],
-        ['key'=>'projects','label'=>'Projets','route'=>'modules.projects','path'=>'/projects','icon'=>'projects','permission'=>'projects.view'],
         ['key'=>'funding','label'=>'Bailleurs et programmes','route'=>'modules.funding','path'=>'/funding','icon'=>'funding','permission'=>'funding.view'],
         ['key'=>'facilities','label'=>'Formations sanitaires','route'=>'modules.health-facilities','path'=>'/health-facilities','icon'=>'facilities','permission'=>'health_facilities.view'],
         ['key'=>'sites','label'=>'Sites de dispensation','route'=>'modules.dispensing-sites','path'=>'/dispensing-sites','icon'=>'sites','permission'=>'dispensing_sites.view'],
@@ -47,8 +45,19 @@ class ApplicationNavigationService
     public function items(User $user): array
     {
         $permissions = $this->permissions($user);
-        return collect(self::ITEMS)
-            ->filter(fn(array $item) => $this->isVisible($item, $permissions))
+        if (app(GovernanceService::class)->roleCode($user) === GovernanceService::SAGO_ADMIN) {
+            return collect(self::ITEMS)
+                ->whereIn('key', ['dashboard', 'configuration', 'profile'])
+                ->map(function (array $item): array {
+                    $item['route'] = $item['key'] === 'dashboard' ? 'sago.dashboard' : $item['route'];
+                    $item['url'] = $this->buildUrl($item['route']);
+                    return $item;
+                })->values()->all();
+        }
+        $items = collect(self::ITEMS)
+            ->filter(fn(array $item) => $this->isVisible($item, $permissions));
+
+        return $items
             ->map(function (array $item): array {
                 $item['url'] = $this->buildUrl($item['route']);
                 return $item;

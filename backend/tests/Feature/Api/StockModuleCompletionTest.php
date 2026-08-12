@@ -39,7 +39,7 @@ class StockModuleCompletionTest extends TestCase
             'status' => 'available',
         ]);
         $permissions = collect([
-            'stocks.view', 'stocks.manage', 'stocks.adjust', 'batches.manage',
+            'stocks.view', 'stocks.manage', 'stocks.adjust', 'catalog.view', 'batches.view', 'batches.manage',
         ])->map(fn (string $code) => Permission::firstOrCreate(['code' => $code], ['name' => $code]));
         $role = Role::create(['code' => 'stock_completion', 'name' => 'Gestionnaire stock']);
         $role->permissions()->attach($permissions->pluck('id'));

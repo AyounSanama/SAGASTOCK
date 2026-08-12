@@ -8,7 +8,7 @@ class ClinicalSupplyService {
   ClinicalSupplyService({ApiClient? client}) : _client = client ?? ApiClient();
   final ApiClient _client;
   final _storage = const FlutterSecureStorage();
-  static const _outboxKey = 'offline_dispensation_outbox';
+  static const _outboxKey = 'offline_clinical_outbox_v2';
 
   Future<Options> _auth() async => Options(
     headers: {
@@ -47,34 +47,50 @@ class ClinicalSupplyService {
     }
   }
 
-  Future<void> createPatient(String id, Map<String, dynamic> data) async =>
-      _client.dio.post(
-        '/organizations/$id/patients',
-        data: data,
-        options: await _auth(),
-      );
-  Future<void> createPrescription(String id, Map<String, dynamic> data) async =>
-      _client.dio.post(
-        '/organizations/$id/prescriptions',
-        data: data,
-        options: await _auth(),
-      );
-  Future<void> validatePrescription(String id, String prescriptionId) async =>
-      _client.dio.post(
-        '/organizations/$id/prescriptions/$prescriptionId/validate',
-        options: await _auth(),
-      );
+  Future<bool> createPatient(String id, Map<String, dynamic> data) {
+    data['client_reference'] ??= const Uuid().v4();
+    return _sendOrQueue('/organizations/$id/patients', data);
+  }
+  Future<bool> createPrescription(String id, Map<String, dynamic> data) {
+    data['client_reference'] ??= const Uuid().v4();
+    return _sendOrQueue('/organizations/$id/prescriptions', data);
+  }
+  Future<bool> validatePrescription(
+    String id,
+    String prescriptionId,
+    Map<String, dynamic> clinicalValidation,
+  ) => _sendOrQueue(
+    '/organizations/$id/prescriptions/$prescriptionId/validate',
+    clinicalValidation,
+  );
+  Future<bool> returnDispensation(
+    String id,
+    String dispensationId,
+    Map<String, dynamic> data,
+  ) => _sendOrQueue(
+    '/organizations/$id/dispensations/$dispensationId/return',
+    data,
+  );
 
   Future<bool> dispense(String id, Map<String, dynamic> data) async {
     data['offline_uuid'] ??= const Uuid().v4();
-    final path = '/organizations/$id/dispensations';
+    return _sendOrQueue('/organizations/$id/dispensations', data);
+  }
+
+  Future<bool> _sendOrQueue(String path, Map<String, dynamic> data) async {
     try {
       await _client.dio.post(path, data: data, options: await _auth());
       return true;
     } on DioException catch (error) {
       if (error.response != null) rethrow;
       final items = await _outbox();
-      items.add({'path': path, 'data': data});
+      items.add({
+        'operation_id': const Uuid().v4(),
+        'path': path,
+        'data': Map<String, dynamic>.from(data),
+        'queued_at': DateTime.now().toIso8601String(),
+        'attempts': 0,
+      });
       await _storage.write(key: _outboxKey, value: jsonEncode(items));
       return false;
     }
@@ -92,8 +108,14 @@ class ClinicalSupplyService {
           data: item['data'],
           options: await _auth(),
         );
-      } on DioException {
-        remaining.add(item);
+      } on DioException catch (error) {
+        // Une erreur réseau ou serveur reste rejouable. Une erreur métier 4xx
+        // est conservée avec son diagnostic afin de ne perdre aucune saisie.
+        remaining.add({
+          ...item,
+          'attempts': ((item['attempts'] as num?)?.toInt() ?? 0) + 1,
+          'last_error': error.response?.data?.toString() ?? error.message,
+        });
       }
     }
     await _storage.write(key: _outboxKey, value: jsonEncode(remaining));

@@ -21,7 +21,7 @@ class UnifiedInterfaceAccessTest extends TestCase
 
     public function test_official_roles_share_one_layout_but_receive_permission_filtered_menus(): void
     {
-        $owner = $this->userWithRole('owner', 'platform');
+        $owner = $this->userWithRole('sago_admin', 'platform');
         $coordination = $this->userWithRole('coordination_admin', 'organization');
         $project = $this->userWithRole('project_admin', 'project');
         $site = $this->userWithRole('site_admin', 'site');
@@ -32,11 +32,10 @@ class UnifiedInterfaceAccessTest extends TestCase
         $projectKeys = collect($navigation->items($project))->pluck('key')->all();
         $siteKeys = collect($navigation->items($site))->pluck('key')->all();
 
-        $this->assertNotContains('configuration', $ownerKeys);
+        $this->assertContains('configuration', $ownerKeys);
         $this->assertNotContains('stocks', $ownerKeys);
-        $this->assertContains('configuration', $coordinationKeys);
-        $this->assertContains('organizations', $coordinationKeys);
-        $this->assertLessThan(array_search('dashboard', $coordinationKeys, true), array_search('configuration', $coordinationKeys, true));
+        $this->assertNotContains('configuration', $coordinationKeys);
+        $this->assertNotContains('organizations', $coordinationKeys);
         $this->assertNotContains('configuration', $projectKeys);
         $this->assertContains('stocks', $projectKeys);
         $this->assertNotContains('configuration', $siteKeys);
@@ -44,18 +43,16 @@ class UnifiedInterfaceAccessTest extends TestCase
         $this->assertContains('receipts', $siteKeys);
     }
 
-    public function test_navigation_items_with_required_parameters_do_not_break_menu_rendering(): void
+    public function test_mission_route_remains_available_without_being_duplicated_in_navigation(): void
     {
-        $user = $this->userWithRole('owner', 'platform');
+        $user = $this->userWithRole('sago_admin', 'platform');
         $navigation = app(ApplicationNavigationService::class);
 
         $items = $navigation->items($user);
 
         $this->assertContains('dashboard', collect($items)->pluck('key')->all());
-        $this->assertTrue(collect($items)->contains(
-            fn(array $item) => $item['key'] === 'missions'
-                && $item['url'] === route('modules.missions')
-        ));
+        $this->assertNotContains('missions', collect($items)->pluck('key')->all());
+        $this->assertTrue(app('router')->has('modules.missions'));
     }
 
     public function test_direct_configuration_url_is_forbidden_to_site_admin(): void

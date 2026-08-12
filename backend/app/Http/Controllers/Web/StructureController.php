@@ -23,13 +23,75 @@ class StructureController extends Controller
 {
     public function __construct(private AuditService $audit, private UserScopeService $scopes) {}
 
+    public function home(Request $request): View
+    {
+        $this->allow($request, 'structures.view');
+        $organizations = $this->scopes->organizations($request->user())->orderBy('name')->get();
+        $organization = $request->filled('organization_id')
+            ? $organizations->firstWhere('id', $request->string('organization_id')->toString())
+            : ($organizations->firstWhere('id', $request->user()->organization_id) ?? $organizations->first());
+        abort_if(! $organization, $request->filled('organization_id') ? 404 : 403);
+
+        return $this->index($request, $organization);
+    }
+
+    public function sites(Request $request): View
+    {
+        $this->allow($request, 'dispensing_sites.view');
+        $organizations = $this->scopes->organizations($request->user())->orderBy('name')->get();
+        $organization = $request->filled('organization_id')
+            ? $organizations->firstWhere('id', $request->string('organization_id')->toString())
+            : ($organizations->firstWhere('id', $request->user()->organization_id) ?? $organizations->first());
+        abort_if(! $organization, $request->filled('organization_id') ? 404 : 403);
+
+        $facilities = $this->scopes->facilities($request->user())
+            ->where('organization_id', $organization->id)
+            ->with(['departments:id,health_facility_id,name', 'pharmacies:id,health_facility_id,name'])
+            ->orderBy('name')->get();
+        $base = $this->scopes->sites($request->user())->where('organization_id', $organization->id);
+        $siteStats = [
+            'total' => (clone $base)->count(),
+            'active' => (clone $base)->where('is_active', true)->count(),
+            'dispensing' => (clone $base)->whereIn('site_type', ['dispensing', 'stock_and_dispensing'])->count(),
+            'facilities' => (clone $base)->distinct()->count('health_facility_id'),
+        ];
+        $sites = $this->scopes->sites($request->user())
+            ->where('organization_id', $organization->id)
+            ->with(['healthFacility:id,name,code', 'department:id,name', 'pharmacy:id,name'])
+            ->when($request->string('search')->toString(), fn ($query, $search) => $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")->orWhere('location', 'like', "%{$search}%")))
+            ->when($request->filled('health_facility_id'), fn ($query) => $query->where('health_facility_id', $request->string('health_facility_id')->toString()))
+            ->when($request->filled('site_type'), fn ($query) => $query->where('site_type', $request->string('site_type')->toString()))
+            ->when($request->get('status') === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($request->get('status') === 'inactive', fn ($query) => $query->where('is_active', false))
+            ->orderBy('name')->paginate(12)->withQueryString();
+        $archivedSites = Site::onlyTrashed()
+            ->where('organization_id', $organization->id)
+            ->whereIn('health_facility_id', $facilities->pluck('id'))
+            ->with('healthFacility:id,name')->latest('deleted_at')->get();
+
+        return view('sites.index', compact(
+            'organizations', 'organization', 'facilities', 'sites', 'archivedSites', 'siteStats',
+        ) + ['canManage' => $request->user()->hasPermission('structures.manage')]);
+    }
+
     public function index(Request $request, Organization $organization): View
     {
         $this->allow($request, 'structures.view');
         $this->organization($request, $organization);
-        $facilities = $organization->healthFacilities()->with(['mission.country', 'projects:id,name', 'departments', 'archivedDepartments', 'pharmacies.department', 'archivedPharmacies', 'sites.department', 'sites.pharmacy', 'archivedSites'])
+        $facilityBase = $organization->healthFacilities();
+        $facilityStats = [
+            'total' => (clone $facilityBase)->count(),
+            'active' => (clone $facilityBase)->where('is_active', true)->count(),
+            'sites' => Site::whereIn('health_facility_id', (clone $facilityBase)->pluck('id'))->count(),
+            'missions' => (clone $facilityBase)->whereNotNull('mission_id')->distinct()->count('mission_id'),
+        ];
+        $facilities = $organization->healthFacilities()->with(['mission.country', 'projects:id,name', 'departments', 'archivedDepartments', 'pharmacies.department', 'archivedPharmacies', 'sites.department', 'sites.pharmacy', 'archivedSites'])->withCount('sites')
             ->when($request->string('search')->toString(), fn ($query, $search) => $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
-            ->orderBy('name')->paginate(12)->withQueryString();
+            ->when($request->filled('mission_id'), fn ($query) => $query->where('mission_id', $request->string('mission_id')->toString()))
+            ->when($request->filled('facility_type'), fn ($query) => $query->where('facility_type', $request->string('facility_type')->toString()))
+            ->when($request->get('status') === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($request->get('status') === 'inactive', fn ($query) => $query->where('is_active', false))
+            ->orderBy('name')->paginate(10)->withQueryString();
         $archivedFacilities = $organization->healthFacilities()->onlyTrashed()->latest('deleted_at')->get();
         $activations = ModuleActivation::where(function ($query) use ($organization) {
             $query->where(fn ($q) => $q->where('target_type', 'organization')->where('target_id', $organization->id))
@@ -38,6 +100,8 @@ class StructureController extends Controller
         })->get()->keyBy(fn ($item) => "{$item->target_type}:{$item->target_id}:{$item->module_code}");
         return view('structures.index', [
             'organization' => $organization, 'facilities' => $facilities,
+            'organizations' => $this->scopes->organizations($request->user())->orderBy('name')->get(),
+            'facilityStats' => $facilityStats,
             'archivedFacilities' => $archivedFacilities, 'activations' => $activations,
             'missions' => $organization->missions()->with('country')->orderBy('name')->get(),
             'projects' => $organization->projects()->orderBy('name')->get(),
@@ -146,6 +210,21 @@ class StructureController extends Controller
             'organization_id' => $organization->id,
         ]);
         return $this->saved($request, $model, 'site.created', 'Site créé.');
+    }
+
+    public function storeWorkspaceSite(Request $request, Organization $organization): RedirectResponse
+    {
+        $this->manage($request, $organization);
+        $request->validate(['health_facility_id' => ['required', 'uuid', 'exists:health_facilities,id']]);
+        $facility = $this->scopes->facilities($request->user())
+            ->where('organization_id', $organization->id)
+            ->findOrFail($request->string('health_facility_id')->toString());
+        $model = $facility->sites()->create([
+            ...$this->siteData($request, $facility),
+            'organization_id' => $organization->id,
+        ]);
+
+        return $this->saved($request, $model, 'site.created', 'Site de dispensation créé avec succès.');
     }
     public function updateSite(Request $request, Organization $organization, HealthFacility $facility, Site $site): RedirectResponse
     {

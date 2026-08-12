@@ -192,6 +192,19 @@ class StockController extends Controller
         return response()->json(['hold' => $hold, 'movement' => $movement], 201);
     }
 
+    public function releaseHold(Request $request, Organization $organization, StockHold $hold): JsonResponse
+    {
+        $this->access($request, $organization, 'stocks.adjust');
+        abort_unless($hold->organization_id === $organization->id && $this->siteIds($request, $organization)->contains($hold->site_id), 404);
+        abort_unless($hold->hold_type === 'quarantine' && $hold->status === 'active', 422, 'Seule une quarantaine active peut être libérée.');
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:2000']]);
+        $movement = $this->ledger->record($organization, $hold->site, $hold->batch, 'quarantine_release', $hold->quantity, $request->user()->id, ['reason' => $data['reason']]);
+        $hold->update(['status' => 'released', 'released_by' => $request->user()->id, 'released_at' => now()]);
+        $this->audit->record($request, 'stock.hold.released', $hold, [], ['movement_id' => $movement->id, 'reason' => $data['reason']]);
+
+        return response()->json(['hold' => $hold->fresh(), 'movement' => $movement]);
+    }
+
     private function access(Request $request, Organization $organization, string $permission): void
     {
         abort_unless($request->user()->hasPermission($permission), 403);

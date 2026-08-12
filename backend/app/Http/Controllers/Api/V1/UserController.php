@@ -162,9 +162,9 @@ class UserController extends Controller
     {
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
         abort_if($request->user()->is($user), 422, 'Vous ne pouvez pas archiver votre propre compte.');
-        if ($user->roles()->whereIn('code', ['owner', 'platform_owner'])->exists()) {
+        if ($user->roles()->whereIn('code', ['sago_admin', 'owner', 'platform_owner'])->exists()) {
             $otherOwners = User::where('is_active', true)->whereKeyNot($user->id)
-                ->whereHas('roles', fn ($query) => $query->whereIn('code', ['owner', 'platform_owner']))->exists();
+                ->whereHas('roles', fn ($query) => $query->whereIn('code', ['sago_admin', 'owner', 'platform_owner']))->exists();
             abort_unless($otherOwners, 422, 'Le dernier propriétaire actif ne peut pas être archivé.');
         }
         $user->tokens()->delete();

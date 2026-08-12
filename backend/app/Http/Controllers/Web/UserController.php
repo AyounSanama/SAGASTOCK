@@ -46,6 +46,7 @@ class UserController extends Controller
             'facilities' => $canCreate ? $this->scopes->facilities(Auth::user())->with(['organization:id,name', 'projects:id'])->orderBy('name')->get(['id', 'organization_id', 'mission_id', 'name']) : collect(),
             'sites' => $canCreate ? $this->scopes->sites(Auth::user())->with('healthFacility:id,name')->orderBy('name')->get(['id', 'health_facility_id', 'name']) : collect(),
             'delegablePermissions' => $canCreate ? $this->delegablePermissions(Auth::user()) : collect(),
+            'userFormContext' => $canCreate ? $this->userFormContext(Auth::user()) : [],
         ]);
     }
 
@@ -144,6 +145,23 @@ class UserController extends Controller
             || $actor->hasPermission('users.create_site_admin');
     }
 
+    private function userFormContext(User $actor): array
+    {
+        $roleCode = app(GovernanceService::class)->roleCode($actor);
+        if ($roleCode !== GovernanceService::PROJECT_ADMIN) {
+            return ['locked' => false];
+        }
+
+        $project = $this->scopes->projects($actor)->with('mission:id,organization_id')->first();
+
+        return [
+            'locked' => true,
+            'organization_id' => $project?->organization_id,
+            'mission_id' => $project?->mission_id,
+            'project_id' => $project?->id,
+        ];
+    }
+
     public function update(Request $request, User $user): RedirectResponse
     {
         $this->allow('users.manage');
@@ -199,9 +217,9 @@ class UserController extends Controller
         $this->allow('users.manage');
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
         abort_if($request->user()->is($user), 422, 'Vous ne pouvez pas archiver votre propre compte.');
-        if ($user->roles()->whereIn('code', ['owner', 'platform_owner'])->exists()) {
+        if ($user->roles()->whereIn('code', ['sago_admin', 'owner', 'platform_owner'])->exists()) {
             $otherOwners = User::where('is_active', true)->whereKeyNot($user->id)
-                ->whereHas('roles', fn($query) => $query->whereIn('code', ['owner', 'platform_owner']))->exists();
+                ->whereHas('roles', fn($query) => $query->whereIn('code', ['sago_admin', 'owner', 'platform_owner']))->exists();
             abort_unless($otherOwners, 422, 'Le dernier propriétaire actif de la plateforme ne peut pas être archivé.');
         }
         $user->tokens()->delete();

@@ -6,13 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\StockBalance;
+use App\Models\StockHold;
 use App\Models\StockMovement;
+use App\Models\Transfer;
 use App\Services\AuditService;
 use App\Services\ModuleActivationService;
 use App\Services\StockLedgerService;
 use App\Services\UserScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class StockController extends Controller
@@ -82,8 +86,15 @@ class StockController extends Controller
         $movementProducts = $organization->products()->with([
             'batches' => fn ($q) => $q->whereIn('status', ['available', 'quarantine'])->orderBy('expires_on'),
         ])->where('is_active', true)->orderBy('name')->get();
+        $transfers = Transfer::with(['sourceSite', 'destinationSite', 'items.product', 'items.batch'])
+            ->where('organization_id', $organization->id)
+            ->where(fn ($query) => $query->whereIn('source_site_id', $siteIds)->orWhereIn('destination_site_id', $siteIds))
+            ->latest()->limit(30)->get();
+        $holds = StockHold::with(['site', 'batch.product'])
+            ->where('organization_id', $organization->id)->whereIn('site_id', $siteIds)
+            ->latest()->limit(30)->get();
 
-        return view('stocks.index', compact('organization', 'sites', 'balances', 'movements', 'stats', 'fefoPriorities', 'movementProducts') + ['movementLabels' => self::MOVEMENT_LABELS]);
+        return view('stocks.index', compact('organization', 'sites', 'balances', 'movements', 'stats', 'fefoPriorities', 'movementProducts', 'transfers', 'holds') + ['movementLabels' => self::MOVEMENT_LABELS]);
     }
 
     public function createMovement(Request $request, Organization $organization): View
@@ -124,6 +135,93 @@ class StockController extends Controller
         $this->audit->record($request, 'stock.movement.compensated', $correction, [], ['original_id' => $movement->id]);
 
         return back()->with('status', 'Mouvement compensatoire créé ; le registre original est conservé.');
+    }
+
+    public function storeTransfer(Request $request, Organization $organization): RedirectResponse
+    {
+        $this->access($request, $organization, 'transfers.manage');
+        $data = $request->validate([
+            'reference' => ['required', 'alpha_dash', 'max:60', Rule::unique('transfers')->where('organization_id', $organization->id)],
+            'source_site_id' => ['required', 'uuid', 'different:destination_site_id'],
+            'destination_site_id' => ['required', 'uuid'],
+            'batch_id' => ['required', 'uuid'],
+            'quantity' => ['required', 'numeric', 'gt:0'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $source = $this->site($request, $organization, $data['source_site_id']);
+        $destination = $this->site($request, $organization, $data['destination_site_id']);
+        $batch = $organization->batches()->findOrFail($data['batch_id']);
+        $transfer = DB::transaction(function () use ($organization, $source, $destination, $batch, $data, $request) {
+            $model = Transfer::create([
+                'organization_id' => $organization->id, 'reference' => $data['reference'],
+                'source_site_id' => $source->id, 'destination_site_id' => $destination->id,
+                'notes' => $data['notes'] ?? null, 'created_by' => $request->user()->id,
+            ]);
+            $model->items()->create([
+                'product_id' => $batch->product_id, 'batch_id' => $batch->id,
+                'quantity_sent' => $data['quantity'],
+            ]);
+
+            return $model;
+        });
+        $this->audit->record($request, 'transfer.created', $transfer);
+
+        return back()->with('status', 'Transfert créé en brouillon.');
+    }
+
+    public function dispatchTransfer(Request $request, Organization $organization, Transfer $transfer): RedirectResponse
+    {
+        $this->access($request, $organization, 'transfers.manage');
+        abort_unless($transfer->organization_id === $organization->id && $this->siteIds($request, $organization)->contains($transfer->source_site_id), 404);
+        $transfer = $this->ledger->dispatchTransfer($transfer, $request->user()->id);
+        $this->audit->record($request, 'transfer.dispatched', $transfer);
+
+        return back()->with('status', 'Transfert expédié et stock source débité.');
+    }
+
+    public function receiveTransfer(Request $request, Organization $organization, Transfer $transfer): RedirectResponse
+    {
+        $this->access($request, $organization, 'transfers.manage');
+        abort_unless($transfer->organization_id === $organization->id && $this->siteIds($request, $organization)->contains($transfer->destination_site_id), 404);
+        $received = $transfer->items->mapWithKeys(fn ($item) => [$item->id => ['quantity_received' => (float) $item->quantity_sent]])->all();
+        $transfer = $this->ledger->receiveTransfer($transfer, $received, $request->user()->id);
+        $this->audit->record($request, 'transfer.received', $transfer);
+
+        return back()->with('status', 'Transfert réceptionné et stock destination crédité.');
+    }
+
+    public function storeHold(Request $request, Organization $organization): RedirectResponse
+    {
+        $this->access($request, $organization, 'stocks.adjust');
+        $data = $request->validate([
+            'site_id' => ['required', 'uuid'], 'batch_id' => ['required', 'uuid'],
+            'hold_type' => ['required', Rule::in(['quarantine', 'destruction'])],
+            'quantity' => ['required', 'numeric', 'gt:0'],
+            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+        ]);
+        $site = $this->site($request, $organization, $data['site_id']);
+        $batch = $organization->batches()->findOrFail($data['batch_id']);
+        $movement = $this->ledger->record($organization, $site, $batch, $data['hold_type'], $data['quantity'], $request->user()->id, ['reason' => $data['reason']]);
+        $hold = StockHold::create([
+            ...$data, 'organization_id' => $organization->id, 'created_by' => $request->user()->id,
+            'status' => $data['hold_type'] === 'destruction' ? 'completed' : 'active',
+        ]);
+        $this->audit->record($request, 'stock.hold.created', $hold, [], ['movement_id' => $movement->id]);
+
+        return back()->with('status', $data['hold_type'] === 'destruction' ? 'Destruction enregistrée.' : 'Lot placé en quarantaine.');
+    }
+
+    public function releaseHold(Request $request, Organization $organization, StockHold $hold): RedirectResponse
+    {
+        $this->access($request, $organization, 'stocks.adjust');
+        abort_unless($hold->organization_id === $organization->id && $this->siteIds($request, $organization)->contains($hold->site_id), 404);
+        abort_unless($hold->hold_type === 'quarantine' && $hold->status === 'active', 422, 'Seule une quarantaine active peut être libérée.');
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:2000']]);
+        $movement = $this->ledger->record($organization, $hold->site, $hold->batch, 'quarantine_release', $hold->quantity, $request->user()->id, ['reason' => $data['reason']]);
+        $hold->update(['status' => 'released', 'released_by' => $request->user()->id, 'released_at' => now()]);
+        $this->audit->record($request, 'stock.hold.released', $hold, [], ['movement_id' => $movement->id, 'reason' => $data['reason']]);
+
+        return back()->with('status', 'Quarantaine libérée et quantité réintégrée au stock.');
     }
 
     private function access(Request $request, Organization $organization, string $permission): void

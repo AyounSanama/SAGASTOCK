@@ -10,6 +10,7 @@ use App\Services\ApplicationNavigationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -42,14 +43,24 @@ class AuthController extends Controller
         if ($knownDevice?->revoked_at) {
             throw ValidationException::withMessages(['device_id' => ['Cet appareil a été révoqué. Contactez un administrateur.']]);
         }
+        // Un appareil ne doit jamais conserver simultanément les jetons de
+        // deux identités. Le nom du jeton est l'empreinte stable du terminal.
+        PersonalAccessToken::where('name', $data['device_id'])->delete();
+        Device::where('fingerprint', $data['device_id'])
+            ->where('user_id', '!=', $user->id)
+            ->delete();
         Device::updateOrCreate(
             ['fingerprint' => $data['device_id']],
             ['id' => $data['device_id'], 'user_id' => $user->id, 'name' => $data['device_name'], 'platform' => $data['platform'], 'last_seen_at' => now(), 'revoked_at' => null],
         );
         $user->update(['last_login_at' => now(), 'failed_login_attempts' => 0, 'locked_until' => null]);
+        $payload = $this->userPayload($user);
         return response()->json([
             'token' => $user->createToken($data['device_id'])->plainTextToken,
-            'user' => $this->userPayload($user),
+            'user' => $payload,
+            'role' => strtoupper((string) $payload['role']),
+            'permissions' => $payload['permissions'],
+            'scope' => $payload['access_scope'],
         ]);
     }
 

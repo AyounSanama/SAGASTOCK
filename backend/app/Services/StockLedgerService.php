@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Batch;
+use App\Models\Inventory;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\StockBalance;
@@ -23,6 +24,9 @@ class StockLedgerService
         abort_unless(in_array($type, [...self::POSITIVE, ...self::NEGATIVE], true), 422, 'Type de mouvement invalide.');
         abort_unless($site->healthFacility()->where('organization_id', $organization->id)->exists(), 422, 'Site hors organisation.');
         abort_unless($batch->organization_id === $organization->id, 422, 'Lot hors organisation.');
+        if (! ($context['bypass_inventory_freeze'] ?? false)) {
+            abort_if(Inventory::where('site_id', $site->id)->whereIn('status', ['counting', 'submitted'])->exists(), 423, 'Le stock de ce site est gelé par un inventaire en cours.');
+        }
         $absolute = abs((float) $quantity);
         if ($absolute <= 0) {
             throw ValidationException::withMessages(['quantity' => 'La quantité doit être supérieure à zéro.']);
