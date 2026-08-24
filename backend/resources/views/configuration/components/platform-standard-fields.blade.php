@@ -1,0 +1,12 @@
+@php($definition=$standard?->definition ?? [])
+<div class="ps-form-grid">
+    <label><span>Catégorie *</span><select name="category" required>@foreach($categories as $key=>$label)<option value="{{ $key }}" @selected(old('category',$standard?->category)===$key)>{{ $label }}</option>@endforeach</select>@error('category')<small>{{ $message }}</small>@enderror</label>
+    <label><span>Code *</span><input name="code" value="{{ old('code',$standard?->code) }}" maxlength="80" required placeholder="ORG_UNIPAYS">@error('code')<small>{{ $message }}</small>@enderror</label>
+    <label class="wide"><span>Nom *</span><input name="name" value="{{ old('name',$standard?->name) }}" maxlength="180" required placeholder="Organisation Unipays Standard">@error('name')<small>{{ $message }}</small>@enderror</label>
+    <label><span>Clé de configuration</span><input name="definition_key" value="{{ old('definition_key',$definition['key'] ?? '') }}" placeholder="access_type"></label>
+    <label><span>Valeur</span><input name="definition_value" value="{{ old('definition_value',$definition['value'] ?? '') }}" placeholder="single_country"></label>
+    <label class="wide"><span>Description</span><textarea name="description" rows="4" maxlength="2000" placeholder="Objectif et règles administratives du standard">{{ old('description',$standard?->description) }}</textarea>@error('description')<small>{{ $message }}</small>@enderror</label>
+    <label class="wide"><span>Notes de modification</span><textarea name="change_notes" rows="2" maxlength="1000" placeholder="Décrivez brièvement cette version">{{ old('change_notes') }}</textarea></label>
+    <label><span>Statut</span><select name="is_active"><option value="1" @selected((string)old('is_active',$standard?->is_active ?? 1)==='1')>Actif</option><option value="0" @selected((string)old('is_active',$standard?->is_active ?? 1)==='0')>Inactif</option></select></label>
+</div>
+<style>.ps-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.ps-form-grid label>span{display:block;margin-bottom:6px;font-size:12px;font-weight:750}.ps-form-grid input,.ps-form-grid select,.ps-form-grid textarea{width:100%;padding:10px 12px;border:1px solid #D5DDE8;border-radius:10px;background:#fff}.ps-form-grid input,.ps-form-grid select{min-height:44px}.ps-form-grid textarea{resize:vertical}.ps-form-grid .wide{grid-column:1/-1}.ps-form-grid label>small{display:block;margin-top:5px;color:#E53935}@media(max-width:650px){.ps-form-grid{grid-template-columns:1fr}.ps-form-grid .wide{grid-column:auto}}</style>

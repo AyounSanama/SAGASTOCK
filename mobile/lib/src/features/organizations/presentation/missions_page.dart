@@ -10,11 +10,13 @@ class MissionsPage extends StatefulWidget {
   const MissionsPage({
     required this.organizationId,
     required this.organizationName,
+    this.allowedCountries = const [],
     super.key,
   });
 
   final String organizationId;
   final String organizationName;
+  final List<Map<String, dynamic>> allowedCountries;
 
   @override
   State<MissionsPage> createState() => _MissionsPageState();
@@ -22,15 +24,25 @@ class MissionsPage extends StatefulWidget {
 
 class _MissionsPageState extends State<MissionsPage> {
   final _service = OrganizationService();
+  final _search = TextEditingController();
   List<Map<String, dynamic>> _missions = [];
   List<Map<String, dynamic>> _countries = [];
   bool _loading = true;
+  bool _archived = false;
+  String _status = '';
+  String _countryId = '';
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -40,8 +52,17 @@ class _MissionsPageState extends State<MissionsPage> {
     });
     try {
       final values = await Future.wait([
-        _service.missions(widget.organizationId),
-        _service.countries(),
+        _service.missions(
+          widget.organizationId,
+          search: _search.text.trim(),
+          status: _status,
+          countryId: _countryId,
+          archived: _archived,
+        ),
+        if (widget.allowedCountries.isEmpty)
+          _service.organizationCountries(widget.organizationId)
+        else
+          Future.value(widget.allowedCountries),
       ]);
       if (!mounted) return;
       setState(() {
@@ -58,6 +79,67 @@ class _MissionsPageState extends State<MissionsPage> {
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _changeArchiveState(Map<String, dynamic> mission) async {
+    final restoring = _archived;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          restoring ? 'Restaurer la mission ?' : 'Archiver la mission ?',
+        ),
+        content: Text(
+          restoring
+              ? 'La mission réapparaîtra dans la liste active.'
+              : 'La mission sera conservée et pourra être restaurée.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(restoring ? 'Restaurer' : 'Archiver'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final synchronized = restoring
+          ? await _service.restoreMission(
+              organizationId: widget.organizationId,
+              missionId: '${mission['id']}',
+            )
+          : await _service.archiveMission(
+              organizationId: widget.organizationId,
+              missionId: '${mission['id']}',
+            );
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            synchronized
+                ? (restoring ? 'Mission restaurée.' : 'Mission archivée.')
+                : 'Action enregistrée hors connexion. Synchronisation en attente.',
+          ),
+        ),
+      );
+    } on DioException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.response?.statusCode == 403
+                ? 'Vous n’avez pas la permission d’effectuer cette action.'
+                : 'Action impossible. Réessayez.',
+          ),
+        ),
+      );
     }
   }
 
@@ -110,13 +192,15 @@ class _MissionsPageState extends State<MissionsPage> {
               isActive: data.isActive,
             ),
     );
-    if (saved != true || !mounted) return;
+    if (saved == null || !mounted) return;
     await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          editing
+          saved == 'pending'
+              ? 'Mission enregistrée hors connexion. Elle sera synchronisée automatiquement.'
+              : editing
               ? 'Mission modifiée avec succès.'
               : 'Mission ajoutée avec succès.',
         ),
@@ -128,11 +212,13 @@ class _MissionsPageState extends State<MissionsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.organizationName)),
-      floatingActionButton: AppFab(
-        onPressed: _loading ? null : _openForm,
-        icon: Icons.add_location_alt_outlined,
-        tooltip: 'Ajouter une mission',
-      ),
+      floatingActionButton: _archived
+          ? null
+          : AppFab(
+              onPressed: _loading ? null : _openForm,
+              icon: Icons.add_location_alt_outlined,
+              tooltip: 'Ajouter une mission',
+            ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -148,6 +234,83 @@ class _MissionsPageState extends State<MissionsPage> {
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _search,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _load(),
+              decoration: InputDecoration(
+                hintText: 'Rechercher une mission…',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: IconButton(
+                  tooltip: 'Rechercher',
+                  onPressed: _load,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ChoiceChip(
+                  label: const Text('Missions actives'),
+                  selected: !_archived,
+                  onSelected: (_) {
+                    setState(() => _archived = false);
+                    _load();
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('Archives'),
+                  selected: _archived,
+                  onSelected: (_) {
+                    setState(() => _archived = true);
+                    _load();
+                  },
+                ),
+                if (!_archived)
+                  DropdownButton<String>(
+                    value: _status,
+                    items: const [
+                      DropdownMenuItem(
+                        value: '',
+                        child: Text('Tous les statuts'),
+                      ),
+                      DropdownMenuItem(value: 'active', child: Text('Actives')),
+                      DropdownMenuItem(
+                        value: 'inactive',
+                        child: Text('Inactives'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _status = value ?? '');
+                      _load();
+                    },
+                  ),
+                if (!_archived && _countries.isNotEmpty)
+                  DropdownButton<String>(
+                    value: _countryId,
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('Tous les pays'),
+                      ),
+                      for (final country in _countries)
+                        DropdownMenuItem(
+                          value: '${country['id']}',
+                          child: Text('${country['name']}'),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _countryId = value ?? '');
+                      _load();
+                    },
+                  ),
+              ],
             ),
             const SizedBox(height: 16),
             if (_loading)
@@ -180,12 +343,17 @@ class _MissionsPageState extends State<MissionsPage> {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      const Text('Aucune mission enregistrée.'),
-                      const SizedBox(height: 14),
-                      AppButton.add(
-                        label: 'Ajouter une mission',
-                        onPressed: _openForm,
+                      Text(
+                        _archived
+                            ? 'Aucune mission archivée.'
+                            : 'Aucune mission enregistrée.',
                       ),
+                      const SizedBox(height: 14),
+                      if (!_archived)
+                        AppButton.add(
+                          label: 'Ajouter une mission',
+                          onPressed: _openForm,
+                        ),
                     ],
                   ),
                 ),
@@ -196,35 +364,58 @@ class _MissionsPageState extends State<MissionsPage> {
                   child: ListTile(
                     leading: const Icon(Icons.public),
                     title: Text('${mission['name']}'),
-                    subtitle: Text(
-                      '${mission['code']} · '
-                      '${(mission['country'] as Map<String, dynamic>?)?['name'] ?? 'Pays non renseigné'}',
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${mission['code']} · '
+                          '${(mission['country'] as Map<String, dynamic>?)?['name'] ?? 'Pays non renseigné'}',
+                        ),
+                        if (mission['_sync_status'] == 'pending') ...[
+                          const SizedBox(height: 4),
+                          const Text(
+                            'En attente de synchronisation',
+                            style: TextStyle(
+                              color: Color(0xFFF57C00),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        AppIconAction(
-                          icon: Icons.edit_outlined,
-                          tooltip: 'Modifier la mission',
-                          color: AppActionColor.orange,
-                          onPressed: () => _openForm(mission),
-                        ),
+                        if (!_archived)
+                          AppIconAction(
+                            icon: Icons.edit_outlined,
+                            tooltip: 'Modifier la mission',
+                            color: AppActionColor.orange,
+                            onPressed: () => _openForm(mission),
+                          ),
                         const SizedBox(width: 4),
-                        Icon(
-                          mission['is_active'] == true
-                              ? Icons.check_circle
-                              : Icons.pause_circle,
-                          color: mission['is_active'] == true
-                              ? Colors.green
-                              : Colors.grey,
+                        AppIconAction(
+                          icon: _archived
+                              ? Icons.restore_rounded
+                              : Icons.archive_outlined,
+                          tooltip: _archived
+                              ? 'Restaurer la mission'
+                              : 'Archiver la mission',
+                          color: _archived
+                              ? AppActionColor.green
+                              : AppActionColor.red,
+                          onPressed: () => _changeArchiveState(mission),
                         ),
                       ],
                     ),
-                    onTap: () => context.push(
-                      '/organizations/${widget.organizationId}/missions/'
-                      '${mission['id']}/projects',
-                      extra: '${mission['name']}',
-                    ),
+                    onTap: _archived
+                        ? null
+                        : () => context.push(
+                            '/organizations/${widget.organizationId}/missions/'
+                            '${mission['id']}/projects',
+                            extra: '${mission['name']}',
+                          ),
                   ),
                 ),
                 const SizedBox(height: 10),

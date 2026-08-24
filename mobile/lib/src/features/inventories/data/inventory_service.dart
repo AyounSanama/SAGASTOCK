@@ -1,19 +1,19 @@
-import 'dart:convert';
-import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/sync/offline_operation_service.dart';
+import '../../../core/data/local_first_repository.dart';
 
 class InventoryService {
-  InventoryService({ApiClient? client}) : _client = client ?? ApiClient();
-  final ApiClient _client;
+  InventoryService({ApiClient? client}) {
+    _client = client ?? ApiClient();
+    _operations = OfflineOperationService(client: _client);
+    _repository = LocalFirstRepository(client: _client, storage: _storage);
+  }
+  late final ApiClient _client;
+  late final OfflineOperationService _operations;
+  late final LocalFirstRepository _repository;
   final _storage = const FlutterSecureStorage();
-  static const _outboxKey = 'offline_inventory_outbox';
-  Future<Options> _auth() async => Options(
-    headers: {
-      'Authorization': 'Bearer ${await _storage.read(key: 'auth_token')}',
-    },
-  );
   Future<List<Map<String, dynamic>>> organizations() =>
       _list('/organizations', 'offline_organizations');
   Future<List<Map<String, dynamic>>> inventories(String id) async {
@@ -22,23 +22,12 @@ class InventoryService {
   }
 
   Future<List<Map<String, dynamic>>> sites(String id) async {
-    final key = 'offline_inventory_sites_$id';
-    try {
-      final r = await _client.dio.get<Map<String, dynamic>>(
-        '/organizations/$id/inventories/options',
-        options: await _auth(),
-      );
-      final data = (r.data?['sites'] as List? ?? [])
-          .cast<Map<String, dynamic>>();
-      await _storage.write(key: key, value: jsonEncode(data));
-      return data;
-    } on DioException catch (e) {
-      if (e.response != null) rethrow;
-      final cached = await _storage.read(key: key);
-      return cached == null
-          ? []
-          : (jsonDecode(cached) as List).cast<Map<String, dynamic>>();
-    }
+    return _repository.list(
+      collection: 'inventory.sites',
+      organizationId: id,
+      endpoint: '/organizations/$id/inventories/options',
+      responseKey: 'sites',
+    );
   }
 
   Future<bool> create(String id, Map<String, dynamic> data) {
@@ -57,81 +46,32 @@ class InventoryService {
   });
   Future<bool> submit(String id, String inventory) =>
       _send('post', '/organizations/$id/inventories/$inventory/submit', {});
-  Future<int> pendingCount() async => (await _outbox()).length;
+  Future<int> pendingCount() =>
+      _operations.pendingCount(entityType: 'inventories');
   Future<bool> _send(
     String method,
     String path,
     Map<String, dynamic> data,
   ) async {
-    try {
-      await _client.dio.request(
-        path,
-        data: data,
-        options: (await _auth()).copyWith(method: method.toUpperCase()),
-      );
-      return true;
-    } on DioException catch (e) {
-      if (e.response != null) rethrow;
-      final q = await _outbox();
-      q.add({
-        'operation_id': const Uuid().v4(),
-        'method': method,
-        'path': path,
-        'data': data,
-        'queued_at': DateTime.now().toIso8601String(),
-        'attempts': 0,
-      });
-      await _storage.write(key: _outboxKey, value: jsonEncode(q));
-      return false;
-    }
+    return _operations.execute(
+      method: method,
+      endpoint: path,
+      payload: data,
+      entityType: 'inventories',
+      organizationId: _organizationFrom(path),
+    );
   }
 
-  Future<void> sync() async {
-    final q = await _outbox();
-    if (q.isEmpty) return;
-    final remaining = <Map<String, dynamic>>[];
-    for (final item in q) {
-      try {
-        await _client.dio.request(
-          item['path'],
-          data: item['data'],
-          options: (await _auth()).copyWith(
-            method: '${item['method']}'.toUpperCase(),
-          ),
-        );
-      } on DioException catch (e) {
-        remaining.add({
-          ...item,
-          'attempts': ((item['attempts'] as num?)?.toInt() ?? 0) + 1,
-          'last_error': e.response?.data?.toString() ?? e.message,
-        });
-      }
-    }
-    await _storage.write(key: _outboxKey, value: jsonEncode(remaining));
-  }
+  Future<void> sync() => _operations.synchronize();
 
   Future<List<Map<String, dynamic>>> _list(String path, String key) async {
-    try {
-      final r = await _client.dio.get<Map<String, dynamic>>(
-        path,
-        options: await _auth(),
-      );
-      final data = (r.data?['data'] as List? ?? [])
-          .cast<Map<String, dynamic>>();
-      await _storage.write(key: key, value: jsonEncode(data));
-      return data;
-    } on DioException catch (e) {
-      if (e.response != null) rethrow;
-      final cached = await _storage.read(key: key);
-      return cached == null
-          ? []
-          : (jsonDecode(cached) as List).cast<Map<String, dynamic>>();
-    }
+    return _repository.list(
+      collection: key,
+      organizationId: _organizationFrom(path),
+      endpoint: path,
+    );
   }
 
-  Future<List<Map<String, dynamic>>> _outbox() async {
-    final v = await _storage.read(key: _outboxKey);
-    return (v == null ? [] : jsonDecode(v) as List)
-        .cast<Map<String, dynamic>>();
-  }
+  String? _organizationFrom(String path) =>
+      RegExp(r'/organizations/([^/]+)').firstMatch(path)?.group(1);
 }

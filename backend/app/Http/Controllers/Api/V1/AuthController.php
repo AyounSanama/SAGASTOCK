@@ -31,6 +31,10 @@ class AuthController extends Controller
         if ($user?->locked_until?->isFuture()) {
             throw ValidationException::withMessages(['login' => ['Compte temporairement verrouillé. Réessayez plus tard.']]);
         }
+        if ($user?->locked_until?->isPast()) {
+            $user->update(['failed_login_attempts' => 0, 'locked_until' => null]);
+            $user->refresh();
+        }
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             if ($user) {
                 $attempts = $user->failed_login_attempts + 1;
@@ -39,6 +43,9 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['login' => ['Identifiants incorrects.']]);
         }
         if (! $user->is_active) throw ValidationException::withMessages(['login' => ['Ce compte est désactivé.']]);
+        if ($user->organization_id && ! $user->organization()->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages(['login' => ['L’organisation rattachée à ce compte est désactivée.']]);
+        }
         $knownDevice = Device::where('fingerprint', $data['device_id'])->first();
         if ($knownDevice?->revoked_at) {
             throw ValidationException::withMessages(['device_id' => ['Cet appareil a été révoqué. Contactez un administrateur.']]);
@@ -79,9 +86,29 @@ class AuthController extends Controller
     {
         $governance = app(GovernanceService::class);
         $navigation = app(ApplicationNavigationService::class);
+        $organization = $user->organization()
+            ->with(['countries' => fn ($query) => $query
+                ->where('countries.is_active', true)
+                ->orderBy('countries.name')])
+            ->first();
+
         return [
             'id' => $user->uuid, 'name' => $user->name, 'username' => $user->username,
-            'email' => $user->email, 'roles' => $user->roles()->pluck('code')->all(),
+            'email' => $user->email,
+            'organization_id' => $organization?->id,
+            'organization' => $organization ? [
+                'id' => $organization->id,
+                'code' => $organization->code,
+                'name' => $organization->name,
+                'is_active' => $organization->is_active,
+                'geographic_access_type' => $organization->geographic_access_type,
+                'countries' => $organization->countries->map(fn ($country) => [
+                    'id' => $country->id,
+                    'iso2' => $country->iso2,
+                    'name' => $country->name,
+                ])->values()->all(),
+            ] : null,
+            'roles' => $user->roles()->pluck('code')->all(),
             'role' => $governance->roleCode($user),
             'dashboard' => $governance->dashboard($user),
             'permissions' => $navigation->permissions($user)->all(),

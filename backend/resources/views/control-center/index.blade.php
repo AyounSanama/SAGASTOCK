@@ -1,290 +1,31 @@
 @extends('layouts.portal')
-@section('title', 'Accueil Configuration · PharmaCare')
+@section('title', 'Configuration · PharmaCare')
 @section('page-title', 'Configuration')
 @section('content')
-    <section class="control-center">
-        <header class="control-hero">
-            <div class="control-hero-icon">✓</div>
-            <div class="control-hero-copy">
-                <span class="eyebrow">Configuration opérationnelle</span>
-                <h2>Accueil Configuration</h2>
-                <p>Gérez les organisations et les missions, ou accédez à l’application principale.</p>
-            </div>
-            <div class="control-hero-actions">
-                @if ($canAddOrganization)
-                    <a class="button configuration-add"
-                        href="{{ route('configuration.workflow.start', 'new-organization') }}">＋ Ajouter une organisation</a>
-                @endif
-                @if ($organization)
-                    <a class="button configuration-add"
-                        href="{{ route('configuration.workflow.start', ['flowType' => 'new-mission', 'organization' => $organization->id]) }}">＋
-                        Ajouter une mission</a>
-                @endif
-                <a class="button primary configuration-enter" href="{{ route('dashboard') }}">Entrer dans l’application
-                    →</a>
-            </div>
-        </header>
-
-        @if (!$organization)
-            <div class="configuration-empty-state">
-                <strong>Aucune organisation configurée</strong>
-                <p>Commencez par ajouter une organisation afin d’activer les autres étapes.</p>
-            </div>
-        @else
-            <div class="control-kpis">
-                <article>
-                    <span>Organisation</span><strong>{{ $organization->name }}</strong><small>{{ $organization->code }}</small>
-                </article>
-                <article>
-                    <span>Mission</span><strong>{{ $mission?->name ?? 'Non disponible' }}</strong><small>{{ $mission?->country?->name ?? $organization->country_code }}</small>
-                </article>
-                <article><span>Projet
-                        actif</span><strong>{{ $project?->name ?? 'Non disponible' }}</strong><small>{{ $project?->code }}</small>
-                </article>
-                <article>
-                    <span>Configuration</span><strong>{{ $progress?->completed_at ? 'Validée' : 'En cours' }}</strong><small>{{ $progress?->completed_at?->format('d/m/Y à H:i') ?? 'Progression conservée' }}</small>
-                </article>
-            </div>
-
-            <div class="control-grid">
-                <article class="control-card">
-                    <header>
-                        <div class="control-card-icon orange">⌖</div>
-                        <div>
-                            <h3>Périmètre opérationnel</h3>
-                            <p>Structure et site actifs</p>
-                        </div>
-                    </header>
-                    <dl>
-                        <div>
-                            <dt>Formation sanitaire</dt>
-                            <dd>{{ $facility?->name ?? 'Non configurée' }}</dd>
-                        </div>
-                        <div>
-                            <dt>Type</dt>
-                            <dd>{{ $facility?->facility_type ?? '—' }}</dd>
-                        </div>
-                        <div>
-                            <dt>Site</dt>
-                            <dd>{{ $site?->name ?? 'Non configuré' }}</dd>
-                        </div>
-                        <div>
-                            <dt>Type de site</dt>
-                            <dd>{{ $site?->site_type ?? '—' }}</dd>
-                        </div>
-                    </dl>
-                </article>
-
-                <article class="control-card">
-                    <header>
-                        <div class="control-card-icon blue">◦</div>
-                        <div>
-                            <h3>Modules actifs</h3>
-                            <p>{{ $enabledModules->count() }} module(s) disponible(s)</p>
-                        </div>
-                    </header>
-                    <div class="control-tags">
-                        @forelse($enabledModules as $label)
-                        <span>{{ $label }}</span>@empty<em>Aucun module actif</em>
-                        @endforelse
-                    </div>
-                </article>
-
-                <article class="control-card">
-                    <header>
-                        <div class="control-card-icon green">✓</div>
-                        <div>
-                            <h3>Fonctionnalités</h3>
-                            <p>Paramètres opérationnels</p>
-                        </div>
-                    </header>
-                    <div class="control-tags green">
-                        @forelse($enabledFeatures as $label)
-                        <span>{{ $label }}</span>@empty<em>Aucune fonctionnalité active</em>
-                        @endforelse
-                    </div>
-                </article>
-
-                <article class="control-card">
-                    <header>
-                        <div class="control-card-icon purple">☷</div>
-                        <div>
-                            <h3>Liste standard</h3>
-                            <p>Référentiel publié</p>
-                        </div>
-                    </header>
-                    <dl>
-                        <div>
-                            <dt>Liste</dt>
-                            <dd>{{ $standardList?->name ?? 'Non configurée' }}</dd>
-                        </div>
-                        <div>
-                            <dt>Code</dt>
-                            <dd>{{ $standardList?->code ?? '—' }}</dd>
-                        </div>
-                        <div>
-                            <dt>Version</dt>
-                            <dd>{{ $standardList?->latestVersion?->version_number ? 'v' . $standardList->latestVersion->version_number : '—' }}
-                            </dd>
-                        </div>
-                    </dl>
-                </article>
-
-                <article class="control-card sync-card">
-                    <header>
-                        <div class="control-card-icon cyan">↻</div>
-                        <div>
-                            <h3>Synchronisation</h3>
-                            <p>Préparation Offline-First</p>
-                        </div>
-                    </header>
-                    <div class="sync-state"><span></span>
-                        <div><strong>Prête</strong><small>Aucune synchronisation exécutée pour le moment.</small></div>
-                    </div>
-                </article>
-
-                <article class="control-card">
-                    <header>
-                        <div class="control-card-icon orange">♙</div>
-                        <div>
-                            <h3>Accès et sécurité</h3>
-                            <p>Périmètre protégé</p>
-                        </div>
-                    </header>
-                    <dl>
-                        <div>
-                            <dt>Utilisateur connecté</dt>
-                            <dd>{{ auth()->user()->name }}</dd>
-                        </div>
-                        <div>
-                            <dt>Rôle</dt>
-                            <dd>{{ auth()->user()->roles()->first()?->name ?? 'Utilisateur' }}</dd>
-                        </div>
-                        <div>
-                            <dt>État</dt>
-                            <dd><span class="control-status success">Accès autorisé</span></dd>
-                        </div>
-                    </dl>
-                </article>
-            </div>
+<section class="configuration-dashboard">
+    <header class="configuration-header">
+        <div class="configuration-header-icon material-symbols-outlined">settings</div>
+        <div><span class="eyebrow">Administration de la plateforme</span><h1>Configuration</h1><p>Gérez les organisations et les référentiels centraux de PharmaCare.</p></div>
+        @if(app(\App\Services\GovernanceService::class)->roleCode(auth()->user()) === \App\Services\GovernanceService::SAGO_ADMIN)
+            <a class="configuration-add-organization" href="{{ route('configuration.organization', ['create' => 1]) }}"><span class="material-symbols-outlined">add</span><span>Ajouter une organisation</span></a>
         @endif
-    </section>
+    </header>
+    <div class="configuration-access-grid" aria-label="Rubriques de configuration">
+        <a class="configuration-access-card" href="{{ route('configuration.organization') }}">
+            <span class="configuration-access-icon material-symbols-outlined">corporate_fare</span>
+            <span class="configuration-access-copy"><strong>Organisations</strong><b>{{ $configurationStats['organizations'] }}</b><small>organisation(s) enregistrée(s)</small></span>
+            <span class="configuration-access-action">Gérer <span class="material-symbols-outlined">arrow_forward</span></span>
+        </a>
+        <a class="configuration-access-card" href="{{ route('configuration.platform-standards.index') }}" aria-label="Ouvrir Standards et référentiels">
+            <span class="configuration-access-icon material-symbols-outlined">format_list_bulleted</span>
+            <span class="configuration-access-copy"><strong>Standards &amp; Référentiels</strong><b>{{ $configurationStats['standards'] }}</b><small>standard(s) plateforme</small></span>
+            <span class="configuration-access-action">Gérer <span class="material-symbols-outlined">arrow_forward</span></span>
+        </a>
+    </div>
+</section>
 @endsection
-
 @push('styles')
-    <style>
-        .control-hero {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 18px;
-            padding: 20px 22px;
-            border: 1px solid var(--pc-border);
-            border-radius: 18px;
-            background: #fff;
-            box-shadow: var(--pc-shadow);
-        }
-
-        .control-hero-icon {
-            width: 48px;
-            height: 48px;
-            display: grid;
-            place-items: center;
-            border-radius: 14px;
-            background: #FFF3E8;
-            color: var(--pc-orange);
-            font-size: 22px;
-            font-weight: 800;
-            flex: 0 0 auto;
-        }
-
-        .control-hero-copy {
-            min-width: 0;
-            flex: 1;
-        }
-
-        .control-hero-copy h2 {
-            margin: 4px 0 6px;
-            font-size: 1.35rem;
-        }
-
-        .control-hero-copy p {
-            margin: 0;
-            color: var(--pc-muted);
-        }
-
-        .control-hero-actions {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-left: auto;
-        }
-
-        .configuration-add {
-            background: #fff !important;
-            color: #f47a20 !important;
-            border: 2px solid #f47a20 !important;
-            box-shadow: none !important;
-        }
-
-        .configuration-enter {
-            margin-left: 4px;
-        }
-
-        .configuration-empty-state {
-            padding: 30px;
-            text-align: center;
-            background: #fff;
-            border: 1px dashed #f4b47d;
-            border-radius: 16px;
-        }
-
-        .configuration-empty-state strong {
-            font-size: 18px;
-        }
-
-        .configuration-empty-state p {
-            margin: 8px 0 0;
-            color: #667085;
-        }
-
-        @media(max-width:1200px) {
-            .control-hero {
-                flex-wrap: wrap;
-                align-items: flex-start
-            }
-
-            .control-hero-actions {
-                width: 100%;
-                justify-content: flex-start;
-                margin-left: 0
-            }
-
-            .control-hero-actions .button {
-                text-align: center;
-                justify-content: center
-            }
-        }
-
-        @media(max-width:700px) {
-            .control-hero {
-                padding: 18px
-            }
-
-            .control-hero-actions {
-                flex-direction: column;
-                align-items: stretch
-            }
-
-            .control-hero-actions .button {
-                width: 100%
-            }
-
-            .configuration-enter {
-                margin-left: 0
-            }
-        }
-    </style>
+<style>
+.configuration-dashboard{display:grid;gap:24px;width:100%;min-width:0}.configuration-header{display:flex;align-items:center;gap:16px;padding:24px;background:#fff;border:1px solid var(--pc-border);border-radius:18px;box-shadow:var(--pc-shadow)}.configuration-header-icon{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;border-radius:15px;background:var(--pc-orange-light,#FFF3E8);color:var(--pc-orange);font-size:31px}.configuration-header h1{margin:4px 0 5px;font-size:clamp(1.65rem,2.5vw,2.1rem)!important}.configuration-header p{margin:0;color:var(--pc-muted)}.configuration-header .eyebrow{color:var(--pc-orange);font-size:.73rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.configuration-add-organization{margin-left:auto;min-height:46px;padding:11px 17px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;background:var(--pc-orange);color:#fff;font-size:.86rem;font-weight:800;white-space:nowrap;box-shadow:0 8px 18px rgba(245,124,0,.22)}.configuration-add-organization .material-symbols-outlined{font-size:21px}.configuration-add-organization:hover{background:#D96E00;transform:translateY(-1px)}.configuration-access-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.configuration-access-card{min-width:0;min-height:230px;padding:22px;display:flex;flex-direction:column;align-items:flex-start;color:var(--pc-ink);background:#fff;border:1px solid var(--pc-border);border-radius:18px;box-shadow:0 10px 28px rgba(36,50,74,.07);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}a.configuration-access-card:hover{transform:translateY(-3px);border-color:rgba(245,124,0,.45);box-shadow:0 16px 34px rgba(36,50,74,.11)}.configuration-access-card-pending{border-style:dashed}.configuration-access-icon{width:52px;height:52px;display:grid;place-items:center;border-radius:14px;color:var(--pc-orange);background:#FFF3E8;font-size:28px}.configuration-access-copy{margin-top:20px;display:flex;flex-direction:column}.configuration-access-copy strong{font-size:1.08rem}.configuration-access-copy b{margin-top:9px;font-size:2rem;line-height:1;color:var(--pc-ink)}.configuration-access-copy small{margin-top:7px;color:var(--pc-muted);font-size:.8rem}.configuration-access-action{margin-top:auto;padding-top:18px;display:inline-flex;align-items:center;gap:6px;color:var(--pc-orange);font-size:.84rem;font-weight:800}.configuration-access-action .material-symbols-outlined{font-size:18px}@media(max-width:1000px){.configuration-header{flex-wrap:wrap}.configuration-add-organization{margin-left:74px}}@media(max-width:650px){.configuration-header{align-items:flex-start;padding:19px}.configuration-add-organization{width:100%;margin-left:0}.configuration-access-grid{grid-template-columns:1fr}.configuration-access-card{min-height:205px}}
+</style>
 @endpush

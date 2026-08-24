@@ -4,42 +4,43 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Connexion · PharmaCare</title>
-    <style>
-        *,*::before,*::after{box-sizing:border-box}
-        body{margin:0;padding:16px;font-family:system-ui;background:#fff7f0;color:#30231a;display:grid;place-items:center;min-height:100vh}
-        .card{background:#fff;width:100%;max-width:420px;padding:16px 30px 18px;border-radius:16px;box-shadow:0 14px 38px #7a350018}
-        .logo{display:block;width:52px;height:52px;object-fit:contain;margin:0 auto 2px}.brand{color:#f47a20;text-align:center;font-size:26px;line-height:1.1;font-weight:900}.sub{text-align:center;color:#705b4c;font-size:14px;line-height:1.3;margin:2px 0 8px}
-        label{font-weight:650;display:block;margin:6px 0 4px}input{width:100%;height:48px;padding:0 14px;border:1px solid #d8c8bb;border-radius:12px;font-size:15px}
-        .password-field{position:relative}.password-field input{padding-right:52px}.toggle-password{position:absolute;right:3px;top:3px;width:42px;height:42px;margin:0;padding:0;border:0;background:transparent;color:#705b4c;font-size:21px;cursor:pointer}
-        .submit{width:100%;height:48px;margin-top:8px;padding:0 16px;border:0;border-radius:12px;background:#f47a20;color:#fff;font-weight:800;font-size:15px}
-        .message{padding:11px;border-radius:8px;background:#eef8ee;color:#176b3a}.error{background:#fff0ee;color:#b42318}
-        .links{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px;font-size:13px}.links a{color:#ad4a00;font-weight:700;text-decoration:none;text-align:right}
-        .check{display:flex;gap:8px;align-items:center;font-weight:400}.check input{width:auto}
-        @media(max-width:480px){.card{padding:14px 28px 16px}.links{align-items:flex-start}}
-    </style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0,0">
+    <link rel="stylesheet" href="/css/pharmacare-portal.css?v={{ filemtime(public_path('css/pharmacare-portal.css')) }}">
     @include('components.auth-styles')
 </head>
-<body>
-<main class="card">
-    <img class="logo" src="{{ asset('images/pharmacare-logo.png') }}" alt="Logo PharmaCare">
-    <div class="brand"><span style="color:#FF7A00">Pharma</span><span style="color:#16A34A">Care</span></div>
-    <p class="sub">Putting Patients at the Heart of Every Supply.</p>
-    @if(session('status'))<p class="message">{{ session('status') }}</p>@endif
-    @if($errors->any())<p class="message error">{{ $errors->first() }}</p>@endif
-    <form method="post" action="{{ route('login.store') }}">
+<body class="auth-page">
+<main class="auth-card" aria-labelledby="login-title">
+    <header class="auth-brand">
+        <img class="auth-logo" src="{{ asset('images/pharmacare-logo.png') }}" alt="Logo PharmaCare">
+        <h1 id="login-title" class="auth-wordmark"><span>Pharma</span><strong>Care</strong></h1>
+        <p>Putting Patients at the Heart of Every Supply.</p>
+    </header>
+
+    @if(session('status'))
+        <div class="auth-alert auth-alert--success" role="status"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span><span>{{ session('status') }}</span></div>
+    @endif
+    @if($errors->any())
+        <div class="auth-alert auth-alert--error" role="alert"><span class="material-symbols-outlined" aria-hidden="true">error</span><span>{{ $errors->first() }}</span></div>
+    @endif
+
+    <form class="auth-form" method="post" action="{{ route('login.store') }}">
         @csrf
-        <label for="login">Adresse e-mail ou identifiant</label>
-        <input id="login" name="login" value="{{ old('login') }}" required autofocus autocomplete="username">
-        <label for="password">Mot de passe</label>
-        <div class="password-field">
-            <input id="password" name="password" type="password" required autocomplete="current-password">
-            <button id="toggle-password" class="toggle-password" type="button" aria-label="Afficher le mot de passe" title="Afficher le mot de passe">👁</button>
-        </div>
-        <div class="links">
-            <label class="check"><input type="checkbox" name="remember"> Rester connecté</label>
+        <x-app-input name="login" label="Adresse e-mail ou identifiant" icon="mail" :value="old('login')" required autofocus autocomplete="username" />
+
+        <label class="app-field {{ $errors->has('password') ? 'is-error' : '' }}" for="password">
+            <span class="app-field__label">Mot de passe <span class="app-field__required" aria-hidden="true">*</span></span>
+            <span class="app-field__control app-field__control--icon auth-password-control">
+                <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+                <input class="app-field__input" id="password" name="password" type="password" required autocomplete="current-password">
+                <button id="toggle-password" class="auth-password-toggle" type="button" aria-label="Afficher le mot de passe" title="Afficher le mot de passe"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
+            </span>
+        </label>
+
+        <div class="auth-options">
+            <label class="auth-remember"><input type="checkbox" name="remember"> <span>Rester connecté</span></label>
             <a href="{{ route('password.request') }}">Mot de passe oublié ?</a>
         </div>
-        <button class="submit">Se connecter</button>
+        <x-app-button type="submit" icon="login" expanded>Se connecter</x-app-button>
     </form>
 </main>
 <script>
@@ -48,9 +49,10 @@
     toggle.addEventListener('click', () => {
         const visible = password.type === 'text';
         password.type = visible ? 'password' : 'text';
-        toggle.textContent = visible ? '👁' : '🙈';
-        toggle.setAttribute('aria-label', visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe');
-        toggle.title = visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe';
+        toggle.querySelector('.material-symbols-outlined').textContent = visible ? 'visibility' : 'visibility_off';
+        const label = visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe';
+        toggle.setAttribute('aria-label', label);
+        toggle.title = label;
         password.focus();
         password.setSelectionRange(password.value.length, password.value.length);
     });

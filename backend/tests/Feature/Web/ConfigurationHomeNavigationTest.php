@@ -16,19 +16,21 @@ class ConfigurationHomeNavigationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_home_only_displays_the_three_authorized_actions(): void
+    public function test_home_displays_only_the_three_configuration_sections(): void
     {
         [$owner] = $this->context();
 
         $this->actingAs($owner)->get(route('configuration.index'))
             ->assertOk()
-            ->assertSee('Ajouter une organisation')
-            ->assertSee('Ajouter une mission')
-            ->assertSee('Entrer dans l’application')
-            ->assertSee('href="'.route('dashboard').'"', false)
-            ->assertDontSee('Ajouter un projet')
-            ->assertDontSee('Ajouter un site')
-            ->assertDontSee('Ajouter un utilisateur');
+            ->assertSee('Organisations')
+            ->assertSee('Missions / Pays')
+            ->assertSee('Listes standards')
+            ->assertDontSee('Ajouter une organisation')
+            ->assertDontSee('Ajouter une mission')
+            ->assertDontSee('Entrer dans l’application')
+            ->assertDontSee('Projet actif')
+            ->assertDontSee('Modules actifs')
+            ->assertDontSee('Fonctionnalités');
     }
 
     public function test_organization_and_mission_actions_start_expected_workflows(): void

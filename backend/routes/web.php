@@ -15,6 +15,8 @@ use App\Http\Controllers\Web\MissionConfigurationController;
 use App\Http\Controllers\Web\ConfigurationWizardController;
 use App\Http\Controllers\Web\ControlCenterController;
 use App\Http\Controllers\Web\OrganizationConfigurationController;
+use App\Http\Controllers\Web\PlatformStandardController;
+use App\Http\Controllers\Web\PlatformStandardAssignmentController;
 use App\Http\Controllers\Web\StockController;
 use App\Http\Controllers\Web\StructureController;
 use App\Http\Controllers\Web\DashboardController;
@@ -53,6 +55,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/configuration/organization', [OrganizationConfigurationController::class, 'save'])->middleware('permission:configuration.view')->name('configuration.organization.save');
     Route::put('/configuration/organization/{organization}', [OrganizationConfigurationController::class, 'update'])->middleware('permission:configuration.view')->name('configuration.organization.update');
     Route::delete('/configuration/organization/{organization}', [OrganizationConfigurationController::class, 'archive'])->middleware('permission:configuration.view')->name('configuration.organization.archive');
+    Route::get('/configuration/platform-standards', [PlatformStandardController::class, 'index'])->middleware(['role:sago_admin', 'permission:platform_standards.view'])->name('configuration.platform-standards.index');
+    Route::get('/configuration/platform-standards/organizations/{organization}', [PlatformStandardController::class, 'assist'])->middleware(['role:sago_admin', 'permission:platform_standards.view'])->name('configuration.platform-standards.organizations.assist');
+    Route::get('/configuration/platform-standards/history/{configuration}', [PlatformStandardController::class, 'historyDetail'])->middleware(['role:sago_admin', 'permission:platform_standards.view'])->name('configuration.platform-standards.history.show');
+    Route::post('/configuration/platform-standards/manual/preview', [PlatformStandardAssignmentController::class, 'previewManual'])->middleware(['role:sago_admin', 'permission:standards.assign'])->name('configuration.platform-standards.manual.preview');
+    Route::post('/configuration/platform-standards/manual/publish', [PlatformStandardAssignmentController::class, 'publishManual'])->middleware(['role:sago_admin', 'permission:standards.assign'])->name('configuration.platform-standards.manual.publish');
+    Route::post('/configuration/platform-standards/history/{configuration}/restore', [PlatformStandardAssignmentController::class, 'restoreManual'])->middleware(['role:sago_admin', 'permission:standards.assign'])->name('configuration.platform-standards.history.restore');
     Route::get('/configuration/mission', [MissionConfigurationController::class, 'show'])->middleware('permission:configuration.view')->name('configuration.mission');
     Route::post('/configuration/mission', [MissionConfigurationController::class, 'save'])->middleware('permission:configuration.view')->name('configuration.mission.save');
     Route::delete('/configuration/mission/{mission}/archive', [MissionConfigurationController::class, 'archive'])->middleware('permission:configuration.view')->name('configuration.mission.archive');
@@ -71,8 +79,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/sago/dashboard', [DashboardController::class, 'index'])->middleware('role:sago_admin')->name('sago.dashboard');
-    Route::get('/projects', [ModulePlaceholderController::class, 'show'])->defaults('module', 'projects')->middleware('permission:projects.view')->name('modules.projects');
-    Route::get('/missions', [ModulePlaceholderController::class, 'show'])->defaults('module', 'missions')->middleware('permission:missions.view')->name('modules.missions');
+    Route::get('/projects', [ProjectController::class, 'home'])->middleware('permission:projects.view')->name('modules.projects');
+    Route::get('/missions', [MissionController::class, 'home'])->middleware('permission:missions.view')->name('modules.missions');
     Route::get('/funding', [FundingController::class, 'home'])->middleware('permission:funding.view')->name('modules.funding');
     Route::get('/health-facilities', [StructureController::class, 'home'])->middleware('permission:health_facilities.view')->name('modules.health-facilities');
     Route::get('/dispensing-sites', [StructureController::class, 'sites'])->middleware('permission:dispensing_sites.view')->name('modules.dispensing-sites');
@@ -120,6 +128,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/organizations/{organization}', [OrganizationController::class, 'destroy'])->middleware('permission:organizations.manage')->name('organizations.destroy');
     Route::post('/countries', [MissionController::class, 'storeCountry'])->name('countries.store');
     Route::get('/organizations/{organization}/missions', [MissionController::class, 'index'])->name('organizations.missions.index');
+    Route::get('/organizations/{organization}/missions/{mission}', [MissionController::class, 'show'])->name('organizations.missions.show');
     Route::post('/organizations/{organization}/missions', [MissionController::class, 'store'])->name('organizations.missions.store');
     Route::put('/organizations/{organization}/missions/{mission}', [MissionController::class, 'update'])->name('organizations.missions.update');
     Route::delete('/organizations/{organization}/missions/{mission}', [MissionController::class, 'destroy'])->name('organizations.missions.destroy');

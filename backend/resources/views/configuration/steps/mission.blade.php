@@ -23,7 +23,7 @@
     </header>
     <div class="step-toolbar">
         <div><strong>{{ $missions->count() }} mission(s)</strong><small>Gérez toutes les missions de l’organisation.</small></div>
-        <a class="button primary" href="{{ route('configuration.mission', ['new' => 1, '_flow'=>$workflow->workflow_id]) }}">＋ Ajouter une mission</a>
+        <x-app-button icon="add" :href="route('configuration.mission', ['new' => 1, '_flow'=>$workflow->workflow_id])">Ajouter une mission</x-app-button>
     </div>
 
     @if($missions->isNotEmpty())
@@ -31,10 +31,10 @@
             @foreach($missions as $item)
                 <article class="{{ $mission?->is($item) ? 'selected' : '' }}">
                     <div><strong>{{ $item->name }}</strong><small>{{ $item->code }} · {{ $item->country?->name }} · {{ $item->is_active ? 'Active' : 'Inactive' }}</small></div>
-                    <a class="button outline" href="{{ route('configuration.mission', ['edit' => $item->id, '_flow'=>$workflow->workflow_id]) }}">✎ Modifier</a>
+                    <x-app-button variant="outline" icon="edit" :href="route('configuration.mission', ['edit' => $item->id, '_flow'=>$workflow->workflow_id])">Modifier</x-app-button>
                     <form method="post" action="{{ route('configuration.mission.archive', ['mission'=>$item, '_flow'=>$workflow->workflow_id]) }}" data-confirm="Archiver cette mission ?">
                         @csrf @method('DELETE')
-                        <button class="button danger-outline" type="submit">⌑ Archiver</button>
+                        <x-app-button variant="danger-outline" icon="archive" type="submit">Archiver</x-app-button>
                     </form>
                 </article>
             @endforeach
@@ -46,7 +46,7 @@
             <summary>Missions archivées ({{ $archivedMissions->count() }})</summary>
             @foreach($archivedMissions as $item)
                 <div><span><strong>{{ $item->name }}</strong><small>{{ $item->code }} · {{ $item->country?->name }}</small></span>
-                    <form method="post" action="{{ route('configuration.mission.restore', ['mission'=>$item, '_flow'=>$workflow->workflow_id]) }}" data-confirm="Restaurer cette mission ?">@csrf<button class="button success-outline" type="submit">↻ Restaurer</button></form>
+                    <form method="post" action="{{ route('configuration.mission.restore', ['mission'=>$item, '_flow'=>$workflow->workflow_id]) }}" data-confirm="Restaurer cette mission ?">@csrf<x-app-button variant="outline" icon="restore" type="submit">Restaurer</x-app-button></form>
                 </div>
             @endforeach
         </details>

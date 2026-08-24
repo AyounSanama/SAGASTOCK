@@ -39,6 +39,8 @@ class DatabaseSeeder extends Seeder
             'catalog.manage' => 'Gérer les référentiels et produits',
             'catalog.publish' => 'Publier les listes standards',
             'standards.assign' => 'Affecter les listes standards',
+            'platform_standards.view' => 'Consulter les standards et référentiels plateforme',
+            'platform_standards.manage' => 'Gérer les standards et référentiels plateforme',
             'batches.manage' => 'Gérer les lots produits',
             'stocks.view' => 'Consulter les stocks et mouvements',
             'stocks.manage' => 'Enregistrer les mouvements de stock',
@@ -94,10 +96,9 @@ class DatabaseSeeder extends Seeder
         $roleDefinitions = [
             'sago_admin' => ['Admin Sago', [
                 'dashboard.view', 'configuration.view', 'configuration.platform.manage',
-                'organizations.view', 'organizations.manage', 'missions.view', 'missions.manage',
-                'projects.view', 'standard_lists.view', 'standard_lists.manage', 'standards.assign',
-                'catalog.publish', 'users.view', 'users.manage', 'roles.manage', 'audit.view',
-                'activity_logs.view', 'settings.view',
+                'organizations.view', 'organizations.manage', 'platform_standards.view',
+                'platform_standards.manage', 'standards.assign',
+                'audit.view', 'activity_logs.view',
             ], 'platform'],
             'owner' => ['Admin Sago (alias historique)', [
                 'dashboard.view', 'configuration.view', 'configuration.platform.manage',
@@ -206,10 +207,25 @@ class DatabaseSeeder extends Seeder
         }
 
         $strictMatrix = [
-            'coordination_admin' => ['dashboard.view','standard_lists.view','catalog.view','products.view','stocks.view','receipts.view','receipts.manage','dispensing.view','dispensing.manage','patients.view','patients.manage','prescriptions.view','prescriptions.manage','prescriptions.validate','dispensations.view','dispensations.manage','inventories.view','inventories.manage','inventories.validate','orders.view','orders.manage','orders.approve','reports.view','reports.export','synchronization.view','users.view','users.manage','activity_logs.view'],
-            'project_admin' => ['dashboard.view','organizations.view','missions.view','project.view','projects.view','health_facilities.view','health_facilities.manage','structures.view','structures.manage','dispensing_sites.view','dispensing_sites.manage','sites.view','sites.manage','users.view','users.create_site_admin','users.update_site_admin','users.suspend_site_admin','standard_lists.view','catalog.view','products.view','products.manage','stocks.view','inventories.view','orders.view','orders.manage','reports.view','reports.export','synchronization.view','project_settings.view','activity_logs.view'],
-            'site_admin' => ['dashboard.view','catalog.view','products.view','stocks.view','stocks.manage','receipts.view','receipts.manage','dispensing.view','dispensing.manage','inventories.view','inventories.manage','orders.view','orders.prepare','reports.view','reports.export_local','synchronization.view','synchronization.manage','site_settings.view','activity_logs.view_local'],
+            'sago_admin' => ['dashboard.view','configuration.view','configuration.platform.manage','organizations.view','organizations.manage','platform_standards.view','platform_standards.manage','standards.assign','audit.view','activity_logs.view'],
+            'coordination_admin' => ['dashboard.view','missions.view','missions.manage','standard_lists.view','catalog.view','products.view','stocks.view','receipts.view','receipts.manage','dispensing.view','dispensing.manage','patients.view','patients.manage','prescriptions.view','prescriptions.manage','prescriptions.validate','dispensations.view','dispensations.manage','inventories.view','inventories.manage','inventories.validate','orders.view','orders.manage','orders.approve','reports.view','reports.export','synchronization.view','users.view','users.manage','activity_logs.view'],
+            'project_admin' => ['dashboard.view','project.view','standard_lists.view','catalog.view','products.view','products.manage','stocks.view','receipts.view','receipts.manage','dispensing.view','dispensing.manage','patients.view','patients.manage','prescriptions.view','prescriptions.manage','prescriptions.validate','dispensations.view','dispensations.manage','inventories.view','inventories.manage','orders.view','orders.manage','reports.view','reports.export','synchronization.view','health_facilities.view','health_facilities.manage','dispensing_sites.view','dispensing_sites.manage','users.view','users.create_site_admin','users.update_site_admin','users.suspend_site_admin','project_settings.view','activity_logs.view'],
+            'site_admin' => ['dashboard.view','standard_lists.view','catalog.view','products.view','stocks.view','stocks.manage','receipts.view','receipts.manage','dispensing.view','dispensing.manage','patients.view','patients.manage','prescriptions.view','prescriptions.manage','dispensations.view','dispensations.manage','inventories.view','inventories.manage','orders.view','orders.manage','orders.prepare','reports.view','reports.export_local','synchronization.view','synchronization.manage','site_settings.view','activity_logs.view_local'],
+            'site_user' => ['dashboard.view','standard_lists.view','catalog.view','products.view','stocks.view','receipts.view','dispensing.view','patients.view','prescriptions.view','prescriptions.manage','dispensations.view','dispensations.manage','inventories.view','orders.view','reports.view','synchronization.view','activity_logs.view_local'],
         ];
+        $strictMatrix['coordination_admin'] = array_values(array_unique([
+            ...$strictMatrix['coordination_admin'],
+            'projects.view',
+            'projects.manage',
+            'health_facilities.view',
+            'health_facilities.manage',
+            'dispensing_sites.view',
+            'dispensing_sites.manage',
+        ]));
+        $strictMatrix['project_admin'] = array_values(array_unique([
+            ...array_diff($strictMatrix['project_admin'], ['project.view']),
+            'projects.view',
+        ]));
         foreach ($strictMatrix as $roleCode => $codes) {
             Role::where('code', $roleCode)->first()?->permissions()
                 ->sync(

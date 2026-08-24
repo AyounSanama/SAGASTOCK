@@ -7,11 +7,15 @@ import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/profile_page.dart';
 import '../../features/auth/presentation/reset_password_page.dart';
 import '../../features/configuration/presentation/configuration_page.dart';
+import '../../features/configuration/presentation/platform_standards_page.dart';
+import '../../features/configuration/presentation/organization_assistance_page.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/organizations/presentation/funding_page.dart';
 import '../../features/organizations/presentation/missions_page.dart';
 import '../../features/organizations/presentation/organizations_page.dart';
 import '../../features/organizations/presentation/projects_page.dart';
+import '../../features/organizations/presentation/scoped_missions_page.dart';
+import '../../features/organizations/presentation/scoped_projects_page.dart';
 import '../../features/receipts/presentation/receipts_page.dart';
 import '../../features/dispensations/presentation/clinical_supply_page.dart';
 import '../../features/inventories/presentation/inventories_page.dart';
@@ -68,8 +72,33 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
           path: '/configuration',
           builder: (context, state) => const ConfigurationPage(),
         ),
+        GoRoute(
+          path: '/standards',
+          builder: (context, state) => const PlatformStandardsPage(),
+        ),
+        GoRoute(
+          path: '/standards/assistance',
+          builder: (context, state) => const PlatformStandardsPage(
+            section: PlatformStandardsSection.assistance,
+          ),
+        ),
+        GoRoute(
+          path: '/standards/history',
+          builder: (context, state) => const PlatformStandardsPage(
+            section: PlatformStandardsSection.history,
+          ),
+        ),
+        GoRoute(
+          path: '/standards/assistance/:organizationId',
+          builder: (context, state) => OrganizationAssistancePage(
+            organizationId: state.pathParameters['organizationId']!,
+          ),
+        ),
         GoRoute(path: '/home', builder: (context, state) => const HomePage()),
-        GoRoute(path: '/sago/dashboard', builder: (context, state) => const HomePage()),
+        GoRoute(
+          path: '/sago/dashboard',
+          builder: (context, state) => const HomePage(),
+        ),
         GoRoute(
           path: '/stocks',
           builder: (context, state) => const StocksPage(),
@@ -107,6 +136,14 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
           builder: (context, state) => const OrganizationsPage(),
         ),
         GoRoute(
+          path: '/missions',
+          builder: (context, state) => const ScopedMissionsPage(),
+        ),
+        GoRoute(
+          path: '/projects',
+          builder: (context, state) => const ScopedProjectsPage(),
+        ),
+        GoRoute(
           path: '/products',
           builder: (context, state) => const CatalogPage(initialTab: 0),
         ),
@@ -115,8 +152,6 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
           builder: (context, state) => const CatalogPage(initialTab: 2),
         ),
         for (final module in const <(String, String, IconData)>[
-          ('/missions', 'Missions', Icons.public_outlined),
-          ('/projects', 'Projets', Icons.account_tree_outlined),
           ('/funding', 'Bailleurs et programmes', Icons.handshake_outlined),
           (
             '/health-facilities',

@@ -84,11 +84,12 @@ class _InventoriesPageState extends State<InventoriesPage> {
       description: 'Choisissez le site et la période de comptage.',
       builder: (_) => InventoryCreateForm(sites: sites),
     );
-    if (data != null && organizationId != null)
+    if (data != null && organizationId != null) {
       await action(
         () => service.create(organizationId!, data),
         'Inventaire créé.',
       );
+    }
   }
 
   Future<void> count(
@@ -102,11 +103,12 @@ class _InventoriesPageState extends State<InventoriesPage> {
           '${line['product']?['name']} · lot ${line['batch']?['batch_number']}',
       builder: (_) => InventoryCountForm(line: line),
     );
-    if (data != null)
+    if (data != null) {
       await action(
         () => service.count(organizationId!, '${inv['id']}', [data]),
         'Comptage enregistré.',
       );
+    }
   }
 
   @override
@@ -263,13 +265,14 @@ class _InventoryCreateFormState extends State<InventoryCreateForm> {
   Widget build(BuildContext c) => _Body(
     keyForm: key,
     onSave: () {
-      if (key.currentState!.validate())
+      if (key.currentState!.validate()) {
         Navigator.pop(c, {
           'site_id': site,
           'reference': reference.text,
           'inventory_type': type,
           'period_date': period.text,
         });
+      }
     },
     children: [
       DropdownButtonFormField<String>(

@@ -11,7 +11,7 @@ void main() {
   Widget subject({
     MissionFormMode mode = MissionFormMode.create,
     Map<String, dynamic>? mission,
-    Future<void> Function(MissionFormData)? onSave,
+    Future<bool> Function(MissionFormData)? onSave,
   }) {
     return MaterialApp(
       theme: AppTheme.light,
@@ -22,17 +22,17 @@ void main() {
           countries: countries,
           mode: mode,
           mission: mission,
-          onSave: onSave ?? (_) async {},
+          onSave: onSave ?? (_) async => true,
         ),
       ),
     );
   }
 
-  testWidgets('le mode création repart avec un formulaire vide', (tester) async {
+  testWidgets('le mode création repart avec un formulaire vide', (
+    tester,
+  ) async {
     await tester.pumpWidget(subject());
-    final fields = tester.widgetList<TextFormField>(
-      find.byType(TextFormField),
-    );
+    final fields = tester.widgetList<TextFormField>(find.byType(TextFormField));
     expect(fields.first.controller?.text, isEmpty);
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Nom de la mission *'),
@@ -63,7 +63,10 @@ void main() {
           'manager_name': 'Responsable',
           'is_active': true,
         },
-        onSave: (data) async => submitted = data,
+        onSave: (data) async {
+          submitted = data;
+          return true;
+        },
       ),
     );
 
@@ -81,7 +84,14 @@ void main() {
 
   testWidgets('annuler ne déclenche aucun enregistrement', (tester) async {
     var saveCount = 0;
-    await tester.pumpWidget(subject(onSave: (_) async => saveCount++));
+    await tester.pumpWidget(
+      subject(
+        onSave: (_) async {
+          saveCount++;
+          return true;
+        },
+      ),
+    );
 
     await tester.ensureVisible(find.text('Annuler'));
     await tester.tap(find.text('Annuler'));

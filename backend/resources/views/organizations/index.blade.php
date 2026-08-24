@@ -437,14 +437,16 @@
         <div>
             <div class="eyebrow">Gestion institutionnelle</div>
             <h1>Organisations</h1>
-            <p>Gérez les ONG, leurs coordonnées et l’ensemble de leur hiérarchie opérationnelle depuis un espace unifié.</p>
+            <p>Gestion des organisations utilisant PharmaCare.</p>
         </div>
-        <button class="btn btn-primary" type="button" data-sheet-open="create-organization-sheet">＋ Nouvelle
-            organisation</button>
+        <button class="btn btn-primary" type="button" data-sheet-open="create-organization-sheet">+ Ajouter une organisation</button>
     </section>
 
     @if (session('status'))
         <div class="notice">{{ session('status') }}</div>
+    @endif
+    @if (session('temporary_password'))
+        <div class="notice">Mot de passe temporaire de l'Admin Coordination : <strong>{{ session('temporary_password') }}</strong>. Copiez-le maintenant ; il devra être modifié à la première connexion.</div>
     @endif
 
     @if ($errors->any())
@@ -573,7 +575,7 @@
         description="Renseignez les informations institutionnelles principales.">
         <form method="post" action="{{ route('organizations.store') }}" data-sheet-form>
             @csrf
-            @include('organizations.partials.form-fields', ['organization' => $formOrganization])
+            @include('organizations.partials.form-fields', ['organization' => $formOrganization, 'countries' => $countries, 'withAdmin' => true])
             <div class="sheet-actions">
                 <button class="btn btn-secondary" type="button"
                     data-sheet-close="create-organization-sheet">Annuler</button>
@@ -588,7 +590,7 @@
             <form method="post" action="{{ route('organizations.update', $organization) }}" data-sheet-form>
                 @csrf
                 @method('PUT')
-                @include('organizations.partials.form-fields', ['organization' => $organization])
+                @include('organizations.partials.form-fields', ['organization' => $organization, 'countries' => $countries, 'withAdmin' => false])
                 <div class="sheet-actions">
                     <button class="btn btn-secondary" type="button"
                         data-sheet-close="edit-organization-{{ $organization->id }}">Annuler</button>

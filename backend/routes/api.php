@@ -21,6 +21,8 @@ use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\StockController;
 use App\Http\Controllers\Api\V1\StructureController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\EffectiveConfigurationController;
+use App\Http\Controllers\Api\V1\PlatformConfigurationController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Route;
 
@@ -31,12 +33,22 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/auth/forgot-password', [PasswordResetController::class, 'forgot']);
         Route::post('/auth/reset-password', [PasswordResetController::class, 'reset']);
     });
-    Route::middleware('auth:sanctum')->group(function (): void {
+    Route::middleware(['auth:sanctum', 'idempotency'])->group(function (): void {
+        Route::get('/configuration/effective', [EffectiveConfigurationController::class, 'index']);
+        Route::post('/configuration/effective/acknowledge', [EffectiveConfigurationController::class, 'acknowledge']);
         Route::get('/configuration/workflows', [ConfigurationWorkflowController::class, 'index'])->middleware('permission:configuration.view');
         Route::post('/configuration/workflows', [ConfigurationWorkflowController::class, 'store'])->middleware('permission:configuration.view');
         Route::get('/configuration/workflows/{workflow}', [ConfigurationWorkflowController::class, 'show'])->middleware('permission:configuration.view');
         Route::put('/configuration/workflows/{workflow}/draft', [ConfigurationWorkflowController::class, 'draft'])->middleware('permission:configuration.view');
         Route::get('/dashboard', [DashboardController::class, 'index']);
+        Route::middleware(['role:sago_admin', 'permission:platform_standards.view'])->prefix('platform-configuration')->group(function (): void {
+            Route::get('/', [PlatformConfigurationController::class, 'home']);
+            Route::get('/organizations', [PlatformConfigurationController::class, 'organizations']);
+            Route::get('/organizations/{organization}', [PlatformConfigurationController::class, 'organization']);
+            Route::post('/organizations/{organization}/preview', [PlatformConfigurationController::class, 'preview'])->middleware('permission:standards.assign');
+            Route::post('/organizations/{organization}/apply', [PlatformConfigurationController::class, 'apply'])->middleware('permission:standards.assign');
+            Route::get('/history', [PlatformConfigurationController::class, 'history']);
+        });
         Route::middleware('permission:stocks.view')->group(function (): void {
             Route::get('/organizations/{organization}/stocks/balances', [StockController::class, 'balances']);
             Route::get('/organizations/{organization}/stocks/movements', [StockController::class, 'movements']);
@@ -129,6 +141,7 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/organizations/{organization}', [OrganizationController::class, 'destroy'])->middleware('permission:organizations.manage');
         Route::get('/countries', [CountryController::class, 'index'])->middleware('permission:missions.view');
         Route::get('/organizations/{organization}/missions', [MissionController::class, 'index'])->middleware('permission:missions.view');
+        Route::get('/organizations/{organization}/missions-archived', [MissionController::class, 'archived'])->middleware('permission:missions.view');
         Route::post('/organizations/{organization}/missions', [MissionController::class, 'store'])->middleware('permission:missions.manage');
         Route::put('/organizations/{organization}/missions/{mission}', [MissionController::class, 'update'])->middleware('permission:missions.manage');
         Route::delete('/organizations/{organization}/missions/{mission}', [MissionController::class, 'destroy'])->middleware('permission:missions.manage');

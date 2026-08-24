@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../configuration/data/effective_configuration_service.dart';
 
 class DashboardService {
   DashboardService({ApiClient? client}) : _client = client ?? ApiClient();
@@ -20,6 +21,12 @@ class DashboardService {
       );
       final data = response.data ?? <String, dynamic>{};
       await _storage.write(key: _cacheKey, value: jsonEncode(data));
+      try {
+        await EffectiveConfigurationService(client: _client, storage: _storage)
+            .refresh();
+      } catch (_) {
+        // Le Dashboard reste accessible avec la dernière configuration valide.
+      }
       data['offline'] = false;
       return data;
     } on DioException catch (error) {

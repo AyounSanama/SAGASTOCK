@@ -18,6 +18,18 @@ class ProjectController extends Controller
 {
     public function __construct(private AuditService $audit, private UserScopeService $scopes) {}
 
+    public function home(Request $request): View
+    {
+        $this->allow('projects.view');
+        $projects = $this->scopes->projects($request->user())
+            ->with(['organization:id,name', 'mission.country:id,iso2,name', 'healthFacilities:id,name,code'])
+            ->when($request->string('search')->toString(), fn ($query, $search) => $query
+                ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
+            ->orderBy('name')->get();
+
+        return view('projects.scope', ['projects' => $projects]);
+    }
+
     public function index(Request $request, Organization $organization): View
     {
         $this->allow('projects.view');
@@ -25,7 +37,8 @@ class ProjectController extends Controller
         return view('projects.index', [
             'organization' => $organization,
             'missions' => $organization->missions()->with('country')->orderBy('name')->get(),
-            'projects' => $organization->projects()->with('mission.country')->orderBy('name')->paginate(20),
+            'projects' => $this->scopes->projects($request->user())->where('organization_id', $organization->id)
+                ->with('mission.country')->orderBy('name')->paginate(20),
             'archivedProjects' => $organization->projects()->onlyTrashed()->with('mission.country')->latest('deleted_at')->get(),
         ]);
     }
@@ -44,6 +57,7 @@ class ProjectController extends Controller
         $this->allow('projects.manage');
         $this->accessible($request, $organization);
         abort_unless($project->organization_id === $organization->id, 404);
+        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
         $old = $project->only(['mission_id', 'code', 'name', 'description', 'starts_on', 'ends_on', 'is_active']);
         $project->update($this->validated($request, $organization, $project));
         $this->audit->record($request, 'project.updated', $project, $old, $project->only(array_keys($old)));
@@ -55,6 +69,7 @@ class ProjectController extends Controller
         $this->allow('projects.manage');
         $this->accessible($request, $organization);
         abort_unless($project->organization_id === $organization->id, 404);
+        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
         $project->delete();
         $this->audit->record($request, 'project.archived', $project);
         return back()->with('status', 'Projet archivé.');

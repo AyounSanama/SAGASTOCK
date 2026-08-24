@@ -1,9 +1,8 @@
-<!doctype html>
-<html lang="fr">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Tableau de bord · PharmaCare</title>
+@extends('layouts.portal')
+@section('title', 'Tableau de bord · PharmaCare')
+@section('page-title', 'Tableau de bord')
+@section('hide-breadcrumb', '1')
+@push('styles')
     <style>
         :root{
             --dash-blue:#2563EB;
@@ -109,9 +108,8 @@
         @media(max-width:1350px){.dashboard-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-analytics{grid-template-columns:1fr 1fr}.dashboard-analytics .analytics-card:first-child{grid-column:1/-1}}
         @media(max-width:760px){.dashboard-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-analytics{grid-template-columns:1fr}.dashboard-analytics .analytics-card:first-child{grid-column:auto}}
     </style>
-</head>
-<body>
-@include('components.app-sidebar')
+@endpush
+@section('content')
 @php
     $dashboardLabel = 'Tableau de bord';
 @endphp
@@ -127,16 +125,24 @@
         </div>
     </section>
 
-    <section class="dashboard-metrics dashboard-metrics-dynamic" aria-label="Indicateurs adaptés à votre périmètre">
+    <section class="app-kpi-grid dashboard-metrics-dynamic" aria-label="Indicateurs adaptés à votre périmètre">
         @foreach($widgets as $widget)
-            <article class="dashboard-metric {{ $widget['color'] }}">
-                <div class="metric-head">
-                    <span class="metric-icon material-symbols-outlined">{{ config('pharmacare_ui.module_icons.'.$widget['icon'], 'dashboard') }}</span>
-                    <span class="metric-label">{{ $widget['label'] }}</span>
-                </div>
-                <strong>{{ number_format((float) $widget['value'], $widget['key']==='stock_quantity' ? 2 : 0, ',', ' ') }}</strong>
-                <a class="metric-link" href="{{ $widget['route'] }}">{{ $widget['caption'] }} →</a>
-            </article>
+            @php
+                $tone = match ($widget['color']) {
+                    'red' => 'red',
+                    'cyan' => 'green',
+                    'blue' => 'blue',
+                    default => 'orange',
+                };
+            @endphp
+            <x-app-kpi-card
+                :label="$widget['label']"
+                :value="number_format((float) $widget['value'], $widget['key']==='stock_quantity' ? 2 : 0, ',', ' ')"
+                :icon="config('pharmacare_ui.module_icons.'.$widget['icon'], 'dashboard')"
+                :caption="$widget['caption']"
+                :href="$widget['route']"
+                :tone="$tone"
+            />
         @endforeach
     </section>
 
@@ -291,5 +297,4 @@
         </aside>
     </section>
 </main>
-</body>
-</html>
+@endsection

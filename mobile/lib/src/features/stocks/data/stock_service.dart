@@ -1,17 +1,22 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/sync/offline_operation_service.dart';
+import '../../../core/data/local_first_repository.dart';
 
 class StockService {
-  StockService({ApiClient? client}) : _client = client ?? ApiClient();
+  StockService({ApiClient? client}) {
+    _client = client ?? ApiClient();
+    _operations = OfflineOperationService(client: _client);
+    _repository = LocalFirstRepository(client: _client, storage: _storage);
+  }
 
-  final ApiClient _client;
+  late final ApiClient _client;
+  late final OfflineOperationService _operations;
+  late final LocalFirstRepository _repository;
   final _storage = const FlutterSecureStorage();
-  static const _outboxKey = 'offline_stock_outbox';
 
   Future<Options> _authorized() async => Options(
     headers: {
@@ -24,7 +29,7 @@ class StockService {
   }
 
   Future<List<Map<String, dynamic>>> balances(String organizationId) async {
-    await _syncOutbox();
+    await _operations.synchronize();
     return _cachedList(
       '/organizations/$organizationId/stocks/balances',
       'offline_stock_balances_$organizationId',
@@ -159,21 +164,12 @@ class StockService {
   Future<Map<String, List<Map<String, dynamic>>>> movementOptions(
     String organizationId,
   ) async {
-    final cacheKey = 'offline_stock_options_$organizationId';
-    try {
-      final response = await _client.dio.get<Map<String, dynamic>>(
-        '/organizations/$organizationId/stocks/options',
-        options: await _authorized(),
-      );
-      final data = response.data ?? <String, dynamic>{};
-      await _storage.write(key: cacheKey, value: jsonEncode(data));
-      return _optionsFrom(data);
-    } on DioException catch (error) {
-      if (error.response != null) rethrow;
-      final cached = await _storage.read(key: cacheKey);
-      if (cached == null) rethrow;
-      return _optionsFrom(jsonDecode(cached) as Map<String, dynamic>);
-    }
+    final data = await _repository.document(
+      collection: 'stock.options',
+      organizationId: organizationId,
+      endpoint: '/organizations/$organizationId/stocks/options',
+    );
+    return _optionsFrom(data);
   }
 
   Future<void> createMovement(
@@ -194,22 +190,13 @@ class StockService {
       'quantity': quantity,
       if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
     };
-    try {
-      await _client.dio.post<Map<String, dynamic>>(
-        path,
-        data: data,
-        options: await _authorized(),
-      );
-    } on DioException catch (error) {
-      if (error.response != null) rethrow;
-      final pending = await _readOutbox();
-      pending.add({
-        'path': path,
-        'data': data,
-        'queued_at': DateTime.now().toIso8601String(),
-      });
-      await _storage.write(key: _outboxKey, value: jsonEncode(pending));
-    }
+    await _operations.execute(
+      method: 'POST',
+      endpoint: path,
+      payload: data,
+      entityType: 'stocks',
+      organizationId: organizationId,
+    );
   }
 
   Future<List<Map<String, dynamic>>> _cachedList(
@@ -217,22 +204,14 @@ class StockService {
     String cacheKey, {
     Map<String, dynamic>? queryParameters,
   }) async {
-    try {
-      final response = await _client.dio.get<Map<String, dynamic>>(
-        path,
-        queryParameters: queryParameters,
-        options: await _authorized(),
-      );
-      final values = (response.data?['data'] as List<dynamic>? ?? [])
-          .cast<Map<String, dynamic>>();
-      await _storage.write(key: cacheKey, value: jsonEncode(values));
-      return values;
-    } on DioException catch (error) {
-      if (error.response != null) rethrow;
-      final cached = await _storage.read(key: cacheKey);
-      if (cached == null) return [];
-      return (jsonDecode(cached) as List).cast<Map<String, dynamic>>();
-    }
+    return _repository.list(
+      collection: cacheKey,
+      organizationId: RegExp(
+        r'/organizations/([^/]+)',
+      ).firstMatch(path)?.group(1),
+      endpoint: path,
+      query: queryParameters ?? const {},
+    );
   }
 
   Map<String, List<Map<String, dynamic>>> _optionsFrom(
@@ -243,28 +222,4 @@ class StockService {
     'batches': (data['batches'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>(),
   };
-
-  Future<List<Map<String, dynamic>>> _readOutbox() async {
-    final value = await _storage.read(key: _outboxKey);
-    return (value == null ? <dynamic>[] : jsonDecode(value) as List)
-        .cast<Map<String, dynamic>>();
-  }
-
-  Future<void> _syncOutbox() async {
-    final pending = await _readOutbox();
-    if (pending.isEmpty) return;
-    final remaining = <Map<String, dynamic>>[];
-    for (final item in pending) {
-      try {
-        await _client.dio.post<void>(
-          item['path'] as String,
-          data: item['data'],
-          options: await _authorized(),
-        );
-      } on DioException {
-        remaining.add(item);
-      }
-    }
-    await _storage.write(key: _outboxKey, value: jsonEncode(remaining));
-  }
 }

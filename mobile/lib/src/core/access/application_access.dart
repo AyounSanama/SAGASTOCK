@@ -42,6 +42,27 @@ abstract final class ApplicationAccess {
       'permission': 'organizations.view',
     },
     {
+      'key': 'standards',
+      'label': 'Standards & Référentiels',
+      'path': '/standards',
+      'icon': 'standard_lists',
+      'permission': 'platform_standards.view',
+    },
+    {
+      'key': 'assistance',
+      'label': 'Assistance',
+      'path': '/standards/assistance',
+      'icon': 'organizations',
+      'permission': 'platform_standards.view',
+    },
+    {
+      'key': 'history',
+      'label': 'Historique',
+      'path': '/standards/history',
+      'icon': 'activity_logs',
+      'permission': 'platform_standards.view',
+    },
+    {
       'key': 'funding',
       'label': 'Bailleurs et programmes',
       'path': '/funding',
@@ -71,7 +92,7 @@ abstract final class ApplicationAccess {
     },
     {
       'key': 'standard-lists',
-      'label': 'Listes standards',
+      'label': 'Listes standards de médicaments',
       'path': '/standard-lists',
       'icon': 'standard_lists',
       'permission': 'standard_lists.view',
@@ -92,17 +113,24 @@ abstract final class ApplicationAccess {
     },
     {
       'key': 'receipts',
-      'label': 'Réceptions',
+      'label': 'Entrées en stock',
       'path': '/receipts',
       'icon': 'receipts',
       'permission': 'receipts.view',
     },
     {
       'key': 'dispensing',
-      'label': 'Dispensation',
+      'label': 'Dispensation de médicaments',
       'path': '/dispensations',
       'icon': 'dispensing',
       'permission': 'dispensing.view',
+    },
+    {
+      'key': 'inventory-orders',
+      'label': 'Inventaires & Commandes',
+      'path': '/inventories',
+      'icon': 'inventories',
+      'permission': 'inventories.view',
     },
     {
       'key': 'inventories',
@@ -195,14 +223,21 @@ abstract final class ApplicationAccess {
     Map<String, dynamic>? user,
   ) {
     final remote = user?['navigation'] as List<dynamic>?;
-    final source = remote == null || remote.isEmpty
+    final role = '${user?['role'] ?? ''}'.toLowerCase();
+    final source = role == 'sago_admin' || remote == null || remote.isEmpty
         ? _fallbackManifest
         : remote.cast<Map<String, dynamic>>();
-
-    final role = '${user?['role'] ?? ''}'.toLowerCase();
-    final filteredSource = role == 'sago_admin'
-        ? source.where((raw) => const {'dashboard', 'configuration', 'profile'}.contains(raw['key']))
-        : source;
+    final allowedKeys = switch (role) {
+      'sago_admin' => const {'dashboard', 'configuration', 'organizations', 'standards', 'assistance', 'history', 'profile'},
+      'coordination_admin' || 'project_admin' || 'site_admin' || 'site_user' => const {
+          'dashboard', 'standard-lists', 'receipts', 'dispensing',
+          'inventory-orders', 'reports', 'synchronization', 'profile',
+        },
+      _ => null,
+    };
+    final filteredSource = allowedKeys == null
+        ? source
+        : source.where((raw) => allowedKeys.contains(raw['key']));
 
     return filteredSource
         .where((raw) => allows(user, raw['permission']?.toString()))
@@ -224,6 +259,7 @@ abstract final class ApplicationAccess {
     const routes = <String, String>{
       '/configuration': 'configuration.view',
       '/organizations': 'organizations.view',
+      '/standards': 'platform_standards.view',
       '/missions': 'missions.view',
       '/projects': 'projects.view',
       '/funding': 'funding.view',

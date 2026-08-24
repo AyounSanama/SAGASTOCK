@@ -22,7 +22,9 @@ class CompleteConfigurationWizardTest extends TestCase
         [$owner] = $this->context();
         $this->actingAs($owner)->get(route('configuration.index'))
             ->assertOk()
-            ->assertSee('Ajouter une organisation')
+            ->assertSee('Organisations')
+            ->assertSee('Missions / Pays')
+            ->assertSee('Listes standards')
             ->assertSee('Entrer dans l’application');
         $this->actingAs($owner)->get(route('configuration.step', 'projects'))->assertForbidden();
         SetupProgress::current()->update(['completed_steps' => [1, 2]]);

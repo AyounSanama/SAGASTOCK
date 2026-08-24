@@ -122,7 +122,7 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
   Future<void> _validate(Map<String, dynamic> receipt) async {
     final organizationId = _organizationId;
     if (organizationId == null) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialogAsFormSheet<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Valider la réception ?'),

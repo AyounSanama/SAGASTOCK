@@ -5,28 +5,23 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Country;
 use App\Models\Organization;
+use App\Models\Role;
 use App\Models\SetupProgress;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\ConfigurationWorkflowService;
+use App\Services\GovernanceService;
 use App\Services\UserScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class OrganizationConfigurationController extends Controller
 {
-    private const TYPES = [
-        'ngo' => 'ONG',
-        'ministry' => 'Ministère de la Santé',
-        'national_program' => 'Programme national',
-        'united_nations' => 'Organisation des Nations unies',
-        'international_agency' => 'Agence internationale',
-        'other' => 'Autre',
-    ];
-
     public function __construct(
         private readonly AuditService $audit,
         private readonly UserScopeService $scopes,
@@ -36,31 +31,25 @@ class OrganizationConfigurationController extends Controller
     public function show(Request $request): View
     {
         $this->authorizeViewing($request);
-        $progress = $this->workflows->resolve($request);
-        $this->workflows->restoreDraft($request, $progress, 1);
-        $completed = collect($progress->completed_steps ?? [])->map(fn ($value) => (int) $value);
         $organizations = $this->scopes->organizations($request->user())
-            ->withCount('missions')
+            ->with(['countries', 'users' => fn ($query) => $query->whereHas(
+                'roles', fn ($roles) => $roles->where('code', GovernanceService::COORDINATION_ADMIN),
+            )->oldest()])
+            ->withCount(['missions', 'projects' => fn ($query) => $query->where('is_active', true)])
             ->orderBy('name')
             ->get();
         $editing = $request->filled('edit')
             ? $organizations->firstWhere('id', $request->input('edit')) ?? abort(404)
             : null;
 
-        return view('configuration.index', [
+        return view('configuration.organizations', [
             'activeModule' => 'configuration',
-            'activeStep' => 1,
-            'completedSteps' => $completed,
-            'stepStates' => $this->workflows->states($progress),
-            'workflow' => $progress,
-            'organization' => $progress->scope_id
-                ? $organizations->firstWhere('id', $progress->scope_id)
-                : null,
             'organizations' => $organizations,
             'editingOrganization' => $editing,
-            'organizationTypes' => self::TYPES,
-            'canManageOrganizations' => $request->user()?->hasPermission('organizations.manage') ?? false,
+            'canManageOrganizations' => app(GovernanceService::class)->roleCode($request->user())
+                === GovernanceService::SAGO_ADMIN,
             'countries' => Country::query()->where('is_active', true)->orderBy('name')->get(),
+            'languages' => config('pharmacare_languages.catalog', []),
         ]);
     }
 
@@ -70,8 +59,30 @@ class OrganizationConfigurationController extends Controller
         $progress = $this->workflows->resolve($request);
         $data = $this->validated($request);
 
-        $organization = DB::transaction(function () use ($request, $data, $progress): Organization {
+        [$organization, $administrator, $temporaryPassword] = DB::transaction(function () use ($request, $data, $progress): array {
             $model = Organization::create($this->payload($request, $data));
+            $model->countries()->sync($data['country_ids']);
+            $temporaryPassword = $data['activation_mode'] === 'invitation'
+                ? Str::password(16, symbols: true)
+                : $data['admin_password'];
+            $administrator = User::create([
+                'organization_id' => $model->id,
+                'name' => trim($data['admin_first_name'].' '.$data['admin_last_name']),
+                'first_name' => trim($data['admin_first_name']),
+                'last_name' => trim($data['admin_last_name']),
+                'email' => strtolower($data['admin_email']),
+                'phone' => $data['admin_phone'] ?? null,
+                'username' => strtolower($data['admin_username']),
+                'password' => $temporaryPassword,
+                'is_active' => $data['admin_status'] === 'active',
+                'must_change_password' => true,
+            ]);
+            $role = Role::query()->where('code', GovernanceService::COORDINATION_ADMIN)
+                ->where('is_active', true)->firstOrFail();
+            $administrator->roles()->attach($role, [
+                'scope_type' => 'organization',
+                'scope_id' => $model->id,
+            ]);
             $this->workflows->complete($progress, 1);
             $version = ((int) SetupProgress::query()
                 ->where('scope_type', 'organization')
@@ -84,7 +95,7 @@ class OrganizationConfigurationController extends Controller
                 'version' => $version,
             ]);
 
-            return $model;
+            return [$model, $administrator, $temporaryPassword];
         });
 
         $this->audit->record(
@@ -94,11 +105,16 @@ class OrganizationConfigurationController extends Controller
             [],
             $organization->only(['code', 'name', 'organization_type', 'country_code', 'is_active']),
         );
+        $this->audit->record($request, 'configuration.organization.coordination_admin_created', $administrator, [], [
+            'organization_id' => $organization->id,
+            'role' => GovernanceService::COORDINATION_ADMIN,
+        ]);
 
         return redirect()->route(
             'configuration.organization',
             $this->workflows->requestParameters($request, $progress),
-        )->with('success', 'Organisation ajoutée avec succès.');
+        )->with('success', 'Organisation et Admin Coordination créés avec succès.')
+            ->with('temporary_password', $data['activation_mode'] === 'invitation' ? $temporaryPassword : null);
     }
 
     public function update(Request $request, Organization $organization): RedirectResponse
@@ -110,6 +126,7 @@ class OrganizationConfigurationController extends Controller
 
         DB::transaction(function () use ($request, $organization, $data): void {
             $organization->update($this->payload($request, $data, $organization));
+            $organization->countries()->sync($data['country_ids']);
         });
         $this->audit->record(
             $request,
@@ -141,24 +158,39 @@ class OrganizationConfigurationController extends Controller
 
     private function validated(Request $request, ?Organization $organization = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'name' => ['required', 'string', 'max:160'],
-            'organization_type' => ['required', Rule::in(array_keys(self::TYPES))],
-            'country_code' => ['required', 'string', 'size:2', 'exists:countries,iso2'],
+            'geographic_access_type' => ['required', Rule::in(['single_country', 'multi_country'])],
+            'country_ids' => ['required', 'array', 'min:1'],
+            'country_ids.*' => ['required', 'uuid', 'distinct', 'exists:countries,id'],
             'code' => [
                 'required', 'alpha_dash', 'max:40',
                 Rule::unique('organizations', 'code')->ignore($organization?->id),
             ],
             'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
-            'address' => ['nullable', 'string', 'max:1000'],
             'phone' => ['nullable', 'string', 'max:40', 'regex:/^[0-9+().\\s-]+$/'],
             'email' => ['nullable', 'email:rfc', 'max:190'],
-            'default_language' => ['required', Rule::in(['fr', 'en'])],
-            'manager_name' => ['required', 'string', 'max:160'],
-            'manager_title' => ['required', 'string', 'max:160'],
+            'default_language' => ['required', Rule::in(array_keys(config('pharmacare_languages.catalog', [])))],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'description' => ['nullable', 'string', 'max:3000'],
+            'admin_first_name' => [Rule::requiredIf($organization === null), 'nullable', 'string', 'max:80'],
+            'admin_last_name' => [Rule::requiredIf($organization === null), 'nullable', 'string', 'max:80'],
+            'admin_email' => [Rule::requiredIf($organization === null), 'nullable', 'email:rfc', 'max:190', Rule::unique('users', 'email')],
+            'admin_phone' => ['nullable', 'string', 'max:40', 'regex:/^[0-9+().\\s-]+$/'],
+            'admin_username' => [Rule::requiredIf($organization === null), 'nullable', 'alpha_dash', 'max:80', Rule::unique('users', 'username')],
+            'activation_mode' => [Rule::requiredIf($organization === null), 'nullable', Rule::in(['temporary_password', 'invitation'])],
+            'admin_password' => [Rule::requiredIf($organization === null && $request->input('activation_mode') === 'temporary_password'), 'nullable', 'string', 'min:10', 'confirmed'],
+            'admin_status' => [Rule::requiredIf($organization === null), 'nullable', Rule::in(['active', 'inactive'])],
         ]);
+
+        if (($data['geographic_access_type'] ?? null) === 'single_country'
+            && count($data['country_ids'] ?? []) !== 1) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'country_ids' => 'Une organisation Unipays doit avoir exactement un pays principal.',
+            ]);
+        }
+
+        return $data;
     }
 
     private function payload(
@@ -176,16 +208,16 @@ class OrganizationConfigurationController extends Controller
         return [
             'name' => trim($data['name']),
             'legal_name' => trim($data['name']),
-            'organization_type' => $data['organization_type'],
-            'country_code' => strtoupper($data['country_code']),
+            'organization_type' => $organization?->organization_type ?? 'other',
+            'country_code' => $data['geographic_access_type'] === 'single_country'
+                ? Country::query()->whereKey($data['country_ids'][0])->value('iso2')
+                : null,
+            'geographic_access_type' => $data['geographic_access_type'],
             'code' => strtoupper($data['code']),
             'logo_path' => $logoPath,
-            'address' => $data['address'] ?? null,
             'phone' => $data['phone'] ?? null,
             'email' => $data['email'] ?? null,
             'default_language' => $data['default_language'],
-            'manager_name' => trim($data['manager_name']),
-            'manager_title' => trim($data['manager_title']),
             'description' => $data['description'] ?? null,
             'is_active' => $data['status'] === 'active',
         ];
@@ -210,6 +242,10 @@ class OrganizationConfigurationController extends Controller
 
     private function authorizeOwner(Request $request): void
     {
-        abort_unless($request->user()?->hasPermission('organizations.manage'), 403);
+        abort_unless(
+            ($request->user()?->hasPermission('organizations.manage') ?? false)
+                || app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::SAGO_ADMIN,
+            403,
+        );
     }
 }

@@ -16,13 +16,13 @@ class Organization extends Model
     protected $keyType = 'string';
     protected $fillable = [
         'code', 'name', 'legal_name', 'organization_type', 'logo_path',
-        'email', 'phone', 'country_code', 'geographic_access_type', 'default_language', 'address',
+        'email', 'phone', 'country_code', 'geographic_access_type', 'default_language', 'additional_languages', 'address',
         'manager_name', 'manager_title', 'description', 'is_active',
     ];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return ['is_active' => 'boolean', 'additional_languages' => 'array'];
     }
 
     public function missions(): HasMany
@@ -62,4 +62,6 @@ class Organization extends Model
     public function batches(): HasMany { return $this->hasMany(Batch::class); }
     public function kits(): HasMany { return $this->hasMany(Kit::class); }
     public function standardLists(): HasMany { return $this->hasMany(StandardList::class); }
+    public function platformStandardAssignments(): HasMany { return $this->hasMany(PlatformStandardAssignment::class); }
+    public function effectiveConfigurations(): HasMany { return $this->hasMany(OrganizationEffectiveConfiguration::class); }
 }

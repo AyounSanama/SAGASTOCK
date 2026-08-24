@@ -38,10 +38,10 @@ class GovernanceMatrixTest extends TestCase
 
         $this->assertSame(['project_admin', 'site_admin'], $governance->assignableCodes($coordination));
         $this->assertSame(['site_admin'], $governance->assignableCodes($projectAdmin));
-        $this->assertSame([], $governance->assignableCodes($siteAdmin));
+        $this->assertSame(['site_user'], $governance->assignableCodes($siteAdmin));
         $this->assertEqualsCanonicalizing(['project_admin', 'site_admin'], $scopes->assignableRoles($coordination)->pluck('code')->all());
         $this->assertSame(['site_admin'], $scopes->assignableRoles($projectAdmin)->pluck('code')->all());
-        $this->assertSame([], $scopes->assignableRoles($siteAdmin)->pluck('code')->all());
+        $this->assertSame(['site_user'], $scopes->assignableRoles($siteAdmin)->pluck('code')->all());
     }
 
     public function test_official_role_cannot_bypass_assignment_matrix_with_a_platform_pivot(): void
@@ -105,7 +105,9 @@ class GovernanceMatrixTest extends TestCase
         Sanctum::actingAs($this->actor('site_admin', 'site', $site->id));
         $this->getJson('/api/v1/assignable-roles')
             ->assertOk()
-            ->assertExactJson(['roles' => []]);
+            ->assertJsonCount(1, 'roles')
+            ->assertJsonPath('roles.0.code', 'site_user')
+            ->assertJsonPath('roles.0.scope_type', 'site');
     }
 
     public function test_sago_admin_can_assign_only_coordination_admin(): void
@@ -172,30 +174,30 @@ class GovernanceMatrixTest extends TestCase
         $coordination = collect($navigation->mobileItems(
             $this->actor('coordination_admin', 'organization', $organization->id)
         ))->pluck('key');
-        foreach (['dashboard', 'users', 'standard-lists', 'products', 'stocks', 'receipts', 'dispensing', 'inventories', 'orders', 'reports', 'synchronization', 'activity_logs', 'profile'] as $key) {
+        foreach (['dashboard', 'missions', 'standard-lists', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'synchronization', 'profile'] as $key) {
             $this->assertTrue($coordination->contains($key), "Coordination menu is missing {$key}");
         }
-        foreach (['configuration','organizations','missions','projects','funding','facilities','sites','settings'] as $key) $this->assertFalse($coordination->contains($key));
+        foreach (['configuration','organizations','projects','funding','facilities','sites','users','products','stocks','inventories','orders','settings','activity_logs'] as $key) $this->assertFalse($coordination->contains($key));
         $this->assertTrue($coordination->contains('receipts'));
         $this->assertTrue($coordination->contains('dispensing'));
 
         $projectMenu = collect($navigation->mobileItems(
             $this->actor('project_admin', 'project', $project->id)
         ))->pluck('key');
-        foreach (['dashboard', 'organizations', 'facilities', 'sites', 'users', 'standard-lists', 'products', 'stocks', 'inventories', 'orders', 'reports', 'synchronization', 'project_settings', 'activity_logs', 'profile'] as $key) {
+        foreach (['dashboard', 'projects', 'standard-lists', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'synchronization', 'profile'] as $key) {
             $this->assertTrue($projectMenu->contains($key), "Project menu is missing {$key}");
         }
-        foreach (['configuration', 'missions', 'projects', 'funding', 'settings', 'site_settings', 'receipts', 'dispensing'] as $key) {
+        foreach (['configuration', 'organizations', 'missions', 'funding', 'facilities', 'sites', 'users', 'products', 'stocks', 'inventories', 'orders', 'settings', 'project_settings', 'site_settings', 'activity_logs'] as $key) {
             $this->assertFalse($projectMenu->contains($key), "Project menu must not contain {$key}");
         }
 
         $siteMenu = collect($navigation->mobileItems(
             $this->actor('site_admin', 'site', $site->id)
         ))->pluck('key');
-        foreach (['dashboard', 'products', 'stocks', 'receipts', 'dispensing', 'inventories', 'orders', 'reports', 'synchronization', 'site_settings', 'local_activity_logs', 'profile'] as $key) {
+        foreach (['dashboard', 'standard-lists', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'synchronization', 'profile'] as $key) {
             $this->assertTrue($siteMenu->contains($key), "Site menu is missing {$key}");
         }
-        foreach (['configuration', 'organizations', 'missions', 'projects', 'funding', 'facilities', 'sites', 'users', 'standard-lists', 'settings', 'project_settings', 'activity_logs'] as $key) {
+        foreach (['configuration', 'organizations', 'missions', 'projects', 'funding', 'facilities', 'sites', 'users', 'products', 'stocks', 'inventories', 'orders', 'settings', 'project_settings', 'site_settings', 'activity_logs', 'local_activity_logs'] as $key) {
             $this->assertFalse($siteMenu->contains($key), "Site menu must not contain {$key}");
         }
 
@@ -207,6 +209,7 @@ class GovernanceMatrixTest extends TestCase
                     'project_settings', 'site_settings' => 'settings',
                     'local_activity_logs' => 'activity_logs',
                     'standard-lists' => 'standard_lists',
+                    'inventory-orders' => 'inventories',
                     default => $key,
                 };
                 $this->assertTrue($icons->has($iconKey), "Material icon is missing for {$key}");
@@ -224,12 +227,12 @@ class GovernanceMatrixTest extends TestCase
 
         $keys = collect(app(\App\Services\ApplicationNavigationService::class)->items($coordination))->pluck('key');
         $this->assertFalse($keys->contains('users'));
-        $this->assertTrue($keys->contains('stocks'));
+        $this->assertTrue($keys->contains('receipts'));
 
         $response = $this->actingAs($coordination)->get('/dashboard')->assertOk();
         $response->assertSee('class="permission-navigation"', false)
             ->assertDontSee('href="'.route('users.index').'"', false)
-            ->assertSee('href="'.route('modules.stocks').'"', false);
+            ->assertSee('href="'.route('modules.receipts').'"', false);
 
         $sidebar = file_get_contents(resource_path('views/components/app-sidebar.blade.php'));
         $this->assertStringNotContainsString('$roleCode', $sidebar);
@@ -288,17 +291,18 @@ class GovernanceMatrixTest extends TestCase
         Sanctum::actingAs($owner);
         $ownerWidgets = collect($this->getJson('/api/v1/dashboard')->assertOk()->json('widgets'))->pluck('key');
         $this->assertTrue($ownerWidgets->contains('organizations'));
-        $this->assertTrue($ownerWidgets->contains('users_active'));
+        $this->assertFalse($ownerWidgets->contains('users_active'));
         $this->assertFalse($ownerWidgets->contains('stock_quantity'));
         $this->assertTrue(collect($navigation->mobileItems($owner))->pluck('key')->contains('configuration'));
 
         $coordination = $this->actor('coordination_admin', 'organization', $organization->id);
         $coordinationMenu = collect($navigation->mobileItems($coordination))->pluck('key')->values();
         $this->assertSame('dashboard', $coordinationMenu->get(0));
+        $this->assertSame('missions', $coordinationMenu->get(1));
         Sanctum::actingAs($coordination);
         $coordinationWidgets = collect($this->getJson('/api/v1/dashboard')->assertOk()->json('widgets'))->pluck('key');
-        $this->assertFalse($coordinationWidgets->contains('missions'));
-        $this->assertFalse($coordinationWidgets->contains('projects'));
+        $this->assertTrue($coordinationWidgets->contains('missions'));
+        $this->assertTrue($coordinationWidgets->contains('projects'));
         $this->assertFalse($coordinationWidgets->contains('sites'));
 
         Sanctum::actingAs($this->actor('project_admin', 'project', $project->id));

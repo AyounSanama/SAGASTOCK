@@ -13,7 +13,7 @@ class Country extends Model
 
     public $incrementing = false;
     protected $keyType = 'string';
-    protected $fillable = ['iso2', 'name', 'is_active'];
+    protected $fillable = ['iso2', 'iso3', 'name', 'is_active'];
 
     protected function casts(): array
     {

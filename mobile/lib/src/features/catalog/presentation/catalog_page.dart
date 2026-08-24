@@ -152,7 +152,7 @@ class _CatalogPageState extends State<CatalogPage>
 
   Future<void> _confirmAction(Map<String, dynamic> item) async {
     final archived = _status == 'archived';
-    final accepted = await showDialog<bool>(
+    final accepted = await showAppDialogAsFormSheet<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
@@ -902,6 +902,10 @@ class _CatalogPageState extends State<CatalogPage>
                     ],
                   ),
                 ),
+                if (item['_sync_status'] != null) ...[
+                  const SizedBox(width: 8),
+                  _SyncStatusBadge(status: '${item['_sync_status']}'),
+                ],
               ],
             ),
             if (_canManage) ...[
@@ -934,6 +938,45 @@ class _CatalogPageState extends State<CatalogPage>
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SyncStatusBadge extends StatelessWidget {
+  const _SyncStatusBadge({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, icon, color) = switch (status) {
+      'conflict' => ('Conflit', Icons.warning_amber_rounded, Colors.deepOrange),
+      'failed' => ('Échec', Icons.error_outline_rounded, Colors.red),
+      'synced' => ('Synchronisé', Icons.cloud_done_outlined, Colors.green),
+      _ => ('En attente', Icons.cloud_upload_outlined, Colors.orange),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

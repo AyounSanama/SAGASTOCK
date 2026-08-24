@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +7,7 @@ import 'src/app.dart';
 import 'src/core/routing/app_router.dart';
 import 'src/core/access/application_access.dart';
 import 'src/features/auth/data/auth_service.dart';
+import 'src/core/sync/sync_bootstrap.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +20,7 @@ Future<void> main() async {
   );
   final router = createAppRouter(initialLocation: initialLocation);
   runApp(ProviderScope(child: SagaStockApp(router: router)));
+  unawaited(SyncBootstrap.startForCachedSession());
 }
 
 Future<String> _resolveInitialLocation() async {

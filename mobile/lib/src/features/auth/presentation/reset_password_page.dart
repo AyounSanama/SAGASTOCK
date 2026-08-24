@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_password_field.dart';
 import 'package:go_router/go_router.dart';
 import '../data/auth_service.dart';
 
@@ -87,22 +88,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                TextField(
+                AppPasswordField(
                   controller: _password,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Nouveau mot de passe',
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Nouveau mot de passe',
                 ),
                 const SizedBox(height: 14),
-                TextField(
+                AppPasswordField(
                   controller: _confirmation,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirmer le mot de passe',
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Confirmer le mot de passe',
                 ),
                 if (_error != null)
                   Padding(

@@ -8,7 +8,7 @@
     <title>@yield('title', 'PharmaCare')</title>
     <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0,0">
-    <link rel="stylesheet" href="{{ asset('css/pharmacare-portal.css') }}">
+    <link rel="stylesheet" href="/css/pharmacare-portal.css?v={{ filemtime(public_path('css/pharmacare-portal.css')) }}">
     @stack('styles')
 </head>
 
@@ -17,12 +17,16 @@
         @include('components.navigation.sidebar')
         <div class="portal-workspace">
             <main class="portal-content">
-                @include('components.navigation.breadcrumb')
-                @yield('content')
+                <x-app-page-layout>
+                    @unless(trim($__env->yieldContent('hide-breadcrumb')) === '1')
+                        @include('components.navigation.breadcrumb')
+                    @endunless
+                    @yield('content')
+                </x-app-page-layout>
             </main>
         </div>
     </div>
-    <script src="{{ asset('js/pharmacare-portal.js') }}"></script>
+    <script src="/js/pharmacare-portal.js?v={{ filemtime(public_path('js/pharmacare-portal.js')) }}"></script>
     @stack('scripts')
 </body>
 

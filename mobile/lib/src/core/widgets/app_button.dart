@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../theme/app_tokens.dart';
 
 enum AppButtonVariant {
   add,
@@ -216,7 +217,7 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final callback = loading ? null : onPressed;
     final color = _color;
-    final height = compact ? 44.0 : 50.0;
+    final height = AppSizes.buttonHeight;
     final foreground = _filled ? Colors.white : color;
     final disabledForeground = const Color(0xFF98A2B3);
     final content = loading
@@ -232,28 +233,28 @@ class AppButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null && !trailingIcon) ...[
-                Icon(icon, size: 19),
-                const SizedBox(width: 9),
+                Icon(icon, size: 18),
+                const SizedBox(width: AppSpacing.sm),
               ],
               Flexible(child: Text(label, textAlign: TextAlign.center)),
               if (icon != null && trailingIcon) ...[
-                const SizedBox(width: 9),
-                Icon(icon, size: 19),
+                const SizedBox(width: AppSpacing.sm),
+                Icon(icon, size: 18),
               ],
             ],
           );
 
     final style = ButtonStyle(
-      minimumSize: WidgetStatePropertyAll(Size(compact ? 48 : 96, height)),
+      minimumSize: WidgetStatePropertyAll(Size(compact ? 44 : 96, height)),
       padding: WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: compact ? 14 : 20, vertical: 11),
+        EdgeInsets.symmetric(horizontal: compact ? 12 : 18, vertical: 9),
       ),
       elevation: const WidgetStatePropertyAll(0),
       shape: WidgetStatePropertyAll(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
       ),
       textStyle: const WidgetStatePropertyAll(
-        TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        AppTypography.button,
       ),
       foregroundColor: WidgetStateProperty.resolveWith(
         (states) =>
@@ -316,8 +317,8 @@ extension on AppActionColor {
   };
 }
 
-class AppIconAction extends StatelessWidget {
-  const AppIconAction({
+class AppIconButton extends StatelessWidget {
+  const AppIconButton({
     super.key,
     required this.icon,
     required this.tooltip,
@@ -339,10 +340,10 @@ class AppIconAction extends StatelessWidget {
       tooltip: tooltip,
       onPressed: loading ? null : onPressed,
       style: ButtonStyle(
-        minimumSize: const WidgetStatePropertyAll(Size.square(44)),
-        fixedSize: const WidgetStatePropertyAll(Size.square(44)),
+        minimumSize: const WidgetStatePropertyAll(Size.square(AppSizes.iconButton)),
+        fixedSize: const WidgetStatePropertyAll(Size.square(AppSizes.iconButton)),
         shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         ),
         backgroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled)
@@ -364,10 +365,13 @@ class AppIconAction extends StatelessWidget {
                 color: actionColor,
               ),
             )
-          : Icon(icon, size: 22),
+          : Icon(icon, size: AppSizes.icon),
     );
   }
 }
+
+@Deprecated('Utiliser AppIconButton. Cet alias sera supprimé après la migration.')
+typedef AppIconAction = AppIconButton;
 
 class AppFab extends StatelessWidget {
   const AppFab({

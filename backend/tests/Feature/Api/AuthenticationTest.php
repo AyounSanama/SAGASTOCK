@@ -47,6 +47,36 @@ class AuthenticationTest extends TestCase
         ])->assertUnprocessable();
     }
 
+    public function test_user_of_inactive_organization_cannot_login_with_explicit_reason(): void
+    {
+        $organization = Organization::create([
+            'code' => 'INACTIVE-ORG',
+            'name' => 'Organisation désactivée',
+            'is_active' => false,
+        ]);
+        $user = User::factory()->create([
+            'organization_id' => $organization->id,
+            'password' => 'Secret@123',
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => $user->email,
+            'password' => 'Secret@123',
+            'device_name' => 'Test Android',
+            'device_id' => '123e4567-e89b-12d3-a456-426614174321',
+            'platform' => 'android',
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.login.0', 'L’organisation rattachée à ce compte est désactivée.');
+
+        $this->post('/login', [
+            'login' => $user->email,
+            'password' => 'Secret@123',
+        ])->assertSessionHasErrors([
+            'login' => 'L’organisation rattachée à ce compte est désactivée.',
+        ]);
+    }
+
     public function test_web_login_redirects_every_active_user_to_independent_dashboard(): void
     {
         $user = User::factory()->create(['password' => 'Secret@123', 'is_active' => true, 'must_change_password' => false]);
@@ -119,6 +149,9 @@ class AuthenticationTest extends TestCase
             'email' => $coordination->email, 'password' => 'Secret@123', 'device_name' => 'Téléphone partagé',
             'device_id' => $deviceId, 'platform' => 'android',
         ])->assertOk()->assertJsonPath('user.role', 'coordination_admin')
+            ->assertJsonFragment(['key' => 'missions'])
+            ->assertJsonFragment(['key' => 'standard-lists'])
+            ->assertJsonMissing(['key' => 'configuration'])
             ->assertJsonFragment(['key' => 'users'])->json('token');
 
         $second = $this->postJson('/api/v1/auth/login', [
@@ -133,5 +166,39 @@ class AuthenticationTest extends TestCase
             ->assertJsonMissing(['key' => 'users']);
         $this->assertDatabaseHas('devices', ['fingerprint' => $deviceId, 'user_id' => $siteAdmin->id]);
         $this->assertDatabaseMissing('devices', ['fingerprint' => $deviceId, 'user_id' => $coordination->id]);
+    }
+
+    public function test_coordination_login_returns_its_organization_and_allowed_countries(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $organization = Organization::create([
+            'code' => 'COORD-SCOPE',
+            'name' => 'Organisation Coordination',
+            'geographic_access_type' => 'single_country',
+        ]);
+        $country = \App\Models\Country::query()->where('is_active', true)->firstOrFail();
+        $organization->countries()->attach($country->id);
+        $user = User::factory()->create([
+            'password' => 'Secret@123',
+            'is_active' => true,
+            'organization_id' => $organization->id,
+        ]);
+        $user->roles()->attach(
+            Role::where('code', 'coordination_admin')->firstOrFail(),
+            ['scope_type' => 'organization', 'scope_id' => $organization->id],
+        );
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => $user->email,
+            'password' => 'Secret@123',
+            'device_name' => 'Test Android',
+            'device_id' => '123e4567-e89b-12d3-a456-426614174777',
+            'platform' => 'android',
+        ])->assertOk()
+            ->assertJsonPath('user.organization_id', $organization->id)
+            ->assertJsonPath('user.organization.id', $organization->id)
+            ->assertJsonPath('user.organization.name', $organization->name)
+            ->assertJsonPath('user.organization.countries.0.id', $country->id)
+            ->assertJsonPath('user.organization.countries.0.iso2', $country->iso2);
     }
 }

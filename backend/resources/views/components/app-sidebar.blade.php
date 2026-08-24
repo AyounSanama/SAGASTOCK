@@ -3,30 +3,33 @@
     $navigationItems = $actor ? app(\App\Services\ApplicationNavigationService::class)->items($actor) : [];
     $materialIcons = config('pharmacare_ui.module_icons', []);
     $activeNavigationItem = collect($navigationItems)->first(fn ($item) => $item['route'] && (request()->routeIs($item['route']) || request()->routeIs($item['route'].'*')));
-    $showGlobalBack = !request()->routeIs('dashboard') && !request()->routeIs('configuration.index');
-    $topbarContext = $activeNavigationItem['label'] ?? trim($__env->yieldContent('page-title')) ?: 'PharmaCare';
+    $isSagoAdmin = $actor && app(\App\Services\GovernanceService::class)->roleCode($actor) === \App\Services\GovernanceService::SAGO_ADMIN;
+    $sagoConfigurationOpen = request()->routeIs('configuration.*') || request()->routeIs('organizations.*');
+    $sagoStandardsOpen = request()->routeIs('configuration.platform-standards.*');
+    $standardsTab = request()->routeIs('configuration.platform-standards.history.*') ? 'history' : request('tab', 'assistance');
 @endphp
 <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0,0">
+<link rel="stylesheet" href="/css/pharmacare-portal.css?v={{ filemtime(public_path('css/pharmacare-portal.css')) }}">
 <style>
     :root {
-        --pc-orange: #F57C00;
-        --pc-orange-dark: #C86500;
-        --pc-blue: #24324A;
-        --pc-green: #22A447;
-        --pc-red: #E53935;
-        --pc-purple: #6B778C;
-        --pc-gray: #6B778C;
-        --pc-navy: #24324A;
-        --pc-navy-2: #24324A;
-        --pc-ink: #24324A;
-        --pc-muted: #6B778C;
-        --pc-border: #E8EDF3;
-        --pc-surface: #F7F9FC;
-        --pc-white: #fff;
-        --pc-radius: 14px;
-        --pc-shadow: 0 12px 30px rgba(20, 39, 74, .08);
-        --pc-sidebar: 272px;
+        --pc-orange: var(--pc-color-primary);
+        --pc-orange-dark: var(--pc-color-primary-dark);
+        --pc-blue: var(--pc-color-text);
+        --pc-green: var(--pc-color-success);
+        --pc-red: var(--pc-color-danger);
+        --pc-purple: var(--pc-color-purple);
+        --pc-gray: var(--pc-color-text-muted);
+        --pc-navy: var(--pc-color-text);
+        --pc-navy-2: var(--pc-color-text);
+        --pc-ink: var(--pc-color-text);
+        --pc-muted: var(--pc-color-text-muted);
+        --pc-border: var(--pc-color-border);
+        --pc-surface: var(--pc-color-background);
+        --pc-white: var(--pc-color-surface);
+        --pc-radius: var(--pc-radius-lg);
+        --pc-shadow: var(--pc-shadow-card);
+        --pc-sidebar: var(--pc-layout-sidebar-open);
     }
 
     * {
@@ -39,7 +42,7 @@
 
     body:not(.portal-body) {
         margin: 0 !important;
-        padding: 76px 0 0 var(--pc-sidebar) !important;
+        padding: var(--pc-layout-topbar) 0 0 var(--pc-sidebar) !important;
         background: var(--pc-surface) !important;
         color: var(--pc-ink) !important;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
@@ -50,7 +53,7 @@
     /* Le portail et les pages historiques partagent exactement le même repère. */
     body.portal-body {
         margin: 0 !important;
-        padding: 76px 0 0 var(--pc-sidebar) !important;
+        padding: var(--pc-layout-topbar) 0 0 var(--pc-sidebar) !important;
         background: var(--pc-surface) !important;
         color: var(--pc-ink) !important;
         transition: padding-left .22s ease;
@@ -58,15 +61,15 @@
 
     body.portal-body .portal-shell,
     body.portal-body .portal-workspace {
-        min-height: calc(100vh - 76px);
+        min-height: calc(100vh - var(--pc-layout-topbar));
         margin-left: 0 !important;
     }
 
     body.portal-body .portal-content {
         width: 100% !important;
-        max-width: 1680px !important;
+        max-width: var(--pc-layout-content-max) !important;
         margin: 0 auto !important;
-        padding: 24px 28px 40px !important;
+        padding: 0 !important;
     }
 
     body>a.app-mobile-brand {
@@ -213,7 +216,7 @@
         outline-offset: 2px
     }
 
-    body button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not([class*="btn-"]),
+    body button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not(.nav-group-toggle):not(.oa-configure):not([class*="btn-"]),
     body .button:not(.secondary):not(.danger):not(.success):not([class*="btn-"]),
     body .btn-primary {
         background: var(--pc-orange) !important;
@@ -539,7 +542,7 @@
     }
 
     .app-brand {
-        height: 76px;
+        height: var(--pc-layout-topbar);
         display: flex;
         align-items: center;
         gap: 12px;
@@ -585,9 +588,18 @@
     }
 
     .app-sidebar-scroll {
+        flex: 1 1 auto;
+        min-width: 0;
         padding: 14px 12px 18px;
         overflow-y: auto;
-        overscroll-behavior: contain
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+        scrollbar-width: none
+    }
+
+    .app-sidebar-scroll::-webkit-scrollbar {
+        width: 0;
+        height: 0
     }
 
     .app-sidebar-scroll>.permission-navigation~* {
@@ -606,7 +618,8 @@
 
     .app-sidebar nav {
         display: grid;
-        gap: 4px
+        gap: 4px;
+        min-width: 0
     }
 
     .app-sidebar nav a {
@@ -614,7 +627,7 @@
         min-height: 45px;
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
         padding: 10px 12px;
         border-radius: 9px;
         color: var(--pc-ink);
@@ -679,7 +692,7 @@
         border: 0 !important;
         border-radius: 11px !important;
         background: transparent !important;
-        color: #DDE8F6 !important;
+        color: var(--pc-ink) !important;
         box-shadow: none !important;
         display: flex !important;
         align-items: center !important;
@@ -691,8 +704,14 @@
     }
 
     .nav-group-toggle:hover {
-        background: rgba(255, 255, 255, .1) !important;
-        color: #fff !important
+        background: #F4F6F9 !important;
+        color: var(--pc-ink) !important
+    }
+
+    .nav-group.open>.nav-group-toggle,
+    .nav-group-toggle.active {
+        background: #FFF3E8 !important;
+        color: var(--pc-orange) !important
     }
 
     .nav-group-chevron {
@@ -701,18 +720,18 @@
         transition: transform .2s ease
     }
 
-    .nav-group.open .nav-group-chevron {
+    .nav-group.open>.nav-group-toggle>.nav-group-chevron {
         transform: rotate(180deg)
     }
 
     .nav-group-items {
         display: none;
-        margin: 2px 0 5px 34px;
-        padding-left: 9px;
-        border-left: 1px solid rgba(255, 255, 255, .14)
+        margin: 2px 0 5px 12px;
+        padding-left: 8px;
+        border-left: 1px solid #E8EDF3
     }
 
-    .nav-group.open .nav-group-items {
+    .nav-group.open>.nav-group-items {
         display: grid;
         gap: 3px
     }
@@ -721,12 +740,34 @@
         min-height: 38px !important;
         padding: 8px 10px !important;
         font-size: 12px !important;
-        color: #BFD0E8 !important
+        color: var(--pc-ink) !important
     }
 
     .nav-group-items a.active {
-        background: var(--pc-orange) !important;
-        color: #fff !important
+        background: #FFF8F1 !important;
+        color: var(--pc-orange) !important
+    }
+
+    .nav-group-items .nav-group {
+        min-width: 0;
+        margin-left: -8px
+    }
+
+    .nav-group-items .nav-group>.nav-group-toggle {
+        min-height: 39px !important;
+        padding: 8px 10px !important;
+        font-size: 12px !important
+    }
+
+    .nav-group-items .nav-group .nav-group-items {
+        margin-left: 12px;
+        padding-left: 8px
+    }
+
+    .nav-group-items .nav-group .nav-group-items a {
+        gap: 8px;
+        white-space: normal;
+        line-height: 1.25
     }
 
     .sidebar-collapsed .nav-group-chevron {
@@ -738,6 +779,7 @@
     }
 
     .sidebar-collapsed .nav-group-items {
+        display: none !important;
         margin-left: 0;
         padding-left: 0;
         border-left: 0
@@ -753,9 +795,9 @@
         }
 
         .mobile-menu-open .nav-group-items {
-            margin-left: 34px;
-            padding-left: 9px;
-            border-left: 1px solid rgba(255, 255, 255, .14)
+            margin-left: 12px;
+            padding-left: 8px;
+            border-left: 1px solid #E8EDF3
         }
     }
 
@@ -789,13 +831,36 @@
         box-shadow: none !important
     }
 
+    .app-account-profile {
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 11px;
+        border: 1px solid var(--pc-border);
+        border-radius: 11px;
+        color: var(--pc-ink);
+        font-size: 13px;
+        font-weight: 750
+    }
+
+    .app-account-profile:hover,
+    .app-account-profile.active {
+        background: #F7F9FC
+    }
+
+    .app-account-profile .material-symbols-outlined,
+    .logout-button .material-symbols-outlined {
+        font-size: 20px
+    }
+
     .app-shell-topbar {
         position: fixed;
         z-index: 1050;
         top: 0;
         left: var(--pc-sidebar);
         right: 0;
-        height: 76px;
+        height: var(--pc-layout-topbar);
         padding: 0 24px;
         background: rgba(255, 255, 255, .96);
         backdrop-filter: blur(12px);
@@ -807,15 +872,31 @@
     }
 
     .sidebar-toggle {
-        width: 44px;
-        height: 44px !important;
-        min-height: 44px !important;
+        width: var(--pc-size-icon-button);
+        height: var(--pc-size-icon-button) !important;
+        min-height: var(--pc-size-icon-button) !important;
         padding: 0 !important;
         background: #EEF2F7 !important;
         color: var(--pc-ink) !important;
         border: 0 !important;
         box-shadow: none !important;
         font-size: 20px !important
+    }
+
+    .topbar-brand-mark {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+    }
+
+    .topbar-brand-mark img {
+        display: block;
+        width: 38px;
+        height: 38px;
+        object-fit: contain;
     }
 
     .topbar-back {
@@ -925,7 +1006,7 @@
     }
 
     body.sidebar-collapsed {
-        --pc-sidebar: 82px
+        --pc-sidebar: var(--pc-layout-sidebar-collapsed)
     }
 
     .sidebar-collapsed .app-brand {
@@ -949,12 +1030,16 @@
     }
 
     .sidebar-collapsed .logout-button {
-        font-size: 0
+        padding-inline: 0 !important
     }
 
-    .sidebar-collapsed .logout-button:after {
-        content: "↪";
-        font-size: 18px
+    .sidebar-collapsed .app-account {
+        padding-inline: 10px
+    }
+
+    .sidebar-collapsed .app-account-profile {
+        justify-content: center;
+        padding-inline: 0
     }
 
     .form-sheet {
@@ -978,13 +1063,13 @@
         right: 0;
         top: 0;
         height: 100%;
-        width: min(var(--sheet-width, 760px), calc(100% - 24px));
+        width: min(var(--sheet-width, var(--pc-layout-form-sheet-max)), var(--pc-layout-form-sheet-max), calc(100% - 24px));
         background: #fff;
         box-shadow: -18px 0 48px rgba(9, 29, 58, .2);
         display: flex;
         flex-direction: column;
         animation: sheet-in .24s ease-out;
-        border-radius: 22px 0 0 22px
+        border-radius: var(--pc-radius-lg) 0 0 var(--pc-radius-lg)
     }
 
     .form-sheet-handle {
@@ -996,7 +1081,7 @@
         position: static !important;
         justify-content: space-between !important;
         align-items: flex-start !important;
-        padding: 24px 26px !important;
+        padding: var(--pc-space-6) !important;
         border-bottom: 1px solid var(--pc-border) !important;
         background: #fff !important
     }
@@ -1012,20 +1097,20 @@
     }
 
     .form-sheet-close {
-        width: 42px;
-        height: 42px !important;
-        min-height: 42px !important;
+        width: var(--pc-size-icon-button);
+        height: var(--pc-size-icon-button) !important;
+        min-height: var(--pc-size-icon-button) !important;
         padding: 0 !important;
         border: 1px solid var(--pc-border) !important;
-        border-radius: 12px !important;
+        border-radius: var(--pc-radius-md) !important;
         background: #F2F4F7 !important;
         color: var(--pc-ink) !important;
-        font-size: 24px !important;
+        font-size: var(--pc-size-icon) !important;
         box-shadow: none !important
     }
 
     .form-sheet-body {
-        padding: 24px 26px 32px;
+        padding: var(--pc-space-6) var(--pc-space-6) var(--pc-space-8);
         overflow-y: auto
     }
 
@@ -1035,8 +1120,8 @@
         bottom: -32px;
         background: #fff;
         border-top: 1px solid var(--pc-border) !important;
-        margin: 26px -26px -32px !important;
-        padding: 18px 26px !important;
+        margin: var(--pc-space-6) calc(-1 * var(--pc-space-6)) calc(-1 * var(--pc-space-8)) !important;
+        padding: var(--pc-space-4) var(--pc-space-6) !important;
         display: flex !important;
         justify-content: flex-end !important;
         gap: 10px !important
@@ -1070,7 +1155,7 @@
 
     @media(max-width:1050px) {
         :root {
-            --pc-sidebar: 82px
+            --pc-sidebar: var(--pc-layout-sidebar-collapsed)
         }
 
         .app-brand {
@@ -1106,7 +1191,7 @@
     @media(max-width:760px) {
         body,
         body.portal-body {
-            padding: 70px 0 0 !important
+            padding: var(--pc-layout-topbar) 0 0 !important
         }
 
         body.portal-body .portal-content {
@@ -1115,12 +1200,12 @@
 
         .app-sidebar {
             transform: translateX(-100%);
-            width: 272px
+            width: var(--pc-layout-sidebar-open)
         }
 
         .app-shell-topbar {
             left: 0;
-            height: 70px;
+            height: var(--pc-layout-topbar);
             padding: 0 14px
         }
 
@@ -1136,7 +1221,7 @@
 
         .mobile-menu-open .app-sidebar {
             transform: translateX(0);
-            width: 272px
+            width: var(--pc-layout-sidebar-open)
         }
 
         .mobile-menu-open .app-brand-copy,
@@ -1180,7 +1265,7 @@
             left: 6px;
             width: auto;
             height: min(93%, 900px);
-            border-radius: 22px 22px 0 0;
+            border-radius: var(--pc-radius-lg) var(--pc-radius-lg) 0 0;
             animation: sheet-up .24s ease-out
         }
 
@@ -1227,9 +1312,9 @@
     }
 </style>
 
-<aside class="app-sidebar" aria-label="Navigation principale">
-    <a class="app-brand" href="{{ route('dashboard') }}">
-        <img src="{{ asset('images/pharmacare-logo.png') }}?v={{ filemtime(public_path('images/pharmacare-logo.png')) }}"
+<aside id="pharmacare-sidebar" class="app-sidebar" aria-label="Navigation principale">
+    <a class="app-brand" href="{{ $isSagoAdmin ? route('sago.dashboard') : route('dashboard') }}">
+        <img src="/images/pharmacare-logo.png"
              alt="Logo PharmaCare" width="48" height="48">
         <span class="app-brand-copy">
             <strong><span class="brand-pharma">Pharma</span><span class="brand-care">Care</span></strong>
@@ -1238,63 +1323,64 @@
     </a>
 
     <div class="app-sidebar-scroll">
-        <div class="app-nav-label">Navigation</div>
         <nav class="permission-navigation">
-            @foreach ($navigationItems as $item)
-                @continue(!$item['url'])
-                @php($active = request()->routeIs($item['route']) || request()->routeIs($item['route'] . '*'))
-                <a class="{{ $active ? 'active' : '' }}" href="{{ $item['url'] }}">
-                    <span
-                        class="nav-icon material-symbols-outlined">{{ $materialIcons[$item['icon']] ?? 'circle' }}</span>
-                    <span class="nav-text">{{ $item['label'] }}</span>
+            @if($isSagoAdmin)
+                <a class="{{ request()->routeIs('sago.dashboard') ? 'active' : '' }}" href="{{ route('sago.dashboard') }}">
+                    <span class="nav-icon material-symbols-outlined">dashboard</span><span class="nav-text">Tableau de bord</span>
                 </a>
-            @endforeach
+                <div class="nav-group {{ $sagoConfigurationOpen ? 'open' : '' }}" data-nav-group>
+                    <button class="nav-group-toggle {{ $sagoConfigurationOpen ? 'active' : '' }}" type="button" aria-expanded="{{ $sagoConfigurationOpen ? 'true' : 'false' }}" aria-controls="sago-configuration-menu">
+                        <span class="nav-icon material-symbols-outlined">settings</span><span class="nav-text">Configuration</span><span class="nav-group-chevron material-symbols-outlined">expand_more</span>
+                    </button>
+                    <div id="sago-configuration-menu" class="nav-group-items">
+                        @if($actor->hasPermission('organizations.view'))
+                            <a class="{{ request()->routeIs('configuration.organization') ? 'active' : '' }}" href="{{ route('configuration.organization') }}"><span class="nav-icon material-symbols-outlined">domain</span><span class="nav-text">Organisations</span></a>
+                        @endif
+                        @if($actor->hasPermission('platform_standards.view'))
+                        <div class="nav-group {{ $sagoStandardsOpen ? 'open' : '' }}" data-nav-group>
+                            <button class="nav-group-toggle {{ $sagoStandardsOpen ? 'active' : '' }}" type="button" aria-expanded="{{ $sagoStandardsOpen ? 'true' : 'false' }}" aria-controls="sago-standards-menu">
+                                <span class="nav-icon material-symbols-outlined">workspace_premium</span><span class="nav-text">Standards &amp; Référentiels</span><span class="nav-group-chevron material-symbols-outlined">expand_more</span>
+                            </button>
+                            <div id="sago-standards-menu" class="nav-group-items">
+                                <a class="{{ $sagoStandardsOpen && $standardsTab === 'assistance' ? 'active' : '' }}" href="{{ route('configuration.platform-standards.index', ['tab' => 'assistance']) }}"><span class="nav-icon material-symbols-outlined">support_agent</span><span class="nav-text">Assistance aux organisations</span></a>
+                                <a class="{{ $sagoStandardsOpen && $standardsTab === 'history' ? 'active' : '' }}" href="{{ route('configuration.platform-standards.index', ['tab' => 'history']) }}"><span class="nav-icon material-symbols-outlined">history</span><span class="nav-text">Historique</span></a>
+                            </div>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            @else
+                @foreach ($navigationItems as $item)
+                    @continue(!$item['url'] || $item['key'] === 'profile')
+                    @php($active = request()->routeIs($item['route']) || request()->routeIs($item['route'] . '*'))
+                    <a class="{{ $active ? 'active' : '' }}" href="{{ $item['url'] }}">
+                        <span class="nav-icon material-symbols-outlined">{{ $materialIcons[$item['icon']] ?? 'circle' }}</span>
+                        <span class="nav-text">{{ $item['label'] }}</span>
+                    </a>
+                @endforeach
+            @endif
         </nav>
     </div>
 
     <div class="app-account">
-        <strong>{{ $actor?->name }}</strong>
-        <small>{{ $actor?->email }}</small>
-        <div class="app-account-meta">
-            <span class="material-symbols-outlined">shield_person</span>
-            <span>{{ $actor?->roles()->first()?->name ?? 'Utilisateur' }}</span>
-        </div>
+        <a class="app-account-profile {{ request()->routeIs('profile.*') ? 'active' : '' }}" href="{{ route('profile.show') }}"><span class="material-symbols-outlined">person</span><span class="nav-text">Mon profil</span></a>
         <form method="post" action="{{ route('logout') }}">
             @csrf
-            <button class="logout-button" aria-label="Déconnexion">Déconnexion</button>
+            <button class="logout-button" aria-label="Déconnexion"><span class="material-symbols-outlined">logout</span><span class="nav-text">Déconnexion</span></button>
         </form>
     </div>
 </aside>
 
-<header class="app-shell-topbar">
-    <button class="sidebar-toggle material-symbols-outlined" type="button"
-        aria-label="Réduire ou ouvrir le menu">menu</button>
-    @if($showGlobalBack)
-        <button class="topbar-back" type="button" data-global-back data-fallback-url="{{ route('dashboard') }}">
-            <span class="material-symbols-outlined">arrow_back</span><span>Retour</span>
-        </button>
-    @endif
-    <span class="topbar-context">{{ $topbarContext }}</span>
-    <span class="topbar-spacer"></span>
-    <a class="topbar-profile" href="{{ route('profile.show') }}">
-        <span class="profile-avatar">{{ mb_strtoupper(mb_substr($actor?->name ?? 'U', 0, 1)) }}</span>
-        <span class="topbar-profile-copy">
-            <strong>{{ $actor?->first_name ?: $actor?->name }}</strong>
-            <small>{{ $actor?->roles()->first()?->name ?? 'Utilisateur' }}</small>
-        </span>
-    </a>
-</header>
+@include('components.navigation.topbar', ['actor' => $actor])
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const body = document.body,
             toggle = document.querySelector('.sidebar-toggle');
-        document.querySelector('[data-global-back]')?.addEventListener('click', event => {
-            const fallback = event.currentTarget.dataset.fallbackUrl;
-            if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) history.back();
-            else location.assign(fallback);
-        });
         if (localStorage.getItem('pc-sidebar') === 'collapsed' && innerWidth > 760) body.classList.add(
             'sidebar-collapsed');
+        const updateToggleState = () => toggle?.setAttribute('aria-expanded',
+            body.classList.contains('sidebar-collapsed') ? 'false' : 'true');
+        updateToggleState();
         toggle?.addEventListener('click', () => {
             if (innerWidth <= 760) {
                 body.classList.toggle('mobile-menu-open');
@@ -1303,6 +1389,7 @@
             body.classList.toggle('sidebar-collapsed');
             localStorage.setItem('pc-sidebar', body.classList.contains('sidebar-collapsed') ?
                 'collapsed' : 'expanded');
+            updateToggleState();
         });
         document.querySelectorAll('[data-nav-group]').forEach(group => {
             const groupToggle = group.querySelector('.nav-group-toggle');

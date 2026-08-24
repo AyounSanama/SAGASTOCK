@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/data/auth_service.dart';
 import '../access/application_access.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_tokens.dart';
 import 'pharmacare_wordmark.dart';
 
 /// Sidebar unique, alimentée exclusivement par le manifeste de permissions.
@@ -52,11 +53,11 @@ class _BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 14),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, AppSpacing.md),
       child: Row(
         children: [
           Image.asset('assets/images/pharmacare-logo.png', width: 52),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           const Expanded(
             child: PharmaCareWordmark(fontSize: 19, textAlign: TextAlign.start),
           ),
@@ -77,10 +78,10 @@ class _NavigationTile extends StatelessWidget {
     final selected =
         location == item.path || location.startsWith('${item.path}/');
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
       decoration: BoxDecoration(
         color: selected ? AppTheme.orangeSoft : Colors.transparent,
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border(
           left: BorderSide(
             color: selected ? AppTheme.orange : Colors.transparent,
@@ -95,7 +96,7 @@ class _NavigationTile extends StatelessWidget {
         selectedColor: AppTheme.orange,
         iconColor: selected ? AppTheme.orange : AppTheme.gray,
         textColor: selected ? AppTheme.orange : AppTheme.ink,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
         leading: Icon(item.icon),
         title: Text(
           item.label,

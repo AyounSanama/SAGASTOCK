@@ -157,7 +157,7 @@ class _FacilitiesPageState extends State<FacilitiesPage>
     required String message,
     required String action,
   }) async {
-    return await showDialog<bool>(
+    return await showAppDialogAsFormSheet<bool>(
           context: context,
           builder: (context) => AlertDialog(
             icon: const Icon(
@@ -590,7 +590,7 @@ class _FacilityDetailsPageState extends State<FacilityDetailsPage> {
     Map<String, dynamic> child,
   ) async {
     final confirmed =
-        await showDialog<bool>(
+        await showAppDialogAsFormSheet<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: Text('Archiver ${child['name']} ?'),

@@ -2,9 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/database/app_database.dart';
+import '../../../core/sync/sync_bootstrap.dart';
+import '../../configuration/data/effective_configuration_service.dart';
 
 class AuthService {
   AuthService({ApiClient? client, FlutterSecureStorage? storage})
@@ -17,6 +21,7 @@ class AuthService {
       _userKey = 'cached_user',
       _authenticatedAtKey = 'authenticated_at',
       _offlineVerifierKey = 'offline_password_verifier';
+  static const _maximumOfflineSession = Duration(days: 30);
 
   Future<bool> hasSession() async {
     final token = await _storage.read(key: _tokenKey);
@@ -92,6 +97,16 @@ class AuthService {
     );
     user['session_mode'] = 'online';
     await _storage.write(key: _userKey, value: jsonEncode(user));
+    try {
+      await EffectiveConfigurationService(
+        client: _client,
+        storage: _storage,
+      ).refresh();
+    } catch (_) {
+      // Une configuration distante indisponible ne doit jamais empêcher la
+      // première ouverture ni le fonctionnement Offline-First.
+    }
+    await SyncBootstrap.startForCachedSession();
     return user;
   }
 
@@ -114,6 +129,7 @@ class AuthService {
     if (user == null ||
         token == null ||
         expected == null ||
+        !await _offlineSessionIsValid() ||
         (normalized != cachedLogin && normalized != cachedUsername) ||
         actual != expected) {
       throw const OfflineAuthenticationException();
@@ -163,7 +179,18 @@ class AuthService {
     final user = await cachedUser();
     final token = await _storage.read(key: _tokenKey);
     final expected = await _storage.read(key: _offlineVerifierKey);
-    return user != null && token != null && expected != null;
+    return user != null &&
+        token != null &&
+        expected != null &&
+        await _offlineSessionIsValid();
+  }
+
+  Future<bool> _offlineSessionIsValid() async {
+    final value = await _storage.read(key: _authenticatedAtKey);
+    final authenticatedAt = value == null ? null : DateTime.tryParse(value);
+    if (authenticatedAt == null) return false;
+    return DateTime.now().toUtc().difference(authenticatedAt.toUtc()) <=
+        _maximumOfflineSession;
   }
 
   Future<void> changePassword({
@@ -206,6 +233,10 @@ class AuthService {
     final token = await _storage.read(key: _tokenKey);
     if (token != null) {
       try {
+        // Termine d'abord les écritures autorisées encore en attente. En cas
+        // d'absence réseau, elles restent dans Drift pour la prochaine
+        // authentification du même utilisateur.
+        await SyncBootstrap.syncNow();
         await _client.dio.post<void>(
           '/auth/logout',
           options: await _authorized(),
@@ -222,6 +253,7 @@ class AuthService {
   /// secure value and offline cache is identity-bound and is removed.
   Future<void> clearAuthenticatedSession({
     bool revokeRemoteToken = false,
+    bool clearLocalData = false,
   }) async {
     if (revokeRemoteToken) {
       final token = await _storage.read(key: _tokenKey);
@@ -235,6 +267,11 @@ class AuthService {
       }
     }
 
+    final previousUser = await cachedUser();
+    await SyncBootstrap.stop();
+    if (clearLocalData && !kIsWeb && previousUser?['id'] != null) {
+      await AppDatabase.shared.clearIdentityData('${previousUser!['id']}');
+    }
     final values = await _storage.readAll();
     for (final key in values.keys) {
       if (key != _deviceKey) {
@@ -262,6 +299,24 @@ class AuthService {
       };
     }
     if (error is DioException && error.response?.statusCode == 422) {
+      final data = error.response?.data;
+      if (data is Map) {
+        final errors = data['errors'];
+        if (errors is Map) {
+          for (final value in errors.values) {
+            if (value is List && value.isNotEmpty && value.first is String) {
+              return value.first as String;
+            }
+            if (value is String && value.trim().isNotEmpty) {
+              return value;
+            }
+          }
+        }
+        final message = data['message'];
+        if (message is String && message.trim().isNotEmpty) {
+          return message;
+        }
+      }
       return 'Adresse e-mail ou mot de passe incorrect.';
     }
     return 'Connexion impossible. Vérifiez le serveur et réessayez.';

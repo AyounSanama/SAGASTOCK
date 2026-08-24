@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\HealthFacility;
+use App\Models\Country;
 use App\Models\Organization;
 use App\Models\Role;
 use App\Models\Site;
@@ -25,7 +26,13 @@ class GovernanceV2SecurityTest extends TestCase
         $this->assertSame(GovernanceService::SAGO_ADMIN,app(GovernanceService::class)->roleCode($admin));
         $this->assertTrue(app(UserScopeService::class)->isPlatform($admin));
         Sanctum::actingAs($admin);
-        $this->postJson('/api/v1/organizations',['code'=>'SAGO-ORG','name'=>'Organisation Sago','organization_type'=>'ngo'])->assertCreated();
+        $country=Country::firstOrCreate(['iso2'=>'CM'],['name'=>'Cameroun','is_active'=>true]);
+        $this->postJson('/api/v1/organizations',[
+            'code'=>'SAGO-ORG','name'=>'Organisation Sago','organization_type'=>'ngo',
+            'geographic_access_type'=>'single_country','country_ids'=>[$country->id],
+            'admin_first_name'=>'Admin','admin_last_name'=>'Coordination',
+            'admin_email'=>'coordination.sago@example.test','admin_username'=>'coordination_sago',
+        ])->assertCreated();
     }
 
     public function test_coordination_is_strictly_isolated_and_cannot_create_organization():void

@@ -22,4 +22,47 @@ void main() {
     expect(message, contains('Connexion au serveur impossible'));
     expect(message, contains('port 8000'));
   });
+
+  test('le login affiche le motif fonctionnel retourné par Laravel', () {
+    final error = DioException(
+      requestOptions: RequestOptions(path: '/auth/login'),
+      response: Response<Map<String, dynamic>>(
+        requestOptions: RequestOptions(path: '/auth/login'),
+        statusCode: 422,
+        data: {
+          'message': 'The given data was invalid.',
+          'errors': {
+            'login': ['Compte temporairement verrouillé. Réessayez plus tard.'],
+          },
+        },
+      ),
+      type: DioExceptionType.badResponse,
+    );
+
+    expect(
+      AuthService.messageFor(error),
+      'Compte temporairement verrouillé. Réessayez plus tard.',
+    );
+  });
+
+  test('le login distingue une organisation désactivée', () {
+    final error = DioException(
+      requestOptions: RequestOptions(path: '/auth/login'),
+      response: Response<Map<String, dynamic>>(
+        requestOptions: RequestOptions(path: '/auth/login'),
+        statusCode: 422,
+        data: {
+          'errors': {
+            'login': ['L’organisation rattachée à ce compte est désactivée.'],
+          },
+        },
+      ),
+      type: DioExceptionType.badResponse,
+    );
+
+    expect(
+      AuthService.messageFor(error),
+      'L’organisation rattachée à ce compte est désactivée.',
+    );
+  });
 }

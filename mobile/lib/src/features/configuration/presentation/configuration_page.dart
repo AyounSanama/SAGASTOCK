@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_badge.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
+import '../../../core/widgets/app_page_header.dart';
 import '../data/configuration_service.dart';
 
 class ConfigurationPage extends StatefulWidget {
@@ -79,19 +82,9 @@ class _ConfigurationPageState extends State<ConfigurationPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
           children: [
-            Text(
-              'Configuration PharmaCare',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: AppTheme.ink,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Configurez votre organisation et démarrez un parcours indépendant pour chaque nouvel élément.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppTheme.gray),
+            const AppPageHeader(
+              title: 'Configuration PharmaCare',
+              description: 'Configurez votre organisation et démarrez un parcours indépendant pour chaque nouvel élément.',
             ),
             const SizedBox(height: 20),
             if (_loading)
@@ -269,23 +262,7 @@ class _WorkflowCard extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: (complete ? AppTheme.green : AppTheme.blue).withValues(
-                    alpha: .10,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  complete ? 'Terminé' : 'En cours',
-                  style: TextStyle(
-                    color: complete ? AppTheme.green : AppTheme.blue,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
+              AppBadge(label: complete ? 'Terminé' : 'En cours', variant: complete ? AppBadgeVariant.success : AppBadgeVariant.info),
             ],
           ),
           const SizedBox(height: 7),
@@ -327,20 +304,5 @@ class _Panel extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFE2E8F0)),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x0A0F172A),
-          blurRadius: 18,
-          offset: Offset(0, 6),
-        ),
-      ],
-    ),
-    child: child,
-  );
+  Widget build(BuildContext context) => AppCard(child: child);
 }

@@ -1,10 +1,8 @@
 @php
     $pageTitle = trim($__env->yieldContent('page-title', 'PharmaCare'));
+    $breadcrumbItems = collect([
+        ['label' => 'Tableau de bord', 'url' => route('dashboard')],
+        $pageTitle !== 'Tableau de bord' && $pageTitle !== 'PharmaCare' ? ['label' => $pageTitle] : null,
+    ])->filter()->values()->all();
 @endphp
-<nav class="portal-breadcrumb" aria-label="Fil d’Ariane">
-    <a href="{{ route('dashboard') }}">Tableau de bord</a>
-    @if($pageTitle !== 'Tableau de bord' && $pageTitle !== 'PharmaCare')
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">{{ $pageTitle }}</span>
-    @endif
-</nav>
+<x-app-breadcrumb class="portal-breadcrumb" :items="$breadcrumbItems" />

@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_form_sheet.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
 import '../data/organization_service.dart';
+import 'organization_creation_page.dart';
 
 class OrganizationsPage extends StatefulWidget {
   const OrganizationsPage({super.key});
@@ -54,7 +54,8 @@ class _OrganizationsPageState extends State<OrganizationsPage> {
     }
   }
 
-  Future<void> _create() async {
+  /* Ancien mini-formulaire conservé temporairement dans l'historique Git.
+  Future<void> _legacyCreate() async {
     final code = TextEditingController();
     final name = TextEditingController();
     final country = TextEditingController();
@@ -162,6 +163,26 @@ class _OrganizationsPageState extends State<OrganizationsPage> {
     country.dispose();
     if (saved == true) await _load();
   }
+  */
+
+  Future<void> _create() async {
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (_) => const OrganizationCreationPage()),
+    );
+    if (result == null || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    final temporaryPassword = result['temporary_password'];
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          temporaryPassword == null
+              ? 'Organisation créée avec succès.'
+              : 'Organisation créée. Mot de passe temporaire : $temporaryPassword',
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,9 +200,9 @@ class _OrganizationsPageState extends State<OrganizationsPage> {
           children: [
             Text(
               'Organisations',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             Text(
@@ -278,38 +299,38 @@ class _OrganizationCard extends StatelessWidget {
           children: [
             Row(
               children: [
-              CircleAvatar(
-                radius: 24,
-                child: Text(name.substring(0, 1).toUpperCase()),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${organization['code']} · ${organization['country_code'] ?? 'Pays non renseigné'}',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 9),
-                    Chip(
-                      avatar: Icon(
-                        active ? Icons.check_circle : Icons.pause_circle,
-                        size: 16,
-                      ),
-                      label: Text(active ? 'Active' : 'Inactive'),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
+                CircleAvatar(
+                  radius: 24,
+                  child: Text(name.substring(0, 1).toUpperCase()),
                 ),
-              ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${organization['code']} · ${organization['country_code'] ?? 'Pays non renseigné'}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 9),
+                      Chip(
+                        avatar: Icon(
+                          active ? Icons.check_circle : Icons.pause_circle,
+                          size: 16,
+                        ),
+                        label: Text(active ? 'Active' : 'Inactive'),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
             const Divider(height: 22),

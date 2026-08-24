@@ -4,12 +4,19 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
+use App\Models\Country;
+use App\Models\Role;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\UserScopeService;
 use App\Services\GovernanceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class OrganizationController extends Controller
 {
@@ -30,7 +37,7 @@ class OrganizationController extends Controller
     public function show(Request $request, Organization $organization): JsonResponse
     {
         $this->accessible($request, $organization);
-        return response()->json(['organization' => $organization]);
+        return response()->json(['organization' => $organization->load('countries:id,iso2,name')]);
     }
 
     public function archived(Request $request): JsonResponse
@@ -51,9 +58,68 @@ class OrganizationController extends Controller
     public function store(Request $request): JsonResponse
     {
         $this->owner($request);
-        $organization = Organization::create($this->validated($request));
-        $this->audit->record($request, 'organization.created', $organization, [], $organization->only(['code', 'name', 'country_code', 'is_active']));
-        return response()->json(['organization' => $organization], 201);
+        [$organizationData, $countryIds, $adminData] = $this->creationData($request);
+        $logoPath = $request->file('logo')?->store('organizations', 'public');
+        if ($logoPath) $organizationData['logo_path'] = $logoPath;
+        try {
+            [$organization, $user, $temporaryPassword] = DB::transaction(function () use ($request, $organizationData, $countryIds, $adminData): array {
+            $organization = Organization::create($organizationData);
+            $organization->countries()->sync($countryIds);
+            $temporaryPassword = ($adminData['activation_mode'] ?? 'invitation') === 'temporary_password'
+                ? ($adminData['admin_password'] ?? Str::password(16, symbols: true))
+                : Str::password(16, symbols: true);
+            $user = User::create([
+                'organization_id' => $organization->id,
+                'name' => trim($adminData['admin_first_name'].' '.$adminData['admin_last_name']),
+                'first_name' => $adminData['admin_first_name'], 'last_name' => $adminData['admin_last_name'],
+                'email' => $adminData['admin_email'], 'phone' => $adminData['admin_phone'] ?? null,
+                'username' => strtolower($adminData['admin_username']), 'password' => $temporaryPassword,
+                'is_active' => ($adminData['admin_status'] ?? 'active') === 'active', 'must_change_password' => true,
+            ]);
+            $role = Role::where('code', GovernanceService::COORDINATION_ADMIN)->where('is_active', true)->firstOrFail();
+            $user->roles()->attach($role, ['scope_type' => 'organization', 'scope_id' => $organization->id]);
+            $this->audit->record($request, 'organization.created', $organization, [], $organization->only(['code', 'name', 'is_active']));
+            return [$organization, $user, $temporaryPassword];
+            });
+        } catch (Throwable $exception) {
+            if ($logoPath) Storage::disk('public')->delete($logoPath);
+            throw $exception;
+        }
+        return response()->json(['organization' => $organization->load('countries'), 'coordination_admin' => $user, 'temporary_password' => $temporaryPassword], 201);
+    }
+
+    private function creationData(Request $request): array
+    {
+        $data = $request->validate([
+            'code' => ['required', 'alpha_dash', 'max:40', 'unique:organizations,code'],
+            'name' => ['required', 'string', 'max:160'],
+            'organization_type' => ['nullable', Rule::in(['ngo','ministry','national_program','united_nations','international_agency','other'])],
+            'email' => ['nullable', 'email', 'max:190'], 'phone' => ['nullable', 'string', 'max:40'],
+            'default_language' => ['nullable', Rule::in(['fr', 'en'])],
+            'additional_languages' => ['nullable', 'array'],
+            'additional_languages.*' => ['string', 'distinct', Rule::in(['fr', 'en'])],
+            'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+            'status' => ['nullable', Rule::in(['active', 'inactive'])],
+            'geographic_access_type' => ['required', Rule::in(['single_country','multi_country'])],
+            'country_ids' => ['required', 'array', 'min:1'], 'country_ids.*' => ['uuid', 'distinct', 'exists:countries,id'],
+            'admin_first_name' => ['required', 'string', 'max:80'], 'admin_last_name' => ['required', 'string', 'max:80'],
+            'admin_email' => ['required', 'email', 'max:190', 'unique:users,email'],
+            'admin_phone' => ['nullable', 'string', 'max:40'],
+            'admin_username' => ['required', 'alpha_dash', 'max:80', 'unique:users,username'],
+            'activation_mode' => ['nullable', Rule::in(['temporary_password', 'invitation'])],
+            'admin_password' => [Rule::requiredIf($request->input('activation_mode') === 'temporary_password'), 'nullable', 'string', 'min:10'],
+            'admin_status' => ['nullable', Rule::in(['active', 'inactive'])],
+        ]);
+        if ($data['geographic_access_type'] === 'single_country' && count($data['country_ids']) !== 1) {
+            abort(422, 'Une organisation unipays doit avoir exactement un pays.');
+        }
+        $country = Country::findOrFail($data['country_ids'][0]);
+        $organizationData = collect($data)->only(['code','name','email','phone','default_language','additional_languages','geographic_access_type'])->all();
+        $organizationData['organization_type'] = $data['organization_type'] ?? 'other';
+        $organizationData['default_language'] = $data['default_language'] ?? 'fr';
+        $organizationData['country_code'] = $data['geographic_access_type'] === 'single_country' ? $country->iso2 : null;
+        $organizationData['is_active'] = ($data['status'] ?? 'active') === 'active';
+        return [$organizationData, $data['country_ids'], $data];
     }
 
     public function update(Request $request, Organization $organization): JsonResponse

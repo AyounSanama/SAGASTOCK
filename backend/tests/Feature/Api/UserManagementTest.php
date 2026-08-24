@@ -109,7 +109,7 @@ class UserManagementTest extends TestCase
         $this->actingAs($admin)->get('/users/'.$target->id.'/edit')
             ->assertOk()
             ->assertSee('Modifier')
-            ->assertSee('data-global-back', false)
+            ->assertDontSee('data-global-back', false)
             ->assertSee('Logo PharmaCare');
         $this->actingAs($admin)->delete('/users/'.$target->id)->assertRedirect('/users');
         $this->assertSoftDeleted('users', ['id' => $target->id]);

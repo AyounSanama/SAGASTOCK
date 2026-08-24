@@ -33,16 +33,16 @@ class MissionFormData {
   final bool isActive;
 }
 
-Future<bool?> showMissionFormSheet({
+Future<String?> showMissionFormSheet({
   required BuildContext context,
   required String organizationId,
   required String organizationName,
   required List<Map<String, dynamic>> countries,
-  required Future<void> Function(MissionFormData data) onSave,
+  required Future<bool> Function(MissionFormData data) onSave,
   MissionFormMode mode = MissionFormMode.create,
   Map<String, dynamic>? mission,
 }) {
-  return showAppFormSheet<bool>(
+  return showAppFormSheet<String>(
     context: context,
     title: mode == MissionFormMode.create
         ? 'Ajouter une mission'
@@ -77,7 +77,7 @@ class MissionFormSheet extends StatefulWidget {
   final List<Map<String, dynamic>> countries;
   final MissionFormMode mode;
   final Map<String, dynamic>? mission;
-  final Future<void> Function(MissionFormData data) onSave;
+  final Future<bool> Function(MissionFormData data) onSave;
 
   @override
   State<MissionFormSheet> createState() => _MissionFormSheetState();
@@ -164,9 +164,7 @@ class _MissionFormSheetState extends State<MissionFormSheet> {
   Future<void> _submit() async {
     setState(() => _saveError = null);
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_startsOn != null &&
-        _endsOn != null &&
-        _endsOn!.isBefore(_startsOn!)) {
+    if (_startsOn != null && _endsOn != null && _endsOn!.isBefore(_startsOn!)) {
       setState(
         () => _saveError =
             'La date de fin doit être postérieure à la date de début.',
@@ -175,7 +173,7 @@ class _MissionFormSheetState extends State<MissionFormSheet> {
     }
     setState(() => _saving = true);
     try {
-      await widget.onSave(
+      final synchronized = await widget.onSave(
         MissionFormData(
           countryId: _countryId,
           code: _code.text.trim(),
@@ -190,7 +188,7 @@ class _MissionFormSheetState extends State<MissionFormSheet> {
           isActive: _isActive,
         ),
       );
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) Navigator.pop(context, synchronized ? 'synced' : 'pending');
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -430,9 +428,8 @@ class _MissionFormSheetState extends State<MissionFormSheet> {
       validator:
           validator ??
           (isRequired
-              ? (value) => value?.trim().isEmpty == true
-                    ? 'Champ obligatoire'
-                    : null
+              ? (value) =>
+                    value?.trim().isEmpty == true ? 'Champ obligatoire' : null
               : null),
     );
   }

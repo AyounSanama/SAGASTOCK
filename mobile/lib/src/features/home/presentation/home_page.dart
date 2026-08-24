@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/theme/module_icon_registry.dart';
+import '../../../core/widgets/app_dashboard_panel.dart';
+import '../../../core/widgets/app_kpi_card.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
 import '../../auth/data/auth_service.dart';
 import '../data/dashboard_service.dart';
@@ -101,7 +104,15 @@ class _DashboardHeader extends StatelessWidget {
               onTap: Scaffold.of(context).openDrawer,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
+          Image.asset(
+            'assets/images/pharmacare-logo.png',
+            width: 38,
+            height: 38,
+            fit: BoxFit.contain,
+            semanticLabel: 'Logo PharmaCare',
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,7 +329,8 @@ class _Statistics extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardWidth = (constraints.maxWidth - 12) / 2;
+        final columns = constraints.maxWidth >= AppBreakpoints.desktop ? 4 : constraints.maxWidth >= AppBreakpoints.tablet ? 3 : constraints.maxWidth >= 520 ? 2 : 1;
+        final cardWidth = (constraints.maxWidth - (AppSpacing.md * (columns - 1))) / columns;
         return Wrap(
           spacing: 12,
           runSpacing: 12,
@@ -372,86 +384,14 @@ class _StatCard extends StatelessWidget {
   final _StatData data;
 
   @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: '${data.label} : ${data.value}',
-      child: InkWell(
-        onTap: () => context.go(data.route),
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          height: 142,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [data.color.withValues(alpha: .88), data.color],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: data.color.withValues(alpha: .22),
-                blurRadius: 16,
-                offset: const Offset(0, 7),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .20),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(data.icon, color: Colors.white, size: 22),
-                  ),
-                  const Spacer(),
-                  const Icon(
-                    Icons.arrow_outward_rounded,
-                    color: Colors.white70,
-                    size: 18,
-                  ),
-                ],
-              ),
-              const Spacer(),
-              Text(
-                data.value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              Text(
-                data.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                data.caption,
-                maxLines: 1,
-                style: const TextStyle(color: Colors.white70, fontSize: 10),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => AppKpiCard(
+    label: data.label,
+    value: data.value,
+    caption: data.caption,
+    icon: data.icon,
+    tone: data.color == AppTheme.red ? AppKpiTone.red : data.color == AppTheme.orange ? AppKpiTone.orange : AppKpiTone.blue,
+    onTap: () => context.go(data.route),
+  );
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -834,70 +774,13 @@ class _DashboardPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D182033),
-            blurRadius: 14,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: .10),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 21),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AppTheme.ink,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppTheme.muted,
-                        fontSize: 10.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (onViewAll != null)
-                TextButton(
-                  onPressed: onViewAll,
-                  child: const Text('Voir tout'),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          child,
-        ],
-      ),
+    return AppDashboardPanel(
+      title: title,
+      description: subtitle,
+      icon: icon,
+      color: color,
+      action: onViewAll == null ? null : TextButton(onPressed: onViewAll, child: const Text('Voir tout')),
+      child: child,
     );
   }
 }

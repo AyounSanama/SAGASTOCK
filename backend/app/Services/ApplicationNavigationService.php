@@ -11,17 +11,20 @@ class ApplicationNavigationService
     /** Manifeste unique : chaque entrée dépend exclusivement d'une permission. */
     private const ITEMS = [
         ['key'=>'dashboard','label'=>'Tableau de bord','route'=>'dashboard','path'=>'/dashboard','icon'=>'dashboard','permission'=>null],
+        ['key'=>'missions','label'=>'Missions','route'=>'modules.missions','path'=>'/missions','icon'=>'missions','permission'=>'missions.view'],
+        ['key'=>'projects','label'=>'Projet actuel','route'=>'modules.projects','path'=>'/projects','icon'=>'projects','permission'=>'projects.view'],
         ['key'=>'configuration','label'=>'Configuration','route'=>'configuration.index','path'=>'/configuration','icon'=>'configuration','permission'=>'configuration.view'],
         ['key'=>'organizations','label'=>'Organisations','route'=>'organizations.index','path'=>'/organizations','icon'=>'organizations','permission'=>'organizations.view'],
         ['key'=>'funding','label'=>'Bailleurs et programmes','route'=>'modules.funding','path'=>'/funding','icon'=>'funding','permission'=>'funding.view'],
         ['key'=>'facilities','label'=>'Formations sanitaires','route'=>'modules.health-facilities','path'=>'/health-facilities','icon'=>'facilities','permission'=>'health_facilities.view'],
         ['key'=>'sites','label'=>'Sites de dispensation','route'=>'modules.dispensing-sites','path'=>'/dispensing-sites','icon'=>'sites','permission'=>'dispensing_sites.view'],
         ['key'=>'users','label'=>'Utilisateurs','route'=>'users.index','path'=>'/users','icon'=>'users','permission'=>'users.view'],
-        ['key'=>'standard-lists','label'=>'Listes standards','route'=>'modules.standard-lists','path'=>'/standard-lists','icon'=>'standard_lists','permission'=>'standard_lists.view'],
+        ['key'=>'standard-lists','label'=>'Listes standards de médicaments','route'=>'modules.standard-lists','path'=>'/standard-lists','icon'=>'standard_lists','permission'=>'standard_lists.view'],
         ['key'=>'products','label'=>'Produits','route'=>'modules.products','path'=>'/products','icon'=>'products','permission'=>'products.view'],
         ['key'=>'stocks','label'=>'Stocks','route'=>'modules.stocks','path'=>'/stocks','icon'=>'stocks','permission'=>'stocks.view'],
-        ['key'=>'receipts','label'=>'Réceptions','route'=>'modules.receipts','path'=>'/receipts','icon'=>'receipts','permission'=>'receipts.view'],
-        ['key'=>'dispensing','label'=>'Dispensation','route'=>'modules.dispensing','path'=>'/dispensations','icon'=>'dispensing','permission'=>'dispensing.view'],
+        ['key'=>'receipts','label'=>'Entrées en stock','route'=>'modules.receipts','path'=>'/receipts','icon'=>'receipts','permission'=>'receipts.view'],
+        ['key'=>'dispensing','label'=>'Dispensation de médicaments','route'=>'modules.dispensing','path'=>'/dispensations','icon'=>'dispensing','permission'=>'dispensing.view'],
+        ['key'=>'inventory-orders','label'=>'Inventaires & Commandes','route'=>'modules.inventories','path'=>'/inventories','icon'=>'inventories','permission'=>'inventories.view'],
         ['key'=>'inventories','label'=>'Inventaires','route'=>'modules.inventories','path'=>'/inventories','icon'=>'inventories','permission'=>'inventories.view'],
         ['key'=>'orders','label'=>'Commandes','route'=>'modules.orders','path'=>'/orders','icon'=>'orders','permission'=>'orders.view'],
         ['key'=>'reports','label'=>'Rapports','route'=>'modules.reports','path'=>'/reports','icon'=>'reports','permission'=>'reports.view'],
@@ -45,23 +48,43 @@ class ApplicationNavigationService
     public function items(User $user): array
     {
         $permissions = $this->permissions($user);
-        if (app(GovernanceService::class)->roleCode($user) === GovernanceService::SAGO_ADMIN) {
-            return collect(self::ITEMS)
-                ->whereIn('key', ['dashboard', 'configuration', 'profile'])
-                ->map(function (array $item): array {
-                    $item['route'] = $item['key'] === 'dashboard' ? 'sago.dashboard' : $item['route'];
-                    $item['url'] = $this->buildUrl($item['route']);
-                    return $item;
-                })->values()->all();
-        }
+        $role = app(GovernanceService::class)->roleCode($user);
+        $allowedKeys = $this->allowedKeys($role);
         $items = collect(self::ITEMS)
+            ->filter(fn (array $item) => $allowedKeys === null || in_array($item['key'], $allowedKeys, true))
             ->filter(fn(array $item) => $this->isVisible($item, $permissions));
 
         return $items
-            ->map(function (array $item): array {
+            ->map(function (array $item) use ($role): array {
+                if ($role === GovernanceService::SAGO_ADMIN && $item['key'] === 'dashboard') {
+                    $item['route'] = 'sago.dashboard';
+                    $item['path'] = '/sago/dashboard';
+                }
                 $item['url'] = $this->buildUrl($item['route']);
                 return $item;
             })->values()->all();
+    }
+
+    private function allowedKeys(?string $role): ?array
+    {
+        return match ($role) {
+            GovernanceService::SAGO_ADMIN => ['dashboard', 'configuration', 'profile'],
+            GovernanceService::COORDINATION_ADMIN => [
+                'dashboard', 'missions', 'projects', 'facilities', 'sites', 'users',
+                'standard-lists', 'products', 'stocks', 'receipts', 'dispensing',
+                'inventory-orders', 'reports', 'synchronization', 'profile',
+            ],
+            GovernanceService::PROJECT_ADMIN => [
+                'dashboard', 'projects', 'standard-lists', 'products', 'stocks', 'receipts', 'dispensing',
+                'inventory-orders', 'reports', 'synchronization', 'profile',
+            ],
+            GovernanceService::SITE_ADMIN,
+            GovernanceService::SITE_USER => [
+                'dashboard', 'standard-lists', 'products', 'stocks', 'receipts', 'dispensing',
+                'inventory-orders', 'reports', 'synchronization', 'profile',
+            ],
+            default => null,
+        };
     }
 
     private function buildUrl(?string $route): ?string
@@ -99,11 +122,12 @@ class ApplicationNavigationService
 
     public function mobileItems(User $user): array
     {
+        $sago = app(GovernanceService::class)->roleCode($user) === GovernanceService::SAGO_ADMIN;
         return collect($this->items($user))->whereNotNull('path')
             ->map(fn(array $item) => [
                 'key' => $item['key'],
                 'label' => $item['label'],
-                'path' => $item['key'] === 'dashboard' ? '/home' : $item['path'],
+                'path' => $item['key'] === 'dashboard' && ! $sago ? '/home' : $item['path'],
                 'icon' => $item['icon'],
                 'permission' => $item['permission'],
             ])->values()->all();

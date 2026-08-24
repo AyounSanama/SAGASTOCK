@@ -1,23 +1,25 @@
 import 'package:flutter/material.dart';
 
+import 'app_tokens.dart';
+
 abstract final class AppTheme {
-  static const orange = Color(0xFFF57C00);
-  static const orangeSoft = Color(0xFFFFF3E8);
-  static const blue = Color(0xFF24324A);
-  static const green = Color(0xFF22A447);
-  static const red = Color(0xFFE53935);
-  static const purple = Color(0xFF6B778C);
-  static const gray = Color(0xFF6B778C);
+  static const orange = AppColors.primary;
+  static const orangeSoft = AppColors.primarySoft;
+  static const blue = AppColors.text;
+  static const green = AppColors.success;
+  static const red = AppColors.danger;
+  static const purple = AppColors.purple;
+  static const gray = AppColors.textMuted;
   static const primary = orange;
-  static const primaryDark = Color(0xFFC86500);
+  static const primaryDark = AppColors.primaryDark;
   static const danger = red;
-  static const ink = Color(0xFF24324A);
-  static const muted = Color(0xFF6B778C);
-  static const border = Color(0xFFE8EDF3);
-  static const surface = Color(0xFFF7F9FC);
+  static const ink = AppColors.text;
+  static const muted = AppColors.textMuted;
+  static const border = AppColors.border;
+  static const surface = AppColors.background;
 
   static final _shape = RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(12),
+    borderRadius: BorderRadius.circular(AppRadius.md),
   );
 
   static ThemeData get light {

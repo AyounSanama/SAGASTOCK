@@ -2,16 +2,30 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/data/local_first_repository.dart';
+import '../../../core/database/app_database.dart';
 import '../../../core/network/api_client.dart';
 
 class OrganizationService {
-  OrganizationService({ApiClient? client, FlutterSecureStorage? storage})
-    : _client = client ?? ApiClient(),
-      _storage = storage ?? const FlutterSecureStorage();
+  OrganizationService({
+    ApiClient? client,
+    FlutterSecureStorage? storage,
+    AppDatabase? database,
+  }) {
+    _client = client ?? ApiClient();
+    _storage = storage ?? const FlutterSecureStorage();
+    _repository = LocalFirstRepository(
+      client: _client,
+      storage: _storage,
+      database: database,
+    );
+  }
 
-  final ApiClient _client;
-  final FlutterSecureStorage _storage;
+  late final ApiClient _client;
+  late final FlutterSecureStorage _storage;
+  late final LocalFirstRepository _repository;
 
   Future<Options> _authorized() async {
     final token = await _storage.read(key: 'auth_token');
@@ -19,73 +33,113 @@ class OrganizationService {
   }
 
   Future<List<Map<String, dynamic>>> list({String search = ''}) async {
-    const cacheKey = 'offline_organizations';
+    return _repository.list(
+      collection: 'organizations',
+      endpoint: '/organizations',
+      query: {if (search.isNotEmpty) 'search': search},
+    );
+  }
+
+  Future<Map<String, dynamic>> create(
+    Map<String, dynamic> payload, {
+    XFile? logo,
+  }) async {
+    final data = FormData.fromMap({
+      ...payload,
+      if (logo != null)
+        'logo': MultipartFile.fromBytes(
+          await logo.readAsBytes(),
+          filename: logo.name,
+        ),
+    });
+    final response = await _client.dio.post<Map<String, dynamic>>(
+      '/organizations',
+      data: data,
+      options: await _authorized(),
+    );
+    return response.data ?? const {};
+  }
+
+  Future<List<Map<String, dynamic>>> countries() async {
+    return _repository.list(
+      collection: 'countries',
+      endpoint: '/countries',
+      responseKey: 'countries',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> organizationCountries(
+    String organizationId,
+  ) async {
     try {
       final response = await _client.dio.get<Map<String, dynamic>>(
-        '/organizations',
-        queryParameters: search.isEmpty ? null : {'search': search},
+        '/organizations/$organizationId',
         options: await _authorized(),
       );
-      final values = (response.data?['data'] as List<dynamic>? ?? [])
-          .cast<Map<String, dynamic>>();
-      if (search.isEmpty) {
-        await _storage.write(key: cacheKey, value: jsonEncode(values));
-      }
-      return values;
+      final organization = response.data?['organization'] as Map?;
+      return (organization?['countries'] as List? ?? const [])
+          .whereType<Map>()
+          .map((country) => Map<String, dynamic>.from(country))
+          .toList(growable: false);
     } on DioException catch (error) {
       if (error.response != null) rethrow;
-      final cached = await _storage.read(key: cacheKey);
-      final values = (cached == null ? <dynamic>[] : jsonDecode(cached) as List)
-          .cast<Map<String, dynamic>>();
-      final query = search.trim().toLowerCase();
-      if (query.isEmpty) return values;
-      return values
-          .where(
-            (item) =>
-                '${item['name']}'.toLowerCase().contains(query) ||
-                '${item['code']}'.toLowerCase().contains(query),
-          )
+      final cached = await _repository.list(
+        collection: 'countries',
+        endpoint: '/countries',
+        responseKey: 'countries',
+      );
+      final userJson = await _storage.read(key: 'cached_user');
+      if (userJson == null) return const [];
+      // The cached login payload remains the authority for the offline scope.
+      final user = jsonDecode(userJson) as Map<String, dynamic>;
+      final allowed =
+          ((user['organization'] as Map?)?['countries'] as List? ?? const [])
+              .whereType<Map>()
+              .map((country) => '${country['id']}')
+              .toSet();
+      return cached
+          .where((country) => allowed.contains('${country['id']}'))
           .toList();
     }
   }
 
-  Future<void> create({
-    required String code,
-    required String name,
-    String? countryCode,
+  Future<List<Map<String, dynamic>>> missions(
+    String organizationId, {
+    String search = '',
+    String status = '',
+    String countryId = '',
+    bool archived = false,
   }) async {
-    await _client.dio.post<void>(
-      '/organizations',
-      data: {
-        'code': code,
-        'name': name,
-        if (countryCode?.isNotEmpty == true)
-          'country_code': countryCode!.toUpperCase(),
-        'is_active': true,
-      },
-      options: await _authorized(),
+    final values = await _repository.list(
+      collection: archived ? 'missions_archived' : 'missions',
+      organizationId: organizationId,
+      endpoint: archived
+          ? '/organizations/$organizationId/missions-archived'
+          : '/organizations/$organizationId/missions',
     );
+    final normalized = search.trim().toLowerCase();
+    return values
+        .where((mission) {
+          final matchesSearch =
+              normalized.isEmpty ||
+              '${mission['name'] ?? ''}'.toLowerCase().contains(normalized) ||
+              '${mission['code'] ?? ''}'.toLowerCase().contains(normalized);
+          final matchesStatus =
+              archived ||
+              status.isEmpty ||
+              (status == 'active' && mission['is_active'] == true) ||
+              (status == 'inactive' && mission['is_active'] != true);
+          final matchesCountry =
+              archived ||
+              countryId.isEmpty ||
+              '${mission['country_id'] ?? (mission['country'] as Map?)?['id'] ?? ''}' ==
+                  countryId;
+          return matchesSearch && matchesStatus && matchesCountry;
+        })
+        .toList(growable: false);
   }
 
-  Future<List<Map<String, dynamic>>> countries() async {
-    final response = await _client.dio.get<Map<String, dynamic>>(
-      '/countries',
-      options: await _authorized(),
-    );
-    return (response.data?['countries'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>();
-  }
-
-  Future<List<Map<String, dynamic>>> missions(String organizationId) async {
-    final response = await _client.dio.get<Map<String, dynamic>>(
-      '/organizations/$organizationId/missions',
-      options: await _authorized(),
-    );
-    return (response.data?['data'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>();
-  }
-
-  Future<void> createMission({
+  Future<bool> createMission({
     required String organizationId,
     required String countryId,
     required String code,
@@ -99,9 +153,12 @@ class OrganizationService {
     String? description,
     bool isActive = true,
   }) async {
-    await _client.dio.post<void>(
-      '/organizations/$organizationId/missions',
-      data: {
+    return _repository.mutate(
+      collection: 'missions',
+      organizationId: organizationId,
+      endpoint: '/organizations/$organizationId/missions',
+      method: 'POST',
+      payload: {
         'country_id': countryId,
         'code': code,
         'name': name,
@@ -114,11 +171,10 @@ class OrganizationService {
         'description': description,
         'is_active': isActive,
       },
-      options: await _authorized(),
     );
   }
 
-  Future<void> updateMission({
+  Future<bool> updateMission({
     required String organizationId,
     required String missionId,
     required String countryId,
@@ -133,9 +189,13 @@ class OrganizationService {
     String? description,
     required bool isActive,
   }) async {
-    await _client.dio.put<void>(
-      '/organizations/$organizationId/missions/$missionId',
-      data: {
+    return _repository.mutate(
+      collection: 'missions',
+      organizationId: organizationId,
+      endpoint: '/organizations/$organizationId/missions/$missionId',
+      method: 'PUT',
+      remoteId: missionId,
+      payload: {
         'country_id': countryId,
         'code': code,
         'name': name,
@@ -148,24 +208,45 @@ class OrganizationService {
         'description': description,
         'is_active': isActive,
       },
-      options: await _authorized(),
     );
   }
 
-  String? _date(DateTime? value) =>
-      value?.toIso8601String().split('T').first;
+  Future<bool> archiveMission({
+    required String organizationId,
+    required String missionId,
+  }) => _repository.mutateEntityState(
+    collection: 'missions',
+    organizationId: organizationId,
+    remoteId: missionId,
+    endpoint: '/organizations/$organizationId/missions/$missionId',
+    deleted: true,
+    method: 'DELETE',
+  );
+
+  Future<bool> restoreMission({
+    required String organizationId,
+    required String missionId,
+  }) => _repository.mutateEntityState(
+    collection: 'missions',
+    organizationId: organizationId,
+    remoteId: missionId,
+    endpoint:
+        '/organizations/$organizationId/missions/archived/$missionId/restore',
+    deleted: false,
+  );
+
+  String? _date(DateTime? value) => value?.toIso8601String().split('T').first;
 
   Future<List<Map<String, dynamic>>> projects({
     required String organizationId,
-    required String missionId,
+    String? missionId,
   }) async {
-    final response = await _client.dio.get<Map<String, dynamic>>(
-      '/organizations/$organizationId/projects',
-      queryParameters: {'mission_id': missionId},
-      options: await _authorized(),
+    return _repository.list(
+      collection: 'projects',
+      organizationId: organizationId,
+      endpoint: '/organizations/$organizationId/projects',
+      query: {'mission_id': ?missionId},
     );
-    return (response.data?['data'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>();
   }
 
   Future<void> createProject({
@@ -175,16 +256,18 @@ class OrganizationService {
     required String name,
     String? description,
   }) async {
-    await _client.dio.post<void>(
-      '/organizations/$organizationId/projects',
-      data: {
+    await _repository.mutate(
+      collection: 'projects',
+      organizationId: organizationId,
+      endpoint: '/organizations/$organizationId/projects',
+      method: 'POST',
+      payload: {
         'mission_id': missionId,
         'code': code,
         'name': name,
         if (description?.isNotEmpty == true) 'description': description,
         'is_active': true,
       },
-      options: await _authorized(),
     );
   }
 

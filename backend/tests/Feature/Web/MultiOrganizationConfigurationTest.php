@@ -25,18 +25,17 @@ class MultiOrganizationConfigurationTest extends TestCase
 
         $this->post(route('configuration.organization.save'), $this->payload('ORG-A', 'Organisation A'))
             ->assertSessionHasNoErrors();
-        $flow = $this->startFlow(ConfigurationFlowType::NewOrganization);
-        $this->post(route('configuration.organization.save', ['_flow' => $flow]), $this->payload('ORG-B', 'Organisation B'))
+        $this->post(route('configuration.organization.save'), $this->payload('ORG-B', 'Organisation B'))
             ->assertSessionHasNoErrors();
 
         $this->assertDatabaseCount('organizations', 2);
-        $this->get(route('configuration.organization', ['_flow' => $flow]))
+        $this->get(route('configuration.organization'))
             ->assertOk()
             ->assertSee('Organisation A')
             ->assertSee('Organisation B');
     }
 
-    public function test_missions_are_isolated_by_organization_workflow(): void
+    public function test_sago_cannot_open_organization_missions(): void
     {
         [$owner, $country] = $this->context();
         $organizationA = $this->organization('ORG-A', 'Organisation A');
@@ -51,15 +50,8 @@ class MultiOrganizationConfigurationTest extends TestCase
         ]);
         $this->actingAs($owner);
 
-        $flowA = $this->startFlow(ConfigurationFlowType::NewMission, $organizationA);
-        $this->get(route('configuration.mission', ['_flow' => $flowA]))
-            ->assertSee('Mission Cameroun A')
-            ->assertDontSee('Mission Cameroun B');
-
-        $flowB = $this->startFlow(ConfigurationFlowType::NewMission, $organizationB);
-        $this->get(route('configuration.mission', ['_flow' => $flowB]))
-            ->assertSee('Mission Cameroun B')
-            ->assertDontSee('Mission Cameroun A');
+        $this->get(route('organizations.missions.index', $organizationA))->assertForbidden();
+        $this->get(route('organizations.missions.index', $organizationB))->assertForbidden();
     }
 
     public function test_coordination_admin_only_sees_the_assigned_organization(): void
@@ -67,7 +59,8 @@ class MultiOrganizationConfigurationTest extends TestCase
         [, , $viewPermission] = $this->context();
         $organizationA = $this->organization('ORG-A', 'Organisation A');
         $this->organization('ORG-B', 'Organisation B');
-        $role = Role::create([
+        $role = Role::where('code', 'coordination_admin')->firstOrFail();
+        $role->update([
             'code' => 'coordination_admin', 'name' => 'Admin Coordination',
             'is_system' => true, 'scope_type' => 'organization',
         ]);
@@ -85,7 +78,7 @@ class MultiOrganizationConfigurationTest extends TestCase
             ->assertDontSee('Ajouter une organisation');
     }
 
-    public function test_new_organization_workflow_has_no_inherited_green_steps_and_empty_form(): void
+    public function test_sago_uses_empty_standalone_organization_form_not_legacy_workflow(): void
     {
         [$owner] = $this->context();
         $this->organization('OLD', 'Ancienne organisation');
@@ -99,14 +92,9 @@ class MultiOrganizationConfigurationTest extends TestCase
         ]);
         $this->actingAs($owner);
 
-        $flow = $this->startFlow(ConfigurationFlowType::NewOrganization);
-        $progress = SetupProgress::where('workflow_id', $flow)->firstOrFail();
-        $this->assertSame([], $progress->completed_steps);
-        $this->assertSame('in_progress', $progress->step_states['1']);
-        foreach (range(2, 12) as $step) {
-            $this->assertSame('not_started', $progress->step_states[(string) $step]);
-        }
-        $this->get(route('configuration.organization', ['_flow' => $flow, 'create' => 1]))
+        $this->get(route('configuration.workflow.start', ['flowType' => ConfigurationFlowType::NewOrganization->value]))
+            ->assertForbidden();
+        $this->get(route('configuration.organization', ['create' => 1]))
             ->assertOk()
             ->assertSee('data-organization-mode="createOrganization"', false)
             ->assertSee('name="name" value=""', false);
@@ -131,7 +119,8 @@ class MultiOrganizationConfigurationTest extends TestCase
     {
         [, , $viewPermission] = $this->context();
         $organization = $this->organization('ORG-A', 'Organisation A');
-        $role = Role::create([
+        $role = Role::where('code', 'coordination_admin')->firstOrFail();
+        $role->update([
             'code' => 'coordination_admin', 'name' => 'Admin Coordination',
             'is_system' => true, 'scope_type' => 'organization',
         ]);
@@ -169,12 +158,19 @@ class MultiOrganizationConfigurationTest extends TestCase
 
     private function payload(string $code, string $name): array
     {
+        $country = Country::where('iso2', 'CM')->firstOrFail();
+
         return [
             '_form_mode' => 'createOrganization',
-            'name' => $name, 'organization_type' => 'ngo', 'country_code' => 'CM',
+            'name' => $name, 'organization_type' => 'ngo',
+            'geographic_access_type' => 'single_country', 'country_ids' => [$country->id],
             'code' => $code, 'default_language' => 'fr', 'status' => 'active',
             'manager_name' => 'Responsable', 'manager_title' => 'Coordination',
             'description' => 'Organisation de test',
+            'admin_first_name' => 'Admin', 'admin_last_name' => $code,
+            'admin_email' => strtolower($code).'@example.org', 'admin_username' => strtolower($code).'_admin',
+            'activation_mode' => 'temporary_password', 'admin_password' => 'Secret123!AB',
+            'admin_password_confirmation' => 'Secret123!AB', 'admin_status' => 'active',
         ];
     }
 
@@ -197,6 +193,9 @@ class MultiOrganizationConfigurationTest extends TestCase
         $missions = Permission::firstOrCreate(['code' => 'missions.manage'], ['name' => 'Gérer les missions']);
         $role = Role::firstOrCreate(['code' => 'owner'], ['name' => 'Propriétaire', 'is_system' => true]);
         $role->permissions()->syncWithoutDetaching([$manage->id, $view->id, $missions->id, $configuration->id]);
+        Role::firstOrCreate(['code' => 'coordination_admin'], [
+            'name' => 'Admin Coordination', 'is_system' => true, 'is_active' => true,
+        ]);
         $owner = User::factory()->create(['is_active' => true]);
         $owner->roles()->attach($role, ['scope_type' => 'platform', 'scope_id' => null]);
 

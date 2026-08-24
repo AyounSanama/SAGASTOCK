@@ -1,20 +1,19 @@
-import 'dart:convert';
-import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/sync/offline_operation_service.dart';
+import '../../../core/data/local_first_repository.dart';
 
 class ClinicalSupplyService {
-  ClinicalSupplyService({ApiClient? client}) : _client = client ?? ApiClient();
-  final ApiClient _client;
+  ClinicalSupplyService({ApiClient? client}) {
+    _client = client ?? ApiClient();
+    _operations = OfflineOperationService(client: _client);
+    _repository = LocalFirstRepository(client: _client, storage: _storage);
+  }
+  late final ApiClient _client;
+  late final OfflineOperationService _operations;
+  late final LocalFirstRepository _repository;
   final _storage = const FlutterSecureStorage();
-  static const _outboxKey = 'offline_clinical_outbox_v2';
-
-  Future<Options> _auth() async => Options(
-    headers: {
-      'Authorization': 'Bearer ${await _storage.read(key: 'auth_token')}',
-    },
-  );
   Future<List<Map<String, dynamic>>> organizations() =>
       _list('/organizations', 'offline_organizations');
   Future<List<Map<String, dynamic>>> patients(String id) =>
@@ -30,31 +29,24 @@ class ClinicalSupplyService {
   }
 
   Future<Map<String, List<Map<String, dynamic>>>> options(String id) async {
-    final key = 'offline_clinical_options_$id';
-    try {
-      final response = await _client.dio.get<Map<String, dynamic>>(
-        '/organizations/$id/dispensations/options',
-        options: await _auth(),
-      );
-      final data = response.data ?? <String, dynamic>{};
-      await _storage.write(key: key, value: jsonEncode(data));
-      return _optionMap(data);
-    } on DioException catch (error) {
-      if (error.response != null) rethrow;
-      final cached = await _storage.read(key: key);
-      if (cached == null) rethrow;
-      return _optionMap(jsonDecode(cached) as Map<String, dynamic>);
-    }
+    final data = await _repository.document(
+      collection: 'clinical.options',
+      organizationId: id,
+      endpoint: '/organizations/$id/dispensations/options',
+    );
+    return _optionMap(data);
   }
 
   Future<bool> createPatient(String id, Map<String, dynamic> data) {
     data['client_reference'] ??= const Uuid().v4();
     return _sendOrQueue('/organizations/$id/patients', data);
   }
+
   Future<bool> createPrescription(String id, Map<String, dynamic> data) {
     data['client_reference'] ??= const Uuid().v4();
     return _sendOrQueue('/organizations/$id/prescriptions', data);
   }
+
   Future<bool> validatePrescription(
     String id,
     String prescriptionId,
@@ -78,66 +70,29 @@ class ClinicalSupplyService {
   }
 
   Future<bool> _sendOrQueue(String path, Map<String, dynamic> data) async {
-    try {
-      await _client.dio.post(path, data: data, options: await _auth());
-      return true;
-    } on DioException catch (error) {
-      if (error.response != null) rethrow;
-      final items = await _outbox();
-      items.add({
-        'operation_id': const Uuid().v4(),
-        'path': path,
-        'data': Map<String, dynamic>.from(data),
-        'queued_at': DateTime.now().toIso8601String(),
-        'attempts': 0,
-      });
-      await _storage.write(key: _outboxKey, value: jsonEncode(items));
-      return false;
-    }
+    return _operations.execute(
+      method: 'POST',
+      endpoint: path,
+      payload: Map<String, dynamic>.from(data),
+      entityType: 'clinical',
+      organizationId: RegExp(
+        r'/organizations/([^/]+)',
+      ).firstMatch(path)?.group(1),
+    );
   }
 
-  Future<int> pendingCount() async => (await _outbox()).length;
-  Future<void> sync() async {
-    final pending = await _outbox();
-    if (pending.isEmpty) return;
-    final remaining = <Map<String, dynamic>>[];
-    for (final item in pending) {
-      try {
-        await _client.dio.post(
-          item['path'],
-          data: item['data'],
-          options: await _auth(),
-        );
-      } on DioException catch (error) {
-        // Une erreur réseau ou serveur reste rejouable. Une erreur métier 4xx
-        // est conservée avec son diagnostic afin de ne perdre aucune saisie.
-        remaining.add({
-          ...item,
-          'attempts': ((item['attempts'] as num?)?.toInt() ?? 0) + 1,
-          'last_error': error.response?.data?.toString() ?? error.message,
-        });
-      }
-    }
-    await _storage.write(key: _outboxKey, value: jsonEncode(remaining));
-  }
+  Future<int> pendingCount() =>
+      _operations.pendingCount(entityType: 'clinical');
+  Future<void> sync() => _operations.synchronize();
 
   Future<List<Map<String, dynamic>>> _list(String path, String key) async {
-    try {
-      final r = await _client.dio.get<Map<String, dynamic>>(
-        path,
-        options: await _auth(),
-      );
-      final data = (r.data?['data'] as List? ?? [])
-          .cast<Map<String, dynamic>>();
-      await _storage.write(key: key, value: jsonEncode(data));
-      return data;
-    } on DioException catch (e) {
-      if (e.response != null) rethrow;
-      final cached = await _storage.read(key: key);
-      return cached == null
-          ? []
-          : (jsonDecode(cached) as List).cast<Map<String, dynamic>>();
-    }
+    return _repository.list(
+      collection: key,
+      organizationId: RegExp(
+        r'/organizations/([^/]+)',
+      ).firstMatch(path)?.group(1),
+      endpoint: path,
+    );
   }
 
   Map<String, List<Map<String, dynamic>>> _optionMap(Map<String, dynamic> d) =>
@@ -145,9 +100,4 @@ class ClinicalSupplyService {
         for (final key in ['sites', 'patients', 'prescriptions', 'products'])
           key: (d[key] as List? ?? []).cast<Map<String, dynamic>>(),
       };
-  Future<List<Map<String, dynamic>>> _outbox() async {
-    final value = await _storage.read(key: _outboxKey);
-    return (value == null ? [] : jsonDecode(value) as List)
-        .cast<Map<String, dynamic>>();
-  }
 }

@@ -1,29 +1,17 @@
-@php
-    $actor = auth()->user();
-    $roleLabel = $actor?->roles()->first()?->name ?? 'Utilisateur';
-@endphp
-<header class="portal-topbar">
-    <button class="mobile-sidebar-toggle material-symbols-outlined" type="button" data-sidebar-toggle aria-label="Ouvrir le menu">menu</button>
-    <h1>@yield('page-title', 'PharmaCare')</h1>
-    <div class="portal-topbar-actions">
-        <label class="language-selector">
-            <span class="material-symbols-outlined" aria-hidden="true">language</span>
-            <select aria-label="Langue de l’interface">
-                <option value="fr" selected>Français</option>
-                <option value="en">English</option>
-            </select>
-        </label>
-        <button class="topbar-icon-button material-symbols-outlined" type="button" aria-label="Notifications">notifications</button>
-        <details class="user-menu">
-            <summary>
-                <span class="user-avatar">{{ mb_strtoupper(mb_substr($actor?->name ?? 'U',0,1)) }}</span>
-                <span class="user-copy"><strong>{{ $actor?->name }}</strong><small>{{ $roleLabel }}</small></span>
-                <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
-            </summary>
-            <div class="user-menu-panel">
-                <a href="{{ route('profile.show') }}">Mon profil</a>
-                <form method="post" action="{{ route('logout') }}">@csrf<button type="submit">Déconnexion</button></form>
-            </div>
-        </details>
-    </div>
+@php($actor = $actor ?? auth()->user())
+<header class="app-shell-topbar">
+    <button class="sidebar-toggle material-symbols-outlined" type="button"
+        aria-label="Réduire ou agrandir le menu" aria-expanded="true"
+        aria-controls="pharmacare-sidebar">menu</button>
+    <strong class="topbar-context">@yield('page-title', 'PharmaCare')</strong>
+    <label class="topbar-search"><span class="material-symbols-outlined">search</span><input type="search" placeholder="Rechercher…" aria-label="Rechercher dans PharmaCare"></label>
+    <span class="topbar-spacer"></span>
+    <button class="topbar-icon material-symbols-outlined" type="button" aria-label="Notifications">notifications_none @if(session('notification_count', 0))<b>{{ min(9, (int) session('notification_count')) }}</b>@endif</button>
+    <a class="topbar-profile" href="{{ route('profile.show') }}">
+        <span class="profile-avatar">{{ mb_strtoupper(mb_substr($actor?->name ?? 'U', 0, 1)) }}</span>
+        <span class="topbar-profile-copy">
+            <strong>{{ $actor?->first_name ?: $actor?->name }}</strong>
+            <small>{{ $actor?->roles()->first()?->name ?? 'Utilisateur' }}</small>
+        </span>
+    </a>
 </header>

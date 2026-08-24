@@ -48,6 +48,10 @@ class AuthController extends Controller
         if ($user?->locked_until?->isFuture()) {
             return back()->withErrors(['login' => 'Compte temporairement verrouillé. Réessayez plus tard.'])->onlyInput('login');
         }
+        if ($user?->locked_until?->isPast()) {
+            $user->update(['failed_login_attempts' => 0, 'locked_until' => null]);
+            $user->refresh();
+        }
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             if ($user) {
                 $attempts = $user->failed_login_attempts + 1;
@@ -58,6 +62,9 @@ class AuthController extends Controller
         }
         if (! $user->is_active) {
             return back()->withErrors(['login' => 'Ce compte est désactivé.'])->onlyInput('login');
+        }
+        if ($user->organization_id && ! $user->organization()->where('is_active', true)->exists()) {
+            return back()->withErrors(['login' => 'L’organisation rattachée à ce compte est désactivée.'])->onlyInput('login');
         }
         Auth::login($user, $request->boolean('remember'));
         $user->update(['last_login_at' => now(), 'failed_login_attempts' => 0, 'locked_until' => null]);
@@ -127,8 +134,10 @@ class AuthController extends Controller
             'dispensing_site_id' => ['nullable', 'uuid', 'exists:sites,id'],
             'password' => ['nullable', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
             'must_change_password' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
             'permission_ids' => ['nullable', 'array'],
             'permission_ids.*' => ['integer', 'exists:permissions,id'],
+            'form_context' => ['nullable', 'string', 'max:80'],
         ]);
         $role = $this->scopes->assignableRoles($request->user())->findOrFail($data['role_id']);
         $roleCode = $this->governance->canonicalCode($role->code);
@@ -174,7 +183,7 @@ class AuthController extends Controller
             'phone' => $data['phone'] ?? null,
             'organization_id' => $organization?->id,
             'password' => $password,
-            'is_active' => true,
+            'is_active' => $request->boolean('is_active', true),
             'must_change_password' => $generated || $request->boolean('must_change_password'),
         ]);
         $user->roles()->sync([$data['role_id'] => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]);
@@ -193,7 +202,10 @@ class AuthController extends Controller
             'scope_type' => $scopeType,
             'scope_id' => $scopeId,
         ]);
-        $response = redirect()->route('users.index')->with('success', "L’utilisateur {$user->name} a été créé avec succès.");
+        $response = ($data['form_context'] ?? null) === 'mission-project-admin' && isset($mission)
+            ? redirect()->route('organizations.missions.show', [$organization, $mission])
+                ->with('status', "L’administrateur projet {$user->name} a été créé et affecté avec succès.")
+            : redirect()->route('users.index')->with('success', "L’utilisateur {$user->name} a été créé avec succès.");
 
         return $generated ? $response->with('temporary_password', $password) : $response;
     }

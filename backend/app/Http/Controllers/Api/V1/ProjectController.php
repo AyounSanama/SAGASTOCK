@@ -19,7 +19,8 @@ class ProjectController extends Controller
     public function index(Request $request, Organization $organization): JsonResponse
     {
         $this->accessible($request, $organization);
-        $projects = $organization->projects()->with('mission.country:id,iso2,name')
+        $projects = $this->scopes->projects($request->user())->where('organization_id', $organization->id)
+            ->with('mission.country:id,iso2,name')
             ->when($request->filled('mission_id'), fn ($query) => $query->where('mission_id', $request->string('mission_id')))
             ->when($request->string('search')->toString(), fn ($query, $search) => $query
                 ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
@@ -39,6 +40,7 @@ class ProjectController extends Controller
     {
         $this->accessible($request, $organization);
         abort_unless($project->organization_id === $organization->id, 404);
+        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
         $old = $project->only(['mission_id', 'code', 'name', 'description', 'starts_on', 'ends_on', 'is_active']);
         $project->update($this->validated($request, $organization, $project));
         $this->audit->record($request, 'project.updated', $project, $old, $project->only(array_keys($old)));
@@ -49,6 +51,7 @@ class ProjectController extends Controller
     {
         $this->accessible($request, $organization);
         abort_unless($project->organization_id === $organization->id, 404);
+        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
         $project->delete();
         $this->audit->record($request, 'project.archived', $project);
         return response()->json(status: 204);

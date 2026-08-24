@@ -21,7 +21,21 @@ class MissionController extends Controller
         $missions = $organization->missions()->with('country:id,iso2,name')
             ->when($request->string('search')->toString(), fn ($query, $search) => $query
                 ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
+            ->when($request->filled('country_id'), fn ($query) => $query->where('country_id', $request->string('country_id')->toString()))
+            ->when($request->get('status') === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($request->get('status') === 'inactive', fn ($query) => $query->where('is_active', false))
             ->orderBy('name')->paginate(20);
+        return response()->json($missions);
+    }
+
+    public function archived(Request $request, Organization $organization): JsonResponse
+    {
+        $this->accessible($request, $organization);
+        $missions = $organization->missions()->onlyTrashed()->with('country:id,iso2,name')
+            ->when($request->string('search')->toString(), fn ($query, $search) => $query
+                ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
+            ->latest('deleted_at')->paginate(20);
+
         return response()->json($missions);
     }
 
@@ -71,7 +85,10 @@ class MissionController extends Controller
     private function validated(Request $request, Organization $organization, ?Mission $mission = null): array
     {
         return $request->validate([
-            'country_id' => ['required', 'uuid', 'exists:countries,id'],
+            'country_id' => [
+                'required', 'uuid',
+                Rule::exists('country_organization', 'country_id')->where('organization_id', $organization->id),
+            ],
             'code' => ['required', 'alpha_dash', 'max:40', Rule::unique('missions')->where('organization_id', $organization->id)->ignore($mission?->id)],
             'name' => ['required', 'string', 'max:160'],
             'starts_on' => ['nullable', 'date'],

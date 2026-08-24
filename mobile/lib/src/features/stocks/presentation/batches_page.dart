@@ -131,7 +131,7 @@ class _BatchesPageState extends State<BatchesPage> {
 
   Future<void> _archiveOrRestore(Map<String, dynamic> batch) async {
     final archived = _status == 'archived';
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialogAsFormSheet<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(archived ? 'Restaurer le lot ?' : 'Archiver le lot ?'),

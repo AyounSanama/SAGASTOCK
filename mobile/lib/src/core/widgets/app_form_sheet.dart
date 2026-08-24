@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_tokens.dart';
+
 /// Form Sheet Material 3 commun à tous les formulaires courts et moyens.
 Future<T?> showAppFormSheet<T>({
   required BuildContext context,
@@ -13,7 +15,7 @@ Future<T?> showAppFormSheet<T>({
     useSafeArea: true,
     showDragHandle: false,
     builder: (sheetContext) => ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760),
+      constraints: const BoxConstraints(maxWidth: AppSizes.formSheetMaxWidth),
       child: Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
@@ -24,14 +26,14 @@ Future<T?> showAppFormSheet<T>({
             Container(
               width: 44,
               height: 4,
-              margin: const EdgeInsets.only(top: 10),
+              margin: const EdgeInsets.only(top: AppSpacing.md),
               decoration: BoxDecoration(
                 color: Theme.of(sheetContext).colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(99),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 10, 12),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.lg, AppSpacing.md, AppSpacing.md),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -45,8 +47,8 @@ Future<T?> showAppFormSheet<T>({
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         if (description != null) ...[
-                          const SizedBox(height: 4),
-                          Text(description),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(description, style: AppTypography.secondary),
                         ],
                       ],
                     ),
@@ -54,7 +56,7 @@ Future<T?> showAppFormSheet<T>({
                   IconButton(
                     tooltip: 'Fermer',
                     onPressed: () => Navigator.pop(sheetContext),
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close, size: AppSizes.icon),
                   ),
                 ],
               ),
@@ -88,7 +90,7 @@ Future<T?> showAppDialogAsFormSheet<T>({
           bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
+          constraints: const BoxConstraints(maxWidth: AppSizes.formSheetMaxWidth),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

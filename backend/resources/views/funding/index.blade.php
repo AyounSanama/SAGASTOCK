@@ -15,7 +15,16 @@
     @media(max-width:760px){body main.funding-shell{padding:20px 14px 46px!important}}
 </style>
 <main class="funding-shell">
-    <header class="page-head"><div><h1>Bailleurs et programmes</h1><p>Gérez les partenaires financiers, les programmes et leurs associations aux projets.</p></div>@if($canManage && $organization)<div class="actions"><button class="btn outline" type="button" data-sheet-open="donor-create-sheet">＋ Ajouter un bailleur</button><button class="btn primary" type="button" data-sheet-open="program-create-sheet">＋ Ajouter un programme</button></div>@endif</header>
+    @if($canManage && $organization)
+        <x-app-page-header title="Bailleurs et programmes" subtitle="Gérez les partenaires financiers, les programmes et leurs associations aux projets." icon="handshake">
+            <x-slot:actions>
+                <x-app-button variant="secondary" icon="add" type="button" data-sheet-open="donor-create-sheet">Ajouter un bailleur</x-app-button>
+                <x-app-button icon="add" type="button" data-sheet-open="program-create-sheet">Ajouter un programme</x-app-button>
+            </x-slot:actions>
+        </x-app-page-header>
+    @else
+        <x-app-page-header title="Bailleurs et programmes" subtitle="Gérez les partenaires financiers, les programmes et leurs associations aux projets." icon="handshake" />
+    @endif
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="notice error">{{ $errors->first() }}</div>@endif
 
@@ -27,7 +36,12 @@
     @if(!$organization)
         <section class="card empty"><h2>Aucune organisation accessible</h2><p>Votre compte ne possède aucun périmètre organisationnel disponible.</p></section>
     @else
-        <section class="stats"><article class="stat"><span class="muted">Bailleurs actifs</span><strong>{{ $donors->where('is_active',true)->count() }}</strong></article><article class="stat"><span class="muted">Programmes actifs</span><strong>{{ $programs->where('is_active',true)->count() }}</strong></article><article class="stat"><span class="muted">Bailleurs du projet</span><strong>{{ $assignedDonors->count() }}</strong></article><article class="stat"><span class="muted">Programmes du projet</span><strong>{{ $assignedPrograms->count() }}</strong></article></section>
+        <section class="app-kpi-grid" aria-label="Indicateurs de financement">
+            <x-app-kpi-card label="Bailleurs actifs" :value="$donors->where('is_active',true)->count()" icon="account_balance" />
+            <x-app-kpi-card label="Programmes actifs" :value="$programs->where('is_active',true)->count()" icon="campaign" tone="blue" />
+            <x-app-kpi-card label="Bailleurs du projet" :value="$assignedDonors->count()" icon="link" tone="green" />
+            <x-app-kpi-card label="Programmes du projet" :value="$assignedPrograms->count()" icon="assignment" tone="violet" />
+        </section>
         <div class="content-grid">
             <section class="card"><div class="section-head"><div><h2>Bailleurs</h2><span class="muted">{{ $donors->count() }} enregistré(s)</span></div></div><div class="table-wrap"><table><thead><tr><th>Bailleur</th><th>Contact</th><th>Projets</th><th>Statut</th><th>Actions</th></tr></thead><tbody>@forelse($donors as $donor)<tr><td><strong>{{ $donor->name }}</strong><div class="muted">{{ $donor->code }}</div></td><td>{{ $donor->email ?: '—' }}<div class="muted">{{ $donor->phone ?: '' }}</div></td><td>{{ $donor->projects_count }}</td><td><span class="badge {{ $donor->is_active?'':'off' }}">{{ $donor->is_active?'Actif':'Inactif' }}</span></td><td><div class="actions">@if($canManage)<button class="btn outline compact" type="button" data-sheet-open="donor-edit-{{ $donor->id }}">Modifier</button><form method="post" action="{{ route('organizations.donors.destroy',[$organization,$donor]) }}" onsubmit="return confirm('Archiver ce bailleur ?')">@csrf @method('DELETE')<button class="btn danger compact">Archiver</button></form>@else<span class="muted">Consultation</span>@endif</div></td></tr>@empty<tr><td class="empty" colspan="5">Aucun bailleur enregistré.</td></tr>@endforelse</tbody></table></div></section>
             <section class="card"><div class="section-head"><div><h2>Programmes</h2><span class="muted">{{ $programs->count() }} enregistré(s)</span></div></div><div class="table-wrap"><table><thead><tr><th>Programme</th><th>Bailleur</th><th>Période</th><th>Projets</th><th>Actions</th></tr></thead><tbody>@forelse($programs as $program)<tr><td><strong>{{ $program->name }}</strong><div class="muted">{{ $program->code }}</div></td><td>{{ $program->donor?->name ?? 'Sans bailleur' }}</td><td>{{ $program->starts_on?->format('d/m/Y') ?? '—' }}<div class="muted">au {{ $program->ends_on?->format('d/m/Y') ?? '—' }}</div></td><td>{{ $program->projects_count }}</td><td><div class="actions">@if($canManage)<button class="btn outline compact" type="button" data-sheet-open="program-edit-{{ $program->id }}">Modifier</button><form method="post" action="{{ route('organizations.programs.destroy',[$organization,$program]) }}" onsubmit="return confirm('Archiver ce programme ?')">@csrf @method('DELETE')<button class="btn danger compact">Archiver</button></form>@else<span class="muted">Consultation</span>@endif</div></td></tr>@empty<tr><td class="empty" colspan="5">Aucun programme enregistré.</td></tr>@endforelse</tbody></table></div></section>

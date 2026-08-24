@@ -58,33 +58,33 @@ void main() {
     expect(keys, isNot(contains('users')));
   });
 
-  test('la navigation conserve le même ordre et le tableau de bord en premier', () {
-    final user = <String, dynamic>{
-      'permissions': <String>[
-        'configuration.view',
-        'organizations.view',
-        'products.view',
-        'stocks.view',
-      ],
-    };
+  test(
+    'la navigation conserve le même ordre et le tableau de bord en premier',
+    () {
+      final user = <String, dynamic>{
+        'permissions': <String>[
+          'configuration.view',
+          'organizations.view',
+          'products.view',
+          'stocks.view',
+        ],
+      };
 
-    final keys = ApplicationAccess.navigation(user)
-        .map((item) => item.key)
-        .toList(growable: false);
+      final keys = ApplicationAccess.navigation(
+        user,
+      ).map((item) => item.key).toList(growable: false);
 
-    expect(keys.first, 'dashboard');
-    expect(
-      keys,
-      <String>[
+      expect(keys.first, 'dashboard');
+      expect(keys, <String>[
         'dashboard',
         'configuration',
         'organizations',
         'products',
         'stocks',
         'profile',
-      ],
-    );
-  });
+      ]);
+    },
+  );
 
   test('une permission retirée supprime immédiatement le module concerné', () {
     final withUsers = ApplicationAccess.navigation(<String, dynamic>{
@@ -123,7 +123,7 @@ void main() {
           'roles': <String>[role],
           'permissions': <String>['dashboard.view'],
         }),
-        '/home',
+        role == 'sago_admin' ? '/sago/dashboard' : '/home',
       );
     }
   });

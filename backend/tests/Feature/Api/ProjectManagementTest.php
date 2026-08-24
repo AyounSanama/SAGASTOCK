@@ -30,7 +30,7 @@ class ProjectManagementTest extends TestCase
     public function test_project_is_scoped_to_organization_and_mission(): void
     {
         Sanctum::actingAs($this->administrator());
-        $country = Country::create(['iso2' => 'CM', 'name' => 'Cameroun']);
+        $country = Country::firstOrCreate(['iso2' => 'CM'], ['name' => 'Cameroun']);
         $organization = Organization::create(['code' => 'ONG', 'name' => 'ONG']);
         $other = Organization::create(['code' => 'OTHER', 'name' => 'Autre']);
         $mission = Mission::create(['organization_id' => $organization->id, 'country_id' => $country->id, 'code' => 'MISSION', 'name' => 'Mission']);
@@ -54,7 +54,7 @@ class ProjectManagementTest extends TestCase
     public function test_project_rejects_a_mission_from_another_organization(): void
     {
         Sanctum::actingAs($this->administrator());
-        $country = Country::create(['iso2' => 'FR', 'name' => 'France']);
+        $country = Country::firstOrCreate(['iso2' => 'FR'], ['name' => 'France']);
         $organization = Organization::create(['code' => 'ONG', 'name' => 'ONG']);
         $other = Organization::create(['code' => 'OTHER', 'name' => 'Autre']);
         $mission = Mission::create(['organization_id' => $other->id, 'country_id' => $country->id, 'code' => 'OTHER', 'name' => 'Autre mission']);

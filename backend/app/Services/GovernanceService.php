@@ -87,6 +87,7 @@ class GovernanceService
             self::SAGO_ADMIN => [self::COORDINATION_ADMIN],
             self::COORDINATION_ADMIN => [self::PROJECT_ADMIN, self::SITE_ADMIN],
             self::PROJECT_ADMIN => [self::SITE_ADMIN],
+            self::SITE_ADMIN => [self::SITE_USER],
             default => [],
         };
     }

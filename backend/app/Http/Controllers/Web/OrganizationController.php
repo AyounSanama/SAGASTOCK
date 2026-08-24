@@ -4,12 +4,17 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
+use App\Models\Country;
+use App\Models\Role;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\UserScopeService;
 use App\Services\GovernanceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -17,23 +22,48 @@ class OrganizationController extends Controller
 {
     public function __construct(private AuditService $audit, private UserScopeService $scopes) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
         $this->allow('organizations.view');
+        if (app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::SAGO_ADMIN) {
+            return redirect()->route('configuration.organization', $request->boolean('create') ? ['create' => 1] : []);
+        }
         $organizations = $this->scopes->organizations($request->user())
             ->when($request->string('search')->toString(), fn ($query, $search) => $query
                 ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
             ->orderBy('name')->paginate(20);
         $archivedOrganizations = $this->scopes->archivedOrganizations($request->user())->latest('deleted_at')->get();
-        return view('organizations.index', compact('organizations', 'archivedOrganizations'));
+        $countries = Country::where('is_active', true)->orderBy('name')->get(['id', 'iso2', 'name']);
+        return view('organizations.index', compact('organizations', 'archivedOrganizations', 'countries'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $this->platformAdmin($request);
-        $organization = Organization::create($this->validated($request));
-        $this->audit->record($request, 'organization.created', $organization, [], $organization->only(['code', 'name', 'is_active']));
+        [$organizationData, $countryIds, $adminData] = $this->creationData($request);
+        $temporaryPassword = DB::transaction(function () use ($request, $organizationData, $countryIds, $adminData): string {
+            $organization = Organization::create($organizationData);
+            $organization->countries()->sync($countryIds);
+            $temporaryPassword = Str::password(16, symbols: true);
+            $user = User::create([
+                'organization_id' => $organization->id,
+                'name' => trim($adminData['admin_first_name'].' '.$adminData['admin_last_name']),
+                'first_name' => $adminData['admin_first_name'], 'last_name' => $adminData['admin_last_name'],
+                'email' => $adminData['admin_email'], 'phone' => $adminData['admin_phone'] ?? null,
+                'username' => strtolower($adminData['admin_username']), 'password' => $temporaryPassword,
+                'is_active' => true, 'must_change_password' => true,
+            ]);
+            $role = Role::where('code', GovernanceService::COORDINATION_ADMIN)->where('is_active', true)->firstOrFail();
+            $user->roles()->attach($role, ['scope_type' => 'organization', 'scope_id' => $organization->id]);
+            $this->audit->record($request, 'organization.created', $organization, [], $organization->only(['code', 'name', 'is_active']));
+            $this->audit->record($request, 'user.created', $user, [], ['role' => GovernanceService::COORDINATION_ADMIN, 'organization_id' => $organization->id]);
+            return $temporaryPassword;
+        });
+        return back()->with('status', 'Organisation et Admin Coordination créés avec succès.')
+            ->with('temporary_password', $temporaryPassword);
+        /*
         return back()->with('status', 'Organisation créée.');
+        */
     }
 
     public function update(Request $request, Organization $organization): RedirectResponse
@@ -64,6 +94,31 @@ class OrganizationController extends Controller
         $model->update(['is_active' => true]);
         $this->audit->record($request, 'organization.restored', $model);
         return back()->with('status', 'Organisation restaurée.');
+    }
+
+    private function creationData(Request $request): array
+    {
+        $data = $request->validate([
+            'code' => ['required', 'alpha_dash', 'max:40', 'unique:organizations,code'],
+            'name' => ['required', 'string', 'max:160'],
+            'organization_type' => ['required', Rule::in(['ngo','ministry','national_program','united_nations','international_agency','other'])],
+            'email' => ['nullable', 'email', 'max:190'], 'phone' => ['nullable', 'string', 'max:40'],
+            'address' => ['nullable', 'string', 'max:1000'], 'is_active' => ['nullable', 'boolean'],
+            'geographic_access_type' => ['required', Rule::in(['single_country','multi_country'])],
+            'country_ids' => ['required', 'array', 'min:1'], 'country_ids.*' => ['uuid', 'distinct', 'exists:countries,id'],
+            'admin_first_name' => ['required', 'string', 'max:80'], 'admin_last_name' => ['required', 'string', 'max:80'],
+            'admin_email' => ['required', 'email', 'max:190', 'unique:users,email'],
+            'admin_phone' => ['nullable', 'string', 'max:40'],
+            'admin_username' => ['required', 'alpha_dash', 'max:80', 'unique:users,username'],
+        ]);
+        if ($data['geographic_access_type'] === 'single_country' && count($data['country_ids']) !== 1) {
+            abort(422, 'Une organisation unipays doit avoir exactement un pays.');
+        }
+        $firstCountry = Country::findOrFail($data['country_ids'][0]);
+        $organizationData = collect($data)->only(['code','name','organization_type','email','phone','address','geographic_access_type'])->all();
+        $organizationData['country_code'] = $data['geographic_access_type'] === 'single_country' ? $firstCountry->iso2 : null;
+        $organizationData['is_active'] = $request->boolean('is_active', true);
+        return [$organizationData, $data['country_ids'], $data];
     }
 
     private function validated(Request $request, ?Organization $organization = null): array

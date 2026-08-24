@@ -1,67 +1,40 @@
-import 'dart:convert';
-
-import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../../core/data/local_first_repository.dart';
+import '../../../core/database/app_database.dart';
 import '../../../core/network/api_client.dart';
 
 class StructureService {
-  StructureService({ApiClient? client, FlutterSecureStorage? storage})
-    : _client = client ?? ApiClient(),
-      _storage = storage ?? const FlutterSecureStorage();
+  StructureService({
+    ApiClient? client,
+    FlutterSecureStorage? storage,
+    AppDatabase? database,
+  }) : _repository = LocalFirstRepository(
+         client: client ?? ApiClient(),
+         storage: storage ?? const FlutterSecureStorage(),
+         database: database,
+       );
 
-  final ApiClient _client;
-  final FlutterSecureStorage _storage;
-
-  Future<Options> _authorized() async {
-    final token = await _storage.read(key: 'auth_token');
-    return Options(headers: {'Authorization': 'Bearer $token'});
-  }
+  final LocalFirstRepository _repository;
 
   Future<Map<String, dynamic>> list(
     String organizationId, {
     String search = '',
   }) async {
-    final cacheKey = 'offline_structures_$organizationId';
-    try {
-      final response = await _client.dio.get<Map<String, dynamic>>(
-        '/organizations/$organizationId/structures',
-        queryParameters: search.isEmpty ? null : {'search': search},
-        options: await _authorized(),
-      );
-      final data = response.data ?? <String, dynamic>{};
-      if (search.isEmpty) {
-        await _storage.write(key: cacheKey, value: jsonEncode(data));
-      }
-      return data;
-    } on DioException catch (error) {
-      if (error.response != null) rethrow;
-      final cached = await _storage.read(key: cacheKey);
-      if (cached == null) {
-        return {
-          'facilities': {'data': <dynamic>[]},
-          'archived_facilities': <dynamic>[],
-          'offline': true,
-        };
-      }
-      final data = jsonDecode(cached) as Map<String, dynamic>;
-      data['offline'] = true;
-      if (search.isNotEmpty) {
-        final query = search.toLowerCase();
-        final facilities =
-            ((data['facilities'] as Map<String, dynamic>?)?['data']
-                        as List<dynamic>? ??
-                    [])
-                .where(
-                  (item) =>
-                      '${item['name']}'.toLowerCase().contains(query) ||
-                      '${item['code']}'.toLowerCase().contains(query),
-                )
-                .toList();
-        (data['facilities'] as Map<String, dynamic>)['data'] = facilities;
-      }
-      return data;
+    final data = await _repository.document(
+      collection: 'structures',
+      organizationId: organizationId,
+      endpoint: '/organizations/$organizationId/structures',
+      query: {if (search.isNotEmpty) 'search': search},
+    );
+    if (data.isEmpty) {
+      return {
+        'facilities': {'data': <dynamic>[]},
+        'archived_facilities': <dynamic>[],
+        'offline': true,
+      };
     }
+    return data;
   }
 
   Future<void> saveFacility({
@@ -72,38 +45,35 @@ class StructureService {
     final path = facilityId == null
         ? '/organizations/$organizationId/facilities'
         : '/organizations/$organizationId/facilities/$facilityId';
-    if (facilityId == null) {
-      await _client.dio.post<void>(
-        path,
-        data: data,
-        options: await _authorized(),
-      );
-    } else {
-      await _client.dio.put<void>(
-        path,
-        data: data,
-        options: await _authorized(),
-      );
-    }
-  }
-
-  Future<void> archiveFacility(
-    String organizationId,
-    String facilityId,
-  ) async {
-    await _client.dio.delete<void>(
-      '/organizations/$organizationId/facilities/$facilityId',
-      options: await _authorized(),
+    await _repository.mutate(
+      collection: 'structures.facilities',
+      organizationId: organizationId,
+      endpoint: path,
+      method: facilityId == null ? 'POST' : 'PUT',
+      remoteId: facilityId,
+      payload: data,
     );
   }
 
-  Future<void> restoreFacility(
-    String organizationId,
-    String facilityId,
-  ) async {
-    await _client.dio.post<void>(
-      '/organizations/$organizationId/facilities/archived/$facilityId/restore',
-      options: await _authorized(),
+  Future<void> archiveFacility(String organizationId, String facilityId) async {
+    await _repository.mutateEntityState(
+      collection: 'structures.facilities',
+      organizationId: organizationId,
+      remoteId: facilityId,
+      endpoint: '/organizations/$organizationId/facilities/$facilityId',
+      deleted: true,
+      method: 'DELETE',
+    );
+  }
+
+  Future<void> restoreFacility(String organizationId, String facilityId) async {
+    await _repository.mutateEntityState(
+      collection: 'structures.facilities',
+      organizationId: organizationId,
+      remoteId: facilityId,
+      endpoint:
+          '/organizations/$organizationId/facilities/archived/$facilityId/restore',
+      deleted: false,
     );
   }
 
@@ -118,19 +88,14 @@ class StructureService {
     final path =
         '/organizations/$organizationId/facilities/$facilityId/$collection'
         '${childId == null ? '' : '/$childId'}';
-    if (childId == null) {
-      await _client.dio.post<void>(
-        path,
-        data: data,
-        options: await _authorized(),
-      );
-    } else {
-      await _client.dio.put<void>(
-        path,
-        data: data,
-        options: await _authorized(),
-      );
-    }
+    await _repository.mutate(
+      collection: 'structures.$collection',
+      organizationId: organizationId,
+      endpoint: path,
+      method: childId == null ? 'POST' : 'PUT',
+      remoteId: childId,
+      payload: data,
+    );
   }
 
   Future<void> archiveChild({
@@ -139,9 +104,14 @@ class StructureService {
     required String kind,
     required String childId,
   }) async {
-    await _client.dio.delete<void>(
-      '/organizations/$organizationId/facilities/$facilityId/${_collection(kind)}/$childId',
-      options: await _authorized(),
+    await _repository.mutateEntityState(
+      collection: 'structures.${_collection(kind)}',
+      organizationId: organizationId,
+      remoteId: childId,
+      endpoint:
+          '/organizations/$organizationId/facilities/$facilityId/${_collection(kind)}/$childId',
+      deleted: true,
+      method: 'DELETE',
     );
   }
 
@@ -152,9 +122,13 @@ class StructureService {
     required String childId,
   }) async {
     final collection = _collection(kind);
-    await _client.dio.post<void>(
-      '/organizations/$organizationId/facilities/$facilityId/$collection/archived/$childId/restore',
-      options: await _authorized(),
+    await _repository.mutateEntityState(
+      collection: 'structures.$collection',
+      organizationId: organizationId,
+      remoteId: childId,
+      endpoint:
+          '/organizations/$organizationId/facilities/$facilityId/$collection/archived/$childId/restore',
+      deleted: false,
     );
   }
 

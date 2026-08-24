@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/data/auth_service.dart';
 import '../access/application_access.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_tokens.dart';
 import 'app_navigation_drawer.dart';
 
 /// Layout authentifié unique. Son contenu varie uniquement avec les permissions.
@@ -19,31 +20,46 @@ class MainLayout extends StatelessWidget {
       future: AuthService().cachedUser(),
       builder: (context, snapshot) {
         final items = ApplicationAccess.navigation(snapshot.data);
+        final isSago = items.any((item) => item.key == 'standards');
+        final compactKeys = isSago
+            ? const {
+                'dashboard',
+                'organizations',
+                'assistance',
+                'history',
+                'profile',
+              }
+            : const {
+                'dashboard',
+                'stocks',
+                'receipts',
+                'dispensations',
+                'dispensing',
+                'inventory-orders',
+                'profile',
+              };
         final compactItems = items.length <= 5
             ? items
             : items
-                .where((item) => const {
-                      'dashboard', 'stocks', 'receipts',
-                      'dispensations', 'dispensing', 'profile',
-                    }.contains(item.key))
-                .take(5)
-                .toList(growable: false);
-        final wide = MediaQuery.sizeOf(context).width >= 1100;
+                  .where((item) => compactKeys.contains(item.key))
+                  .take(5)
+                  .toList(growable: false);
+        final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.desktop;
 
         return Scaffold(
           body: Row(
             children: [
               if (wide)
-                const SizedBox(width: 300, child: AppNavigationDrawer()),
+                const SizedBox(
+                  width: AppSizes.sidebarWidth,
+                  child: AppNavigationDrawer(),
+                ),
               Expanded(child: child),
             ],
           ),
           bottomNavigationBar: wide || compactItems.isEmpty
               ? null
-              : _BottomNavigation(
-                  items: compactItems,
-                  location: location,
-                ),
+              : _BottomNavigation(items: compactItems, location: location),
         );
       },
     );
@@ -62,13 +78,20 @@ class _BottomNavigation extends StatelessWidget {
       minimum: const EdgeInsets.fromLTRB(10, 0, 10, 8),
       child: Container(
         height: 68,
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.sm,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppTheme.border),
           boxShadow: const [
-            BoxShadow(color: Color(0x1A182033), blurRadius: 22, offset: Offset(0, 7)),
+            BoxShadow(
+              color: Color(0x1A182033),
+              blurRadius: 22,
+              offset: Offset(0, 7),
+            ),
           ],
         ),
         child: Row(
@@ -77,7 +100,9 @@ class _BottomNavigation extends StatelessWidget {
               Expanded(
                 child: _NavigationItem(
                   item: item,
-                  selected: location == item.path || location.startsWith('${item.path}/'),
+                  selected:
+                      location == item.path ||
+                      location.startsWith('${item.path}/'),
                 ),
               ),
           ],
@@ -98,10 +123,10 @@ class _NavigationItem extends StatelessWidget {
     final color = selected ? AppTheme.orange : AppTheme.gray;
     return Material(
       color: selected ? AppTheme.orangeSoft : Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: () => context.go(item.path),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

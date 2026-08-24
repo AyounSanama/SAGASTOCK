@@ -9,11 +9,9 @@
 <section class="configuration-page"
          data-workflow-step="{{ $activeStep }}"
          data-workflow-draft-url="{{ route('configuration.workflow.draft', $workflow->workflow_id) }}">
-    <a class="configuration-home-back" href="{{ route('configuration.index', ['_flow'=>$workflow->workflow_id]) }}">
-        ← Retour à l’accueil Configuration
-    </a>
+    <x-app-button variant="ghost" icon="arrow_back" :href="route('configuration.index', ['_flow'=>$workflow->workflow_id])">Retour à l’accueil Configuration</x-app-button>
     <article class="configuration-intro">
-        <div class="intro-icon">⚙</div>
+        <div class="intro-icon material-symbols-outlined" aria-hidden="true">settings</div>
         <div class="intro-copy"><h2>{{ $workflow->flow_type->label() }}</h2><p>Workflow version {{ $workflow->version }} · progression indépendante et sécurisée.</p></div>
         <div class="intro-progress">
             <strong>Étape {{ min($activeStep,11) }} sur 11</strong>
