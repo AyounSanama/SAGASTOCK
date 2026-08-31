@@ -172,13 +172,10 @@ class _OrganizationsPageState extends State<OrganizationsPage> {
     if (result == null || !mounted) return;
     await _load();
     if (!mounted) return;
-    final temporaryPassword = result['temporary_password'];
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          temporaryPassword == null
-              ? 'Organisation créée avec succès.'
-              : 'Organisation créée. Mot de passe temporaire : $temporaryPassword',
+        content: const Text(
+          'Organisation et compte Admin Coordination créés avec succès. L’utilisateur devra modifier son mot de passe lors de sa première connexion.',
         ),
       ),
     );

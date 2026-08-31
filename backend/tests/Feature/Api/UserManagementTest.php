@@ -2,8 +2,11 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\Country;
+use App\Models\Mission;
 use App\Models\Organization;
 use App\Models\Permission;
+use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,10 +20,10 @@ class UserManagementTest extends TestCase
 
     private function administrator(): User
     {
-        $permission = Permission::create(['code' => 'users.manage', 'name' => 'Gérer les utilisateurs']);
-        $view = Permission::create(['code' => 'users.view', 'name' => 'Consulter les utilisateurs']);
-        $role = Role::create(['code' => 'admin', 'name' => 'Administrateur']);
-        $role->permissions()->attach([$permission->id, $view->id]);
+        $permission = Permission::firstOrCreate(['code' => 'users.manage'], ['name' => 'Gérer les utilisateurs']);
+        $view = Permission::firstOrCreate(['code' => 'users.view'], ['name' => 'Consulter les utilisateurs']);
+        $role = Role::firstOrCreate(['code' => 'admin'], ['name' => 'Administrateur']);
+        $role->permissions()->syncWithoutDetaching([$permission->id, $view->id]);
         $user = User::factory()->create(['is_active' => true]);
         $user->roles()->attach($role->id, ['scope_type' => 'platform']);
 
@@ -36,7 +39,10 @@ class UserManagementTest extends TestCase
             'email' => 'marie@example.org',
             'role_id' => $role->id,
             'scope_type' => 'platform',
-        ])->assertCreated()->assertJsonStructure(['user', 'temporary_password']);
+        ])->assertCreated()
+            ->assertJsonStructure(['user', 'message'])
+            ->assertJsonMissingPath('temporary_password')
+            ->assertJsonMissingPath('password');
         $user = User::where('email', 'marie@example.org')->firstOrFail();
         $this->putJson('/api/v1/users/'.$user->id, ['is_active' => false])->assertOk()->assertJsonPath('user.is_active', false);
         $this->assertDatabaseHas('audit_logs', ['event' => 'user.created', 'auditable_id' => (string) $user->id]);
@@ -152,13 +158,13 @@ class UserManagementTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['event' => 'user.restored', 'auditable_id' => (string) $target->id]);
     }
 
-    public function test_organization_admin_cannot_access_users_outside_its_scope(): void
+    public function test_generic_organization_scoped_admin_cannot_access_users_outside_its_scope(): void
     {
-        $manage = Permission::create(['code' => 'users.manage', 'name' => 'Gérer les utilisateurs']);
-        $view = Permission::create(['code' => 'users.view', 'name' => 'Consulter les utilisateurs']);
-        $adminRole = Role::create(['code' => 'organization_admin', 'name' => 'Administrateur organisation', 'is_system' => true]);
-        $adminRole->permissions()->attach([$manage->id, $view->id]);
-        $memberRole = Role::create(['code' => 'clinician', 'name' => 'Clinicien', 'is_system' => true]);
+        $manage = Permission::firstOrCreate(['code' => 'users.manage'], ['name' => 'Gérer les utilisateurs']);
+        $view = Permission::firstOrCreate(['code' => 'users.view'], ['name' => 'Consulter les utilisateurs']);
+        $adminRole = Role::firstOrCreate(['code' => 'organization_scope_test'], ['name' => 'Administrateur organisation', 'is_system' => true]);
+        $adminRole->permissions()->syncWithoutDetaching([$manage->id, $view->id]);
+        $memberRole = Role::firstOrCreate(['code' => 'clinician'], ['name' => 'Clinicien', 'is_system' => true]);
         $organizationA = Organization::create(['code' => 'ORG-A', 'name' => 'Organisation A']);
         $organizationB = Organization::create(['code' => 'ORG-B', 'name' => 'Organisation B']);
         $admin = User::factory()->create(['is_active' => true]);
@@ -173,5 +179,50 @@ class UserManagementTest extends TestCase
         $this->getJson('/api/v1/users/'.$outside->id)->assertNotFound();
         $this->deleteJson('/api/v1/users/'.$outside->id)->assertNotFound();
         $this->assertNotSoftDeleted('users', ['id' => $outside->id]);
+    }
+
+    public function test_user_sheet_groups_real_permissions_and_hides_technical_scope_id(): void
+    {
+        $admin = $this->administrator();
+        $organization = Organization::create(['code' => 'ORG-UI', 'name' => 'Médecins du Monde']);
+        $country = Country::firstOrCreate(['iso3' => 'CMR'], ['iso2' => 'CM', 'name' => 'Cameroun']);
+        $mission = Mission::create([
+            'organization_id' => $organization->id,
+            'country_id' => $country->id,
+            'code' => 'MISSION-UI',
+            'name' => 'Mission Cameroun',
+        ]);
+        $project = Project::create([
+            'organization_id' => $organization->id,
+            'mission_id' => $mission->id,
+            'code' => 'PROJ-UI',
+            'name' => 'Projet Santé Mère-Enfant',
+        ]);
+        $permissions = collect([
+            ['code' => 'users.view', 'name' => 'Consulter les utilisateurs'],
+            ['code' => 'projects.view', 'name' => 'Consulter les projets'],
+            ['code' => 'stocks.view', 'name' => 'Consulter les stocks et mouvements'],
+        ])->map(fn (array $permission) => Permission::updateOrCreate(
+            ['code' => $permission['code']],
+            ['name' => $permission['name']],
+        ));
+        $role = Role::create(['code' => 'project_ui', 'name' => 'Admin Projet', 'is_active' => true]);
+        $role->permissions()->sync($permissions->pluck('id'));
+        $target = User::factory()->create(['organization_id' => $organization->id]);
+        $target->roles()->attach($role, ['scope_type' => 'project', 'scope_id' => $project->id]);
+
+        $response = $this->actingAs($admin)->get('/users/'.$target->id)->assertOk();
+
+        $response->assertSee('Admin Projet')
+            ->assertSee('Projet Santé Mère-Enfant')
+            ->assertSee('Médecins du Monde')
+            ->assertSee('Utilisateurs & accès')
+            ->assertSee('Projets')
+            ->assertSee('Stock & réceptions')
+            ->assertSee('3 permissions')
+            ->assertSee('Consulter les utilisateurs')
+            ->assertSee('Consulter les projets')
+            ->assertSee('Consulter les stocks et mouvements')
+            ->assertDontSee($project->id);
     }
 }

@@ -1,27 +1,14 @@
 <!doctype html>
-<html lang="fr">
-<head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Nouveau mot de passe · PharmaCare</title>
-    @include('components.auth-styles')
-</head>
-<body>
-<main class="card">
-    <img class="logo" src="{{ asset('images/pharmacare-logo.png') }}" alt="Logo PharmaCare">
-    <h1>Nouveau mot de passe</h1>
-    <p>Choisissez au moins 12 caractères et évitez un mot de passe déjà utilisé ailleurs.</p>
-    @if($errors->any())<p class="error">{{ $errors->first() }}</p>@endif
-    <form method="post" action="{{ route('password.update') }}">
-        @csrf
-        <input type="hidden" name="token" value="{{ $token }}">
-        <label for="email">Adresse e-mail</label>
-        <input id="email" name="email" type="email" value="{{ old('email',$email) }}" required>
-        <label for="password">Nouveau mot de passe</label>
-        <input id="password" name="password" type="password" minlength="12" required>
-        <label for="password_confirmation">Confirmer le mot de passe</label>
-        <input id="password_confirmation" name="password_confirmation" type="password" minlength="12" required>
-        <button style="width:100%;margin-top:20px">Réinitialiser le mot de passe</button>
-    </form>
-</main>
-</body>
-</html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nouveau mot de passe · PharmaCare</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0,0"><link rel="stylesheet" href="/css/pharmacare-portal.css?v={{ filemtime(public_path('css/pharmacare-portal.css')) }}">@include('components.auth-styles')</head>
+<body class="auth-page"><main class="auth-card" aria-labelledby="reset-title">
+ <header class="auth-brand"><img class="auth-logo" src="{{ asset('images/pharmacare-logo.png') }}" alt="Logo PharmaCare"><h1 id="reset-title" class="auth-wordmark"><span>Pharma</span><strong>Care</strong></h1><p>Choisissez un nouveau mot de passe sécurisé.</p></header>
+ @if($errors->any())<div class="auth-alert auth-alert--error" role="alert"><span class="material-symbols-outlined">error</span><span>{{ $errors->first() }}</span></div>@endif
+ <form class="auth-form" method="post" action="{{ route('password.update') }}">@csrf<input type="hidden" name="token" value="{{ $token }}">
+  <x-app-input name="email" label="Adresse e-mail" type="email" icon="mail" :value="old('email',$email)" required autocomplete="email" />
+  @foreach([['password','Nouveau mot de passe','new-password'],['password_confirmation','Confirmer le mot de passe','new-password']] as [$name,$label,$autocomplete])
+   <label class="app-field {{ $errors->has($name) ? 'is-error' : '' }}" for="{{ $name }}"><span class="app-field__label">{{ $label }} <span class="app-field__required">*</span></span><span class="app-field__control app-field__control--icon auth-password-control"><span class="material-symbols-outlined">lock</span><input class="app-field__input" id="{{ $name }}" name="{{ $name }}" type="password" minlength="6" required autocomplete="{{ $autocomplete }}"><button class="auth-password-toggle" type="button" data-password-toggle="{{ $name }}" aria-label="Afficher le mot de passe"><span class="material-symbols-outlined">visibility</span></button></span></label>
+  @endforeach
+  <x-app-button type="submit" icon="restart_alt" expanded>Réinitialiser le mot de passe</x-app-button>
+  <x-app-button variant="text" :href="route('login')" icon="arrow_back" expanded>Retour à la connexion</x-app-button>
+ </form>
+</main><script>document.querySelectorAll('[data-password-toggle]').forEach(button=>button.addEventListener('click',()=>{const input=document.getElementById(button.dataset.passwordToggle);const visible=input.type==='text';input.type=visible?'password':'text';button.querySelector('span').textContent=visible?'visibility':'visibility_off';button.setAttribute('aria-label',visible?'Afficher le mot de passe':'Masquer le mot de passe');input.focus()}));</script></body></html>

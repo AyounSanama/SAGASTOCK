@@ -20,9 +20,6 @@
     @if(session('success'))
         <div class="alert success" role="status">{{ session('success') }}</div>
     @endif
-    @if(session('temporary_password'))
-        <div class="temporary-password" role="status"><strong>Mot de passe temporaire généré :</strong><code>{{ session('temporary_password') }}</code><small>Communiquez-le de façon sécurisée à l’Admin Coordination.</small></div>
-    @endif
     @if($errors->any())
         <div class="alert error validation-summary" role="alert">
             <strong>Le formulaire contient {{ $errors->count() }} erreur(s).</strong>

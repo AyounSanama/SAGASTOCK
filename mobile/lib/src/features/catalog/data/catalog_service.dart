@@ -69,6 +69,57 @@ class CatalogService {
     query: {'search': search, 'status': status},
   );
 
+  Future<List<Map<String, dynamic>>> projects(String organizationId) =>
+      _repository.list(
+        collection: 'catalog.projects',
+        endpoint: '/organizations/$organizationId/projects',
+        organizationId: organizationId,
+      );
+
+  Future<Map<String, dynamic>> projectStandardList(String projectId) =>
+      _repository.document(
+        collection: 'project.standard-list',
+        endpoint: '/projects/$projectId/standard-list',
+        query: {'project_id': projectId},
+      );
+
+  Future<List<Map<String, dynamic>>> generateProjectStandardList(
+    String projectId,
+    Map<String, dynamic> context,
+  ) async {
+    final response = await _client.dio.post<Map<String, dynamic>>(
+      '/projects/$projectId/standard-list/generate',
+      data: context,
+      options: await _authorized(),
+    );
+    return ((response.data?['products'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>();
+  }
+
+  Future<void> saveProjectStandardList({
+    required String projectId,
+    required String code,
+    required String name,
+    required Map<String, dynamic> context,
+    required List<String> productIds,
+  }) async {
+    await _client.dio.post<void>(
+      '/projects/$projectId/standard-list',
+      data: {...context, 'code': code, 'name': name, 'product_ids': productIds},
+      options: await _authorized(),
+    );
+  }
+
+  Future<void> publishProjectStandardList(
+    String projectId,
+    String listId,
+  ) async {
+    await _client.dio.post<void>(
+      '/projects/$projectId/standard-list/$listId/publish',
+      options: await _authorized(),
+    );
+  }
+
   Future<List<Map<String, dynamic>>> _list(
     String organizationId,
     String resource, {

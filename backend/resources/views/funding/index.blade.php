@@ -1,34 +1,37 @@
-<!doctype html>
-<html lang="fr">
-<head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Bailleurs et programmes · PharmaCare</title>
+@extends('layouts.portal')
+@section('title', 'Configuration des projets - PharmaCare')
+@section('page-title', 'Configuration des projets')
+@push('styles')
     <style>
         :root{--orange:#f57c00;--orange-soft:#fff3e8;--ink:#24324a;--muted:#667085;--line:#e8edf3;--bg:#f7f9fc;--green:#22a447;--red:#e53935;--blue:#2563eb}
         *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif}.funding-shell{width:100%;min-width:0;overflow-x:clip}.page-head,.toolbar,.section-head,.actions,.stat-row{display:flex;align-items:center;gap:12px}.page-head,.section-head{justify-content:space-between}.page-head{padding-bottom:4px}.page-head h1{margin:0;font-size:28px;letter-spacing:-.02em}.page-head p,.muted{color:var(--muted)}.page-head p{margin:7px 0 0}.toolbar{margin:22px 0;padding:16px;background:#fff;border:1px solid var(--line);border-radius:16px;flex-wrap:wrap;box-shadow:0 6px 18px #24324a08}.toolbar label{min-width:240px;flex:1;color:var(--muted);font-size:12px;font-weight:750}.toolbar select,.field input,.field select,.field textarea{width:100%;margin-top:6px;border:1px solid #d7dee8;border-radius:12px;padding:11px 12px;background:#fff;color:var(--ink);font:inherit}.toolbar select:focus,.field input:focus,.field select:focus,.field textarea:focus{outline:3px solid #f57c0020;border-color:var(--orange)}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}.stat,.card{min-width:0;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 24px #24324a0a}.stat{padding:18px;border-top:3px solid var(--orange)}.stat strong{display:block;font-size:26px;margin-top:5px}.content-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}.content-grid>*{min-width:0}.card{padding:20px;margin-bottom:18px}.section-head h2{margin:0;font-size:19px}.btn{min-height:42px;border-radius:12px;padding:9px 14px;border:2px solid transparent;font-weight:750;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;font:inherit;transition:transform .15s ease,box-shadow .15s ease,background .15s ease}.btn:hover{transform:translateY(-1px);box-shadow:0 6px 15px #24324a16}.primary{background:var(--orange);color:#fff}.outline{background:#fff;border-color:var(--orange);color:var(--orange)}.blue{border-color:var(--blue);color:var(--blue)}.danger{background:#fff;border-color:var(--red);color:var(--red)}.success{background:var(--green);color:#fff}.compact{min-height:34px;padding:6px 9px;font-size:12px}.table-wrap{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-inline:contain;margin-top:15px;border:1px solid var(--line);border-radius:13px;scrollbar-width:thin;scrollbar-color:#c7d0dc transparent}table{width:100%;min-width:680px;border-collapse:collapse}th,td{padding:12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}th{font-size:12px;color:var(--muted);background:#fafbfc}tr:last-child td{border-bottom:0}.badge{display:inline-flex;padding:5px 9px;border-radius:999px;background:#eaf8ef;color:#17763a;font-size:12px;font-weight:750}.badge.off{background:#fdecec;color:#b42318}.empty{padding:26px;text-align:center;color:var(--muted)}.notice{padding:13px 15px;border-radius:12px;margin:16px 0;background:#eaf8ef;color:#176b3a}.notice.error{background:#fdecec;color:#b42318}.form-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:15px}.field{min-width:0;font-weight:700;font-size:13px}.field.full{grid-column:1/-1}.sheet-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}.association{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end;margin-top:15px}.association-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}.chip{max-width:100%;display:flex;align-items:center;gap:8px;background:var(--orange-soft);border-radius:12px;padding:8px 10px}.chip form{margin:0}.archived{margin-top:18px}.actions form{margin:0}@media(max-width:1100px){.content-grid{grid-template-columns:1fr}}@media(max-width:900px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.page-head{align-items:flex-start;flex-direction:column}.stats,.form-grid,.association-fields{grid-template-columns:1fr}.toolbar label{min-width:100%}.actions{flex-wrap:wrap}.actions .btn{flex:1}.field.full{grid-column:auto}.association{grid-template-columns:1fr}.association>.btn{width:100%}table{min-width:620px}}
+        .reference-grid{grid-template-columns:1fr}.section-donors .reference-grid>section:nth-child(2),.section-programs .reference-grid>section:nth-child(1){display:none}
     </style>
-</head>
-<body>
-@include('components.app-sidebar')
+@endpush
+@section('content')
 <style>
-    body main.funding-shell{width:100%!important;max-width:1440px!important;min-width:0!important;margin:0 auto!important;padding:28px 32px 60px!important;overflow-x:clip!important}
-    @media(max-width:760px){body main.funding-shell{padding:20px 14px 46px!important}}
+    .funding-shell{width:100%;max-width:1440px;min-width:0;margin:0 auto;overflow-x:clip}
 </style>
-<main class="funding-shell">
+<main class="funding-shell section-{{ $activeSection }}">
     @if($canManage && $organization)
-        <x-app-page-header title="Bailleurs et programmes" subtitle="Gérez les partenaires financiers, les programmes et leurs associations aux projets." icon="handshake">
+        <x-app-page-header title="Configuration des projets" subtitle="Gérez les projets, leurs bailleurs et leurs programmes depuis un espace unique." icon="work">
             <x-slot:actions>
-                <x-app-button variant="secondary" icon="add" type="button" data-sheet-open="donor-create-sheet">Ajouter un bailleur</x-app-button>
-                <x-app-button icon="add" type="button" data-sheet-open="program-create-sheet">Ajouter un programme</x-app-button>
+                @if($activeSection === 'donors')
+                    <x-app-button icon="add" type="button" data-sheet-open="donor-create-sheet">Ajouter un bailleur</x-app-button>
+                @else
+                    <x-app-button icon="add" type="button" data-sheet-open="program-create-sheet">Ajouter un programme</x-app-button>
+                @endif
             </x-slot:actions>
         </x-app-page-header>
     @else
-        <x-app-page-header title="Bailleurs et programmes" subtitle="Gérez les partenaires financiers, les programmes et leurs associations aux projets." icon="handshake" />
+        <x-app-page-header title="Configuration des projets" subtitle="Consultez les projets, leurs bailleurs et leurs programmes depuis un espace unique." icon="work" />
     @endif
+    @include('projects.partials.configuration-tabs', ['activeTab' => $activeSection])
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="notice error">{{ $errors->first() }}</div>@endif
 
     <form class="toolbar" method="get" action="{{ route('modules.funding') }}">
+        <input type="hidden" name="section" value="{{ $activeSection }}">
         <label>Organisation<select name="organization_id" onchange="this.form.submit()"><option value="">Sélectionner</option>@foreach($organizations as $item)<option value="{{ $item->id }}" @selected($organization?->id===$item->id)>{{ $item->name }}</option>@endforeach</select></label>
         <label>Projet<select name="project_id" onchange="this.form.submit()"><option value="">Sélectionner un projet</option>@foreach($projects as $item)<option value="{{ $item->id }}" @selected($project?->id===$item->id)>{{ $item->name }}{{ $item->mission ? ' · '.$item->mission->name : '' }}</option>@endforeach</select></label>
     </form>
@@ -42,7 +45,7 @@
             <x-app-kpi-card label="Bailleurs du projet" :value="$assignedDonors->count()" icon="link" tone="green" />
             <x-app-kpi-card label="Programmes du projet" :value="$assignedPrograms->count()" icon="assignment" tone="violet" />
         </section>
-        <div class="content-grid">
+        <div class="content-grid reference-grid">
             <section class="card"><div class="section-head"><div><h2>Bailleurs</h2><span class="muted">{{ $donors->count() }} enregistré(s)</span></div></div><div class="table-wrap"><table><thead><tr><th>Bailleur</th><th>Contact</th><th>Projets</th><th>Statut</th><th>Actions</th></tr></thead><tbody>@forelse($donors as $donor)<tr><td><strong>{{ $donor->name }}</strong><div class="muted">{{ $donor->code }}</div></td><td>{{ $donor->email ?: '—' }}<div class="muted">{{ $donor->phone ?: '' }}</div></td><td>{{ $donor->projects_count }}</td><td><span class="badge {{ $donor->is_active?'':'off' }}">{{ $donor->is_active?'Actif':'Inactif' }}</span></td><td><div class="actions">@if($canManage)<button class="btn outline compact" type="button" data-sheet-open="donor-edit-{{ $donor->id }}">Modifier</button><form method="post" action="{{ route('organizations.donors.destroy',[$organization,$donor]) }}" onsubmit="return confirm('Archiver ce bailleur ?')">@csrf @method('DELETE')<button class="btn danger compact">Archiver</button></form>@else<span class="muted">Consultation</span>@endif</div></td></tr>@empty<tr><td class="empty" colspan="5">Aucun bailleur enregistré.</td></tr>@endforelse</tbody></table></div></section>
             <section class="card"><div class="section-head"><div><h2>Programmes</h2><span class="muted">{{ $programs->count() }} enregistré(s)</span></div></div><div class="table-wrap"><table><thead><tr><th>Programme</th><th>Bailleur</th><th>Période</th><th>Projets</th><th>Actions</th></tr></thead><tbody>@forelse($programs as $program)<tr><td><strong>{{ $program->name }}</strong><div class="muted">{{ $program->code }}</div></td><td>{{ $program->donor?->name ?? 'Sans bailleur' }}</td><td>{{ $program->starts_on?->format('d/m/Y') ?? '—' }}<div class="muted">au {{ $program->ends_on?->format('d/m/Y') ?? '—' }}</div></td><td>{{ $program->projects_count }}</td><td><div class="actions">@if($canManage)<button class="btn outline compact" type="button" data-sheet-open="program-edit-{{ $program->id }}">Modifier</button><form method="post" action="{{ route('organizations.programs.destroy',[$organization,$program]) }}" onsubmit="return confirm('Archiver ce programme ?')">@csrf @method('DELETE')<button class="btn danger compact">Archiver</button></form>@else<span class="muted">Consultation</span>@endif</div></td></tr>@empty<tr><td class="empty" colspan="5">Aucun programme enregistré.</td></tr>@endforelse</tbody></table></div></section>
         </div>
@@ -63,4 +66,4 @@
 @foreach($programs as $program)<x-form-sheet id="program-edit-{{ $program->id }}" title="Modifier le programme"><form method="post" action="{{ route('organizations.programs.update',[$organization,$program]) }}">@csrf @method('PUT')<div class="form-grid"><label class="field">Code *<input name="code" value="{{ $program->code }}" required></label><label class="field">Nom *<input name="name" value="{{ $program->name }}" required></label><label class="field full">Bailleur<select name="donor_id"><option value="">Sans bailleur</option>@foreach($donors as $item)<option value="{{ $item->id }}" @selected($program->donor_id===$item->id)>{{ $item->name }}</option>@endforeach</select></label><label class="field">Début<input type="date" name="starts_on" value="{{ $program->starts_on?->format('Y-m-d') }}"></label><label class="field">Fin<input type="date" name="ends_on" value="{{ $program->ends_on?->format('Y-m-d') }}"></label><label class="field full">Description<textarea name="description">{{ $program->description }}</textarea></label><label class="field full"><input style="width:auto" type="checkbox" name="is_active" value="1" @checked($program->is_active)> Programme actif</label></div><div class="sheet-actions"><button class="btn outline" type="button" data-sheet-close="program-edit-{{ $program->id }}">Annuler</button><button class="btn primary">Enregistrer</button></div></form></x-form-sheet>@endforeach
 @if($errors->any() && in_array(old('form_context'),['donor-create','program-create'],true))<script>document.addEventListener('DOMContentLoaded',()=>document.getElementById(@json(old('form_context').'-sheet'))?.showModal())</script>@endif
 @endif
-</body></html>
+@endsection

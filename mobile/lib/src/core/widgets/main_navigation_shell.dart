@@ -20,8 +20,13 @@ class MainLayout extends StatelessWidget {
       future: AuthService().cachedUser(),
       builder: (context, snapshot) {
         final items = ApplicationAccess.navigation(snapshot.data);
+        final role = '${snapshot.data?['role'] ?? ''}'.toLowerCase();
         final isSago = items.any((item) => item.key == 'standards');
-        final compactKeys = isSago
+        final compactKeys = role == 'coordination_admin'
+            ? const {'dashboard', 'projects', 'standard-lists', 'profile'}
+            : role == 'project_admin'
+            ? const {'dashboard', 'projects', 'standard-lists', 'profile'}
+            : isSago
             ? const {
                 'dashboard',
                 'organizations',
@@ -38,12 +43,10 @@ class MainLayout extends StatelessWidget {
                 'inventory-orders',
                 'profile',
               };
-        final compactItems = items.length <= 5
-            ? items
-            : items
-                  .where((item) => compactKeys.contains(item.key))
-                  .take(5)
-                  .toList(growable: false);
+        final compactItems = items
+            .where((item) => compactKeys.contains(item.key))
+            .take(5)
+            .toList(growable: false);
         final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.desktop;
 
         return Scaffold(
@@ -133,7 +136,7 @@ class _NavigationItem extends StatelessWidget {
             Icon(item.icon, size: 22, color: color),
             const SizedBox(height: 4),
             Text(
-              item.label,
+              _compactLabel(item),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -147,6 +150,14 @@ class _NavigationItem extends StatelessWidget {
       ),
     );
   }
+
+  String _compactLabel(ApplicationNavigationItem item) => switch (item.key) {
+    'dashboard' => 'Accueil',
+    'projects' => 'Projets',
+    'standard-lists' => 'Liste standard',
+    'profile' => 'Mon profil',
+    _ => item.label,
+  };
 }
 
 @Deprecated('Utiliser MainLayout.')

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/widgets/app_button.dart';
 import '../data/auth_service.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
+import '../../../core/localization/app_locale.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -13,32 +14,46 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final _auth = AuthService();
   Map<String, dynamic>? _user;
-  List<Map<String, dynamic>> _devices = [];
   bool _loading = true;
+  bool _savingLocale = false;
+  String _preferredLocale = 'fr';
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  Widget _information(String label, Object? value, IconData icon) {
+    final text = '${value ?? ''}'.trim();
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon),
+      title: Text(label),
+      subtitle: Text(text.isEmpty ? 'Non renseign\u00e9' : text),
+    );
+  }
+
   Future<void> _load() async {
     final user = await _auth.cachedUser();
-    List<Map<String, dynamic>> devices = [];
-    try {
-      devices = await _auth.devices();
-    } catch (_) {}
     if (mounted) {
       setState(() {
         _user = user;
-        _devices = devices;
+        _preferredLocale = '${user?['preferred_locale'] ?? 'fr'}';
         _loading = false;
       });
     }
   }
 
-  Future<void> _revoke(String id) async {
-    await _auth.revokeDevice(id);
-    await _load();
+  Future<void> _saveLocale() async {
+    setState(() => _savingLocale = true);
+    await _auth.updatePreferredLocale(_preferredLocale);
+    AppLocale.apply(_preferredLocale);
+    if (mounted) {
+      setState(() => _savingLocale = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Préférence de langue enregistrée.')),
+      );
+    }
   }
 
   @override
@@ -51,10 +66,112 @@ class _ProfilePageState extends State<ProfilePage> {
             padding: const EdgeInsets.all(20),
             children: [
               Card(
-                child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text(_user?['name'] as String? ?? 'Utilisateur'),
-                  subtitle: Text(_user?['email'] as String? ?? ''),
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 28,
+                            child: Icon(Icons.person_outline_rounded),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${_user?['name'] ?? 'Utilisateur'}',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                                Text('${_user?['role'] ?? ''}'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 28),
+                      _information(
+                        'Pr\u00e9nom',
+                        _user?['first_name'],
+                        Icons.badge_outlined,
+                      ),
+                      _information(
+                        'Nom',
+                        _user?['last_name'],
+                        Icons.badge_outlined,
+                      ),
+                      _information(
+                        'Adresse e-mail',
+                        _user?['email'],
+                        Icons.email_outlined,
+                      ),
+                      _information(
+                        'T\u00e9l\u00e9phone',
+                        _user?['phone'],
+                        Icons.phone_outlined,
+                      ),
+                      _information(
+                        'Identifiant',
+                        _user?['username'],
+                        Icons.account_circle_outlined,
+                      ),
+                      if (_user?['organization'] is Map)
+                        _information(
+                          'Organisation',
+                          (_user!['organization'] as Map)['name'],
+                          Icons.apartment_outlined,
+                        ),
+                      if (_user?['coordination'] is Map)
+                        _information(
+                          'Coordination',
+                          (_user!['coordination'] as Map)['name'],
+                          Icons.public_outlined,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Préférences',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        initialValue: _preferredLocale,
+                        decoration: const InputDecoration(
+                          labelText: 'Langue de l’interface',
+                          prefixIcon: Icon(Icons.language_outlined),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'fr',
+                            child: Text('Français'),
+                          ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _preferredLocale = value ?? 'fr'),
+                      ),
+                      const SizedBox(height: 12),
+                      AppButton.save(
+                        label: 'Enregistrer la langue',
+                        expanded: true,
+                        loading: _savingLocale,
+                        onPressed: _savingLocale ? null : _saveLocale,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -64,42 +181,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 icon: Icons.password_rounded,
                 onPressed: () => context.push('/change-password'),
               ),
-              const SizedBox(height: 24),
-              Text(
-                'Appareils autoris\u00e9s',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              if (_devices.isEmpty)
-                const Text(
-                  'Aucun appareil synchronis\u00e9 ou serveur indisponible.',
-                ),
-              for (final device in _devices)
-                Card(
-                  child: ListTile(
-                    leading: Icon(
-                      device['platform'] == 'ios'
-                          ? Icons.phone_iphone
-                          : Icons.android,
-                    ),
-                    title: Text(device['name'] as String? ?? 'Appareil'),
-                    subtitle: Text(
-                      device['revoked_at'] == null
-                          ? 'Actif'
-                          : 'R\u00e9voqu\u00e9',
-                    ),
-                    trailing: device['revoked_at'] == null
-                        ? IconButton(
-                            tooltip: 'R\u00e9voquer',
-                            onPressed: () => _revoke(device['id'] as String),
-                            color: Theme.of(context).colorScheme.error,
-                            icon: const Icon(Icons.block_rounded),
-                          )
-                        : null,
-                  ),
-                ),
               const SizedBox(height: 20),
               AppButton.delete(
                 expanded: true,

@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\HealthFacility;
 use App\Models\Mission;
 use App\Models\Organization;
-use App\Models\Project;
 use App\Models\Permission;
+use App\Models\Project;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditService;
@@ -31,11 +31,11 @@ class UserController extends Controller
 
         return view('dashboard.index', [
             'users' => $this->scopes->users(Auth::user(), User::with('roles'))
-                ->when($request->string('search')->toString(), fn($query, $search) => $query
-                    ->where(fn($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
-                ->when($request->filled('role_id'), fn($query) => $query->whereHas('roles', fn($roles) => $roles->whereKey($request->integer('role_id'))))
-                ->when($request->get('status') === 'active', fn($query) => $query->where('is_active', true))
-                ->when($request->get('status') === 'inactive', fn($query) => $query->where('is_active', false))
+                ->when($request->string('search')->toString(), fn ($query, $search) => $query
+                    ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
+                ->when($request->filled('role_id'), fn ($query) => $query->whereHas('roles', fn ($roles) => $roles->whereKey($request->integer('role_id'))))
+                ->when($request->get('status') === 'active', fn ($query) => $query->where('is_active', true))
+                ->when($request->get('status') === 'inactive', fn ($query) => $query->where('is_active', false))
                 ->orderBy('name')->paginate(20)->withQueryString(),
             'roles' => $this->scopes->roles(Auth::user())->orderBy('name')->get(),
             'canCreateUsers' => $canCreate,
@@ -59,6 +59,7 @@ class UserController extends Controller
             'delegablePermissions' => $this->delegablePermissions(Auth::user()),
             'roles' => $this->scopes->assignableRoles(Auth::user())->orderBy('name')->get(),
             'organizations' => $this->scopes->organizations(Auth::user())->orderBy('name')->get(['id', 'name']),
+            'missions' => Mission::whereIn('organization_id', $this->scopes->organizationIds(Auth::user()))->orderBy('name')->get(['id', 'organization_id', 'name']),
             'projects' => $this->scopes->projects(Auth::user())->with('organization:id,name')->orderBy('name')->get(['id', 'organization_id', 'name']),
             'facilities' => $this->scopes->facilities(Auth::user())->with('organization:id,name')->orderBy('name')->get(['id', 'organization_id', 'name']),
             'sites' => $this->scopes->sites(Auth::user())->with('healthFacility:id,name')->orderBy('name')->get(['id', 'health_facility_id', 'name']),
@@ -69,8 +70,8 @@ class UserController extends Controller
     {
         $this->allow('users.view');
         $users = $this->scopes->users(Auth::user(), User::onlyTrashed()->with('roles'))
-            ->when($request->string('search')->toString(), fn($query, $search) => $query
-                ->where(fn($nested) => $nested->where('name', 'like', "%{$search}%")
+            ->when($request->string('search')->toString(), fn ($query, $search) => $query
+                ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")->orWhere('username', 'like', "%{$search}%")))
             ->latest('deleted_at')->paginate(20)->withQueryString();
 
@@ -116,6 +117,7 @@ class UserController extends Controller
             'managedUser' => $user->load('roles'),
             'roles' => $this->scopes->assignableRoles(Auth::user())->orderBy('name')->get(),
             'organizations' => $this->scopes->organizations(Auth::user())->orderBy('name')->get(['id', 'name']),
+            'missions' => Mission::whereIn('organization_id', $this->scopes->organizationIds(Auth::user()))->orderBy('name')->get(['id', 'organization_id', 'name']),
             'projects' => $this->scopes->projects(Auth::user())->with('organization:id,name')->orderBy('name')->get(['id', 'organization_id', 'name']),
             'facilities' => $this->scopes->facilities(Auth::user())->with('organization:id,name')->orderBy('name')->get(['id', 'organization_id', 'name']),
             'sites' => $this->scopes->sites(Auth::user())->with('healthFacility:id,name')->orderBy('name')->get(['id', 'health_facility_id', 'name']),
@@ -125,7 +127,7 @@ class UserController extends Controller
     private function expectedScope(User $actor): ?string
     {
         return match (app(GovernanceService::class)->assignableCode($actor)) {
-            GovernanceService::COORDINATION_ADMIN => 'organization',
+            GovernanceService::COORDINATION_ADMIN => 'mission',
             GovernanceService::PROJECT_ADMIN => 'project',
             GovernanceService::SITE_ADMIN, GovernanceService::SITE_USER => 'site',
             default => null,
@@ -191,6 +193,14 @@ class UserController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
         $user->roles()->sync([$data['role_id'] => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]);
+        $user->update(['organization_id' => match ($scopeType) {
+            'organization' => $scopeId,
+            'mission' => Mission::whereKey($scopeId)->value('organization_id'),
+            'project' => Project::whereKey($scopeId)->value('organization_id'),
+            'facility' => HealthFacility::whereKey($scopeId)->value('organization_id'),
+            'site' => Site::whereKey($scopeId)->value('organization_id'),
+            default => null,
+        }]);
         if (app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::SITE_ADMIN) {
             $allowed = Permission::whereIn('code', GovernanceService::SITE_DELEGABLE_PERMISSIONS)
                 ->whereIn('id', $data['permission_ids'] ?? [])->pluck('id');
@@ -219,7 +229,7 @@ class UserController extends Controller
         abort_if($request->user()->is($user), 422, 'Vous ne pouvez pas archiver votre propre compte.');
         if ($user->roles()->whereIn('code', ['sago_admin', 'owner', 'platform_owner'])->exists()) {
             $otherOwners = User::where('is_active', true)->whereKeyNot($user->id)
-                ->whereHas('roles', fn($query) => $query->whereIn('code', ['sago_admin', 'owner', 'platform_owner']))->exists();
+                ->whereHas('roles', fn ($query) => $query->whereIn('code', ['sago_admin', 'owner', 'platform_owner']))->exists();
             abort_unless($otherOwners, 422, 'Le dernier propriétaire actif de la plateforme ne peut pas être archivé.');
         }
         $user->tokens()->delete();
@@ -237,9 +247,10 @@ class UserController extends Controller
             return ['platform', null];
         }
         [$type, $id] = array_pad(explode(':', $scope, 2), 2, null);
-        abort_unless($id && in_array($type, ['organization', 'project', 'facility', 'site'], true), 422, 'Périmètre invalide.');
+        abort_unless($id && in_array($type, ['organization', 'mission', 'project', 'facility', 'site'], true), 422, 'Périmètre invalide.');
         $exists = match ($type) {
             'organization' => Organization::whereKey($id)->exists(),
+            'mission' => Mission::whereKey($id)->exists(),
             'project' => Project::whereKey($id)->exists(),
             'facility' => HealthFacility::whereKey($id)->exists(),
             'site' => Site::whereKey($id)->exists(),

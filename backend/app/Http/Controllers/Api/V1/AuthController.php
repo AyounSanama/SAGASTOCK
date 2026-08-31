@@ -4,14 +4,18 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
+use App\Models\HealthFacility;
+use App\Models\Mission;
 use App\Models\User;
-use App\Services\GovernanceService;
 use App\Services\ApplicationNavigationService;
+use App\Services\GovernanceService;
+use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Laravel\Sanctum\PersonalAccessToken;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -26,7 +30,9 @@ class AuthController extends Controller
             'platform' => ['required', 'in:android,ios'],
         ]);
         $login = $data['login'] ?? $data['email'] ?? null;
-        if (! $login) throw ValidationException::withMessages(['login' => ['Adresse e-mail ou identifiant requis.']]);
+        if (! $login) {
+            throw ValidationException::withMessages(['login' => ['Adresse e-mail ou identifiant requis.']]);
+        }
         $user = User::where('email', $login)->orWhere('username', strtolower($login))->first();
         if ($user?->locked_until?->isFuture()) {
             throw ValidationException::withMessages(['login' => ['Compte temporairement verrouillé. Réessayez plus tard.']]);
@@ -42,7 +48,9 @@ class AuthController extends Controller
             }
             throw ValidationException::withMessages(['login' => ['Identifiants incorrects.']]);
         }
-        if (! $user->is_active) throw ValidationException::withMessages(['login' => ['Ce compte est désactivé.']]);
+        if (! $user->is_active) {
+            throw ValidationException::withMessages(['login' => ['Ce compte est désactivé.']]);
+        }
         if ($user->organization_id && ! $user->organization()->where('is_active', true)->exists()) {
             throw ValidationException::withMessages(['login' => ['L’organisation rattachée à ce compte est désactivée.']]);
         }
@@ -62,6 +70,7 @@ class AuthController extends Controller
         );
         $user->update(['last_login_at' => now(), 'failed_login_attempts' => 0, 'locked_until' => null]);
         $payload = $this->userPayload($user);
+
         return response()->json([
             'token' => $user->createToken($data['device_id'])->plainTextToken,
             'user' => $payload,
@@ -76,9 +85,21 @@ class AuthController extends Controller
         return response()->json(['user' => $this->userPayload($request->user())]);
     }
 
+    public function updateLocale(Request $request): JsonResponse
+    {
+        $supported = config('pharmacare_languages.translated_locales', ['fr']);
+        $data = $request->validate([
+            'preferred_locale' => ['required', 'string', Rule::in($supported)],
+        ]);
+        $request->user()->update($data);
+
+        return response()->json(['user' => $this->userPayload($request->user()->refresh())]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()?->delete();
+
         return response()->json(['message' => 'Déconnexion réussie.']);
     }
 
@@ -91,10 +112,19 @@ class AuthController extends Controller
                 ->where('countries.is_active', true)
                 ->orderBy('countries.name')])
             ->first();
+        $mission = Mission::with('country')
+            ->withCount('projects')
+            ->whereIn('id', app(UserScopeService::class)->coordinationMissionIds($user))
+            ->first();
 
         return [
-            'id' => $user->uuid, 'name' => $user->name, 'username' => $user->username,
+            'id' => $user->uuid, 'name' => $user->name,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'username' => $user->username,
             'email' => $user->email,
+            'phone' => $user->phone,
+            'preferred_locale' => $user->preferred_locale ?: 'fr',
             'organization_id' => $organization?->id,
             'organization' => $organization ? [
                 'id' => $organization->id,
@@ -107,6 +137,23 @@ class AuthController extends Controller
                     'iso2' => $country->iso2,
                     'name' => $country->name,
                 ])->values()->all(),
+            ] : null,
+            'mission_id' => $mission?->id,
+            'country_id' => $mission?->country_id,
+            'coordination' => $mission ? [
+                'id' => $mission->id,
+                'code' => $mission->code,
+                'name' => $mission->name,
+                'is_active' => $mission->is_active,
+                'starts_on' => $mission->starts_on?->toDateString(),
+                'ends_on' => $mission->ends_on?->toDateString(),
+                'country' => $mission->country ? [
+                    'id' => $mission->country->id,
+                    'iso2' => $mission->country->iso2,
+                    'name' => $mission->country->name,
+                ] : null,
+                'projects_count' => $mission->projects_count,
+                'health_facilities_count' => HealthFacility::where('mission_id', $mission->id)->count(),
             ] : null,
             'roles' => $user->roles()->pluck('code')->all(),
             'role' => $governance->roleCode($user),

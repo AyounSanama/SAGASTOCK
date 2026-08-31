@@ -11,11 +11,12 @@ import '../../features/configuration/presentation/platform_standards_page.dart';
 import '../../features/configuration/presentation/organization_assistance_page.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/organizations/presentation/funding_page.dart';
+import '../../features/organizations/presentation/scoped_funding_page.dart';
 import '../../features/organizations/presentation/missions_page.dart';
 import '../../features/organizations/presentation/organizations_page.dart';
 import '../../features/organizations/presentation/projects_page.dart';
 import '../../features/organizations/presentation/scoped_missions_page.dart';
-import '../../features/organizations/presentation/scoped_projects_page.dart';
+import '../../features/organizations/presentation/project_configuration_page.dart';
 import '../../features/receipts/presentation/receipts_page.dart';
 import '../../features/dispensations/presentation/clinical_supply_page.dart';
 import '../../features/inventories/presentation/inventories_page.dart';
@@ -23,6 +24,9 @@ import '../../features/orders/presentation/orders_page.dart';
 import '../../features/stocks/presentation/stocks_page.dart';
 import '../../features/stocks/presentation/batches_page.dart';
 import '../../features/structures/presentation/facilities_page.dart';
+import '../../features/structures/presentation/scoped_facilities_page.dart';
+import '../../features/structures/presentation/scoped_sites_page.dart';
+import '../../features/users/presentation/scoped_users_page.dart';
 import '../widgets/main_navigation_shell.dart';
 import '../widgets/authorized_module_page.dart';
 import '../access/application_access.dart';
@@ -47,6 +51,9 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
       return null;
     }
     final user = await auth.cachedUser();
+    if (!ApplicationAccess.moduleAvailable(user, state.uri.path)) {
+      return '/home';
+    }
     final required = ApplicationAccess.requiredPermission(state.uri.path);
     return ApplicationAccess.allows(user, required) ? null : '/home';
   },
@@ -141,7 +148,25 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
         ),
         GoRoute(
           path: '/projects',
-          builder: (context, state) => const ScopedProjectsPage(),
+          builder: (context, state) => ProjectConfigurationPage(
+            openCreate: state.uri.queryParameters['create'] == '1',
+          ),
+        ),
+        GoRoute(
+          path: '/funding',
+          builder: (context, state) => const ScopedFundingPage(),
+        ),
+        GoRoute(
+          path: '/health-facilities',
+          builder: (context, state) => const ScopedFacilitiesPage(),
+        ),
+        GoRoute(
+          path: '/dispensing-sites',
+          builder: (context, state) => const ScopedSitesPage(),
+        ),
+        GoRoute(
+          path: '/users',
+          builder: (context, state) => const ScopedUsersPage(),
         ),
         GoRoute(
           path: '/products',
@@ -152,18 +177,6 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
           builder: (context, state) => const CatalogPage(initialTab: 2),
         ),
         for (final module in const <(String, String, IconData)>[
-          ('/funding', 'Bailleurs et programmes', Icons.handshake_outlined),
-          (
-            '/health-facilities',
-            'Formations sanitaires',
-            Icons.local_hospital_outlined,
-          ),
-          (
-            '/dispensing-sites',
-            'Sites de dispensation',
-            Icons.location_on_outlined,
-          ),
-          ('/users', 'Utilisateurs', Icons.people_outline),
           ('/reports', 'Rapports', Icons.assessment_outlined),
           ('/synchronization', 'Synchronisation', Icons.sync_outlined),
           ('/settings', 'Paramètres organisation', Icons.settings_outlined),

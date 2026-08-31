@@ -1,298 +1,223 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/access/application_access.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/theme/module_icon_registry.dart';
 import '../../../core/widgets/app_dashboard_panel.dart';
-import '../../../core/widgets/app_kpi_card.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
 import '../../auth/data/auth_service.dart';
 import '../data/dashboard_service.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.loadFuture});
+
+  @visibleForTesting
+  final Future<List<dynamic>>? loadFuture;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: const AppNavigationDrawer(),
-      body: SafeArea(
-        child: FutureBuilder<Map<String, dynamic>>(
-          future: DashboardService().load(),
-          builder: (context, snapshot) {
-            final data = snapshot.data ?? const <String, dynamic>{};
-            final stats = data['stats'] as Map<String, dynamic>? ??
-                const <String, dynamic>{};
-            final activities = _asMaps(data['activities']);
-            final movements = _asMaps(data['recent_movements']);
-            final widgets = _asMaps(data['widgets']);
-            final navigation = _asMaps(data['navigation']);
-            final offline = data['offline'] == true;
+  Widget build(BuildContext context) => Scaffold(
+    drawer: const AppNavigationDrawer(),
+    body: SafeArea(
+      child: FutureBuilder<List<dynamic>>(
+        future:
+            loadFuture ??
+            Future.wait<dynamic>([
+              DashboardService().load(),
+              AuthService().cachedUser(),
+            ]),
+        builder: (context, snapshot) {
+          final data =
+              snapshot.data?.first as Map<String, dynamic>? ?? const {};
+          final user = snapshot.data != null && snapshot.data!.length > 1
+              ? snapshot.data![1] as Map<String, dynamic>?
+              : null;
+          final stats = data['stats'] as Map<String, dynamic>? ?? const {};
+          final widgets = _maps(data['widgets']);
+          final navigation = _maps(data['navigation']);
+          final activities = _maps(data['activities']);
+          final projects = _maps(data['recent_projects']);
+          final offline = data['offline'] == true;
 
-            return RefreshIndicator(
-              onRefresh: () async => DashboardService().load(),
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: _DashboardHeader(
-                      offline: offline,
-                      onLogout: () async {
-                        await AuthService().logout();
-                        if (context.mounted) context.go('/login');
-                      },
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
-                    sliver: SliverList.list(
-                      children: [
-                        _DashboardIntro(offline: offline),
-                        const SizedBox(height: 18),
-                        _Statistics(stats: stats, widgets: widgets),
-                        const SizedBox(height: 24),
-                        const _SectionTitle(
-                          title: 'Actions rapides',
-                          subtitle: 'Accédez à vos opérations courantes',
-                        ),
-                        const SizedBox(height: 12),
-                        _QuickActions(navigation: navigation),
-                        const SizedBox(height: 24),
-                        _StockAlerts(movements: movements),
-                        const SizedBox(height: 18),
-                        _RecentActivities(activities: activities),
+          return RefreshIndicator(
+            onRefresh: () => DashboardService().load(),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                const SliverToBoxAdapter(child: _DashboardHeader()),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+                  sliver: SliverList.list(
+                    children: [
+                      _Welcome(user: user, offline: offline),
+                      const SizedBox(height: AppSpacing.xl),
+                      _SummaryCards(
+                        role: '${user?['role'] ?? ''}',
+                        stats: stats,
+                        widgets: widgets,
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      const _SectionTitle('Actions rapides'),
+                      const SizedBox(height: AppSpacing.md),
+                      _QuickActions(user: user, navigation: navigation),
+                      if (projects.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.xl),
+                        _RecentProjects(projects: projects),
                       ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  static List<Map<String, dynamic>> _asMaps(dynamic value) {
-    if (value is! List) return const [];
-    return value.whereType<Map>().map((item) {
-      return item.map((key, value) => MapEntry(key.toString(), value));
-    }).toList();
-  }
-}
-
-class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader({
-    required this.offline,
-    required this.onLogout,
-  });
-
-  final bool offline;
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-      child: Row(
-        children: [
-          Builder(
-            builder: (context) => _HeaderAction(
-              icon: Icons.menu_rounded,
-              tooltip: 'Menu principal',
-              onTap: Scaffold.of(context).openDrawer,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Image.asset(
-            'assets/images/pharmacare-logo.png',
-            width: 38,
-            height: 38,
-            fit: BoxFit.contain,
-            semanticLabel: 'Logo PharmaCare',
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tableau de bord',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppTheme.ink,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -.4,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Vue d’ensemble de PharmaCare',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppTheme.muted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                      const SizedBox(height: AppSpacing.xl),
+                      _RecentActivities(activities: activities),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-          _HeaderAction(
-            icon: offline ? Icons.cloud_off_rounded : Icons.cloud_done_rounded,
-            tooltip: offline ? 'Mode hors connexion' : 'Données synchronisées',
-            color: offline ? AppTheme.gray : AppTheme.green,
-            onTap: () {},
-          ),
-          const SizedBox(width: 8),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              _HeaderAction(
-                icon: Icons.notifications_none_rounded,
-                tooltip: 'Notifications',
-                color: AppTheme.blue,
-                onTap: () {},
-              ),
-              Positioned(
-                top: -3,
-                right: -2,
-                child: Container(
-                  width: 19,
-                  height: 19,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: AppTheme.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 8),
-          Semantics(
-            button: true,
-            label: 'Ouvrir mon profil',
-            child: InkWell(
-              onTap: () => context.go('/profile'),
-              onLongPress: onLogout,
-              borderRadius: BorderRadius.circular(22),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.orange.withValues(alpha: .12),
-                  border: Border.all(
-                    color: AppTheme.orange.withValues(alpha: .32),
-                  ),
-                ),
-                child: const Icon(Icons.person_rounded, color: AppTheme.orange),
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
-    );
+    ),
+  );
+
+  static List<Map<String, dynamic>> _maps(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map((item) {
+          return item.map((key, value) => MapEntry('$key', value));
+        })
+        .toList(growable: false);
   }
 }
 
-class _HeaderAction extends StatelessWidget {
-  const _HeaderAction({
+class _DashboardHeader extends StatelessWidget {
+  const _DashboardHeader();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+    child: Row(
+      children: [
+        Builder(
+          builder: (context) => _HeaderButton(
+            icon: Icons.menu_rounded,
+            tooltip: 'Menu principal',
+            onPressed: Scaffold.of(context).openDrawer,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        const Expanded(
+          child: Text(
+            'Tableau de bord',
+            maxLines: 1,
+            style: TextStyle(
+              color: AppTheme.ink,
+              fontSize: 21,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -.35,
+            ),
+          ),
+        ),
+        const _HeaderButton(
+          icon: Icons.notifications_none_rounded,
+          tooltip: 'Notifications bientôt disponibles',
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        _HeaderButton(
+          icon: Icons.person_outline_rounded,
+          tooltip: 'Mon profil',
+          color: AppTheme.orange,
+          onPressed: () => context.go('/profile'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _HeaderButton extends StatelessWidget {
+  const _HeaderButton({
     required this.icon,
     required this.tooltip,
-    required this.onTap,
+    this.onPressed,
     this.color = AppTheme.ink,
   });
-
   final IconData icon;
   final String tooltip;
-  final VoidCallback onTap;
+  final VoidCallback? onPressed;
   final Color color;
 
   @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onTap,
-      style: IconButton.styleFrom(
-        minimumSize: const Size.square(44),
-        fixedSize: const Size.square(44),
-        foregroundColor: color,
-        backgroundColor: color.withValues(alpha: .08),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
-      ),
-      icon: Icon(icon, size: 23),
-    );
-  }
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    style: IconButton.styleFrom(
+      minimumSize: const Size.square(44),
+      fixedSize: const Size.square(44),
+      foregroundColor: color,
+      backgroundColor: color.withValues(alpha: .08),
+      disabledForegroundColor: AppTheme.muted,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+    ),
+    icon: Icon(icon, size: 24),
+  );
 }
 
-class _DashboardIntro extends StatelessWidget {
-  const _DashboardIntro({required this.offline});
-
+class _Welcome extends StatelessWidget {
+  const _Welcome({required this.user, required this.offline});
+  final Map<String, dynamic>? user;
   final bool offline;
 
   @override
   Widget build(BuildContext context) {
+    final name = '${user?['name'] ?? ''}'.trim();
+    final message = switch ('${user?['role'] ?? ''}'.toLowerCase()) {
+      'coordination_admin' => 'Voici l’essentiel de votre coordination.',
+      'project_admin' => 'Voici l’essentiel de votre projet.',
+      _ => 'Voici l’essentiel de votre activité.',
+    };
+    final statusColor = offline ? AppTheme.gray : AppTheme.green;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Bonjour 👋',
-                style: TextStyle(
+                name.isEmpty ? 'Bonjour 👋' : 'Bonjour, $name 👋',
+                style: const TextStyle(
                   color: AppTheme.ink,
-                  fontSize: 18,
+                  fontSize: 19,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              SizedBox(height: 3),
+              const SizedBox(height: 4),
               Text(
-                'Voici les informations essentielles de votre activité.',
-                style: TextStyle(
-                  color: AppTheme.muted,
-                  fontSize: 12,
-                  height: 1.35,
-                ),
+                message,
+                style: const TextStyle(color: AppTheme.muted, fontSize: 13),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.sm),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
-            color: (offline ? AppTheme.gray : AppTheme.green)
-                .withValues(alpha: .10),
-            borderRadius: BorderRadius.circular(999),
+            color: statusColor.withValues(alpha: .10),
+            borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                offline ? Icons.cloud_off_rounded : Icons.circle,
-                color: offline ? AppTheme.gray : AppTheme.green,
+                offline ? Icons.cloud_off_outlined : Icons.circle,
                 size: offline ? 15 : 8,
+                color: statusColor,
               ),
               const SizedBox(width: 6),
               Text(
-                offline ? 'Hors connexion' : 'À jour',
+                offline ? 'Hors connexion' : 'En ligne',
                 style: TextStyle(
-                  color: offline ? AppTheme.gray : AppTheme.green,
+                  color: statusColor,
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),
@@ -305,482 +230,425 @@ class _DashboardIntro extends StatelessWidget {
   }
 }
 
-class _Statistics extends StatelessWidget {
-  const _Statistics({required this.stats, required this.widgets});
-
+class _SummaryCards extends StatelessWidget {
+  const _SummaryCards({
+    required this.role,
+    required this.stats,
+    required this.widgets,
+  });
+  final String role;
   final Map<String, dynamic> stats;
   final List<Map<String, dynamic>> widgets;
 
   @override
   Widget build(BuildContext context) {
-    final items = widgets.map((widget) {
-      final key = widget['key']?.toString() ?? '';
-      final rawValue = widget['value'] ?? stats[key] ?? 0;
-      return _StatData(
-        key: key,
-        value: key == 'stock_quantity' ? _quantity(rawValue) : '$rawValue',
-        label: widget['label']?.toString() ?? key,
-        caption: widget['caption']?.toString() ?? '',
-        icon: ModuleIconRegistry.resolve(widget['icon']?.toString()),
-        color: _widgetColor(widget['color']?.toString()),
-        route: widget['route']?.toString() ?? '/home',
-      );
-    }).toList(growable: false);
+    final items = role.toLowerCase() == 'coordination_admin'
+        ? const <_SummaryData>[
+            _SummaryData(
+              'missions',
+              'Ma coordination',
+              'Mission pays',
+              Icons.public_outlined,
+              '/missions',
+            ),
+            _SummaryData(
+              'projects',
+              'Projets',
+              'Projets actifs',
+              Icons.business_center_outlined,
+              '/projects',
+            ),
+            _SummaryData(
+              'donors',
+              'Bailleurs',
+              'Bailleurs actifs',
+              Icons.account_balance_outlined,
+              '/funding',
+            ),
+            _SummaryData(
+              'programs',
+              'Programmes',
+              'Programmes actifs',
+              Icons.folder_outlined,
+              '/funding',
+            ),
+          ]
+        : widgets
+              .map(
+                (item) => _SummaryData(
+                  '${item['key'] ?? ''}',
+                  '${item['label'] ?? ''}',
+                  '${item['caption'] ?? ''}',
+                  ModuleIconRegistry.resolve(item['icon']?.toString()),
+                  '${item['route'] ?? '/home'}',
+                  value: item['value'],
+                ),
+              )
+              .toList(growable: false);
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= AppBreakpoints.desktop ? 4 : constraints.maxWidth >= AppBreakpoints.tablet ? 3 : constraints.maxWidth >= 520 ? 2 : 1;
-        final cardWidth = (constraints.maxWidth - (AppSpacing.md * (columns - 1))) / columns;
+        final columns = constraints.maxWidth >= 680 ? 4 : 2;
+        final width =
+            (constraints.maxWidth - AppSpacing.md * (columns - 1)) / columns;
         return Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.md,
           children: [
             for (final item in items)
-              SizedBox(width: cardWidth, child: _StatCard(data: item)),
+              SizedBox(
+                width: width,
+                child: _SummaryCard(
+                  data: item,
+                  value: '${item.value ?? stats[item.key] ?? 0}',
+                ),
+              ),
           ],
         );
       },
     );
   }
-
-  static String _quantity(dynamic value) {
-    final number = num.tryParse('$value') ?? 0;
-    return number == number.roundToDouble()
-        ? number.toInt().toString()
-        : number.toStringAsFixed(1);
-  }
-
-  static Color _widgetColor(String? color) => switch (color) {
-    'red' => AppTheme.red,
-    'orange' => AppTheme.orange,
-    'cyan' => const Color(0xFF16B8B4),
-    _ => AppTheme.blue,
-  };
 }
 
-class _StatData {
-  const _StatData({
-    required this.value,
-    required this.label,
-    required this.caption,
-    required this.icon,
-    required this.color,
-    required this.route,
-    required this.key,
+class _SummaryData {
+  const _SummaryData(
+    this.key,
+    this.label,
+    this.caption,
+    this.icon,
+    this.route, {
+    this.value,
   });
-
-  final String value;
+  final String key;
   final String label;
   final String caption;
   final IconData icon;
-  final Color color;
   final String route;
-  final String key;
+  final dynamic value;
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({required this.data});
-
-  final _StatData data;
-
-  @override
-  Widget build(BuildContext context) => AppKpiCard(
-    label: data.label,
-    value: data.value,
-    caption: data.caption,
-    icon: data.icon,
-    tone: data.color == AppTheme.red ? AppKpiTone.red : data.color == AppTheme.orange ? AppKpiTone.orange : AppKpiTone.blue,
-    onTap: () => context.go(data.route),
-  );
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, this.subtitle});
-
-  final String title;
-  final String? subtitle;
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.data, required this.value});
+  final _SummaryData data;
+  final String value;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppTheme.ink,
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            subtitle!,
-            style: const TextStyle(color: AppTheme.muted, fontSize: 11),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.navigation});
-
-  final List<Map<String, dynamic>> navigation;
-
-  @override
-  Widget build(BuildContext context) {
-    const colors = [AppTheme.orange, AppTheme.blue, AppTheme.green, AppTheme.purple, AppTheme.gray];
-    final modules = navigation
-        .where((item) => !{'dashboard', 'configuration', 'profile'}.contains(item['key']?.toString()))
-        .take(5)
-        .toList(growable: false);
-    return SizedBox(
-      height: 98,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: modules.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (context, index) => _QuickAction(
-          label: modules[index]['label']?.toString() ?? '',
-          icon: ModuleIconRegistry.resolve(modules[index]['icon']?.toString()),
-          color: colors[index % colors.length],
-          route: modules[index]['path']?.toString(),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickAction extends StatelessWidget {
-  const _QuickAction({
-    required this.label,
-    required this.icon,
-    required this.color,
-    this.route,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color color;
-  final String? route;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 82,
-      child: InkWell(
-        onTap: route == null ? null : () => context.go(route!),
-        borderRadius: BorderRadius.circular(16),
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    child: InkWell(
+      onTap: () => context.go(data.route),
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Ink(
-              width: 58,
-              height: 58,
+            Container(
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: .10),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withValues(alpha: .20)),
+                color: AppTheme.orangeSoft,
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
-              child: Icon(icon, color: color, size: 26),
+              child: Icon(data.icon, color: AppTheme.orange, size: 23),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 10),
             Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
+              data.label,
+              maxLines: 2,
               style: const TextStyle(
                 color: AppTheme.ink,
-                fontSize: 10.5,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                color: AppTheme.orange,
+                fontSize: 25,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            Text(
+              data.caption,
+              maxLines: 2,
+              style: const TextStyle(color: AppTheme.muted, fontSize: 11),
             ),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
-class _StockAlerts extends StatelessWidget {
-  const _StockAlerts({required this.movements});
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title);
+  final String title;
+  @override
+  Widget build(BuildContext context) => Text(
+    title,
+    style: const TextStyle(
+      color: AppTheme.ink,
+      fontSize: 18,
+      fontWeight: FontWeight.w800,
+    ),
+  );
+}
 
-  final List<Map<String, dynamic>> movements;
+class _QuickActions extends StatelessWidget {
+  const _QuickActions({required this.user, required this.navigation});
+  final Map<String, dynamic>? user;
+  final List<Map<String, dynamic>> navigation;
 
   @override
   Widget build(BuildContext context) {
-    return _DashboardPanel(
-      title: 'Derniers mouvements de stock',
-      subtitle: 'Suivi des opérations récentes',
-      icon: Icons.inventory_2_outlined,
-      color: AppTheme.orange,
-      onViewAll: () => context.go('/stocks'),
-      child: movements.isEmpty
-          ? const _EmptyRow(
-              icon: Icons.check_circle_outline_rounded,
-              color: AppTheme.green,
-              title: 'Aucun mouvement récent',
-              subtitle: 'Le stock est prêt à être utilisé.',
-            )
-          : Column(
+    final role = '${user?['role'] ?? ''}'.toLowerCase();
+    final permissions = ApplicationAccess.permissions(user);
+    final actions = role == 'coordination_admin'
+        ? <_ActionData>[
+            if (permissions.contains('projects.manage'))
+              const _ActionData(
+                'Créer un projet',
+                Icons.add_rounded,
+                '/projects?create=1',
+              ),
+            if (permissions.contains('funding.view'))
+              const _ActionData(
+                'Bailleurs & Programmes',
+                Icons.account_balance_outlined,
+                '/funding',
+              ),
+            if (permissions.contains('standard_lists.view'))
+              const _ActionData(
+                'Liste standard du projet',
+                Icons.format_list_bulleted_rounded,
+                '/standard-lists',
+              ),
+          ]
+        : navigation
+              .where(
+                (item) => !{'dashboard', 'profile'}.contains('${item['key']}'),
+              )
+              .take(4)
+              .map(
+                (item) => _ActionData(
+                  '${item['label'] ?? ''}',
+                  ModuleIconRegistry.resolve(item['icon']?.toString()),
+                  '${item['path'] ?? '/home'}',
+                ),
+              )
+              .toList(growable: false);
+
+    if (actions.isEmpty) return const SizedBox.shrink();
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.lg,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth / actions.length;
+            return Wrap(
               children: [
-                for (var index = 0;
-                    index < movements.length && index < 4;
-                    index++) ...[
-                  _MovementRow(item: movements[index]),
-                  if (index < movements.length - 1 && index < 3)
-                    const Divider(height: 1),
-                ],
+                for (final action in actions)
+                  SizedBox(
+                    width: width,
+                    child: _QuickAction(data: action),
+                  ),
               ],
-            ),
+            );
+          },
+        ),
+      ),
     );
   }
 }
 
-class _MovementRow extends StatelessWidget {
-  const _MovementRow({required this.item});
+class _ActionData {
+  const _ActionData(this.label, this.icon, this.route);
+  final String label;
+  final IconData icon;
+  final String route;
+}
 
-  final Map<String, dynamic> item;
-
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({required this.data});
+  final _ActionData data;
   @override
-  Widget build(BuildContext context) {
-    final product = item['product'] as Map?;
-    final site = item['site'] as Map?;
-    final type = '${item['type'] ?? item['movement_type'] ?? 'Mouvement'}';
-    final isOut = type.toLowerCase().contains('out') ||
-        type.toLowerCase().contains('sort');
-    final color = isOut ? AppTheme.red : AppTheme.green;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 11),
-      child: Row(
+  Widget build(BuildContext context) => InkWell(
+    onTap: () => context.go(data.route),
+    borderRadius: BorderRadius.circular(AppRadius.md),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 54,
+            height: 54,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: .10),
-              borderRadius: BorderRadius.circular(12),
+              color: AppTheme.orangeSoft,
+              borderRadius: BorderRadius.circular(18),
             ),
-            child: Icon(
-              isOut ? Icons.north_east_rounded : Icons.south_west_rounded,
-              color: color,
-              size: 20,
-            ),
+            child: Icon(data.icon, color: AppTheme.orange, size: 27),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${product?['name'] ?? 'Produit pharmaceutique'}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppTheme.ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${site?['name'] ?? 'Site de stockage'}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppTheme.muted,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: .09),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              type,
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
+          const SizedBox(height: 8),
+          Text(
+            data.label,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.ink,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
             ),
           ),
         ],
       ),
+    ),
+  );
+}
+
+class _RecentProjects extends StatelessWidget {
+  const _RecentProjects({required this.projects});
+  final List<Map<String, dynamic>> projects;
+  @override
+  Widget build(BuildContext context) => AppDashboardPanel(
+    title: 'Mes projets récents',
+    icon: Icons.business_center_outlined,
+    color: AppTheme.orange,
+    action: TextButton(
+      onPressed: () => context.go('/projects'),
+      child: const Text('Voir tout'),
+    ),
+    child: Column(
+      children: [
+        for (var index = 0; index < projects.length; index++) ...[
+          _ProjectRow(project: projects[index]),
+          if (index < projects.length - 1) const Divider(height: 1),
+        ],
+      ],
+    ),
+  );
+}
+
+class _ProjectRow extends StatelessWidget {
+  const _ProjectRow({required this.project});
+  final Map<String, dynamic> project;
+  @override
+  Widget build(BuildContext context) {
+    final donors = (project['donors'] as List? ?? const []).length;
+    final programs = (project['programs'] as List? ?? const []).length;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+      leading: Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          color: AppTheme.orangeSoft,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: const Icon(
+          Icons.business_center_outlined,
+          color: AppTheme.orange,
+        ),
+      ),
+      title: Text(
+        '${project['name'] ?? 'Projet'}',
+        maxLines: 2,
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+      subtitle: Text(
+        'Code : ${project['code'] ?? '—'} · Bailleurs : $donors · Programmes : $programs',
+        maxLines: 2,
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => context.go('/projects'),
     );
   }
 }
 
 class _RecentActivities extends StatelessWidget {
   const _RecentActivities({required this.activities});
-
   final List<Map<String, dynamic>> activities;
-
   @override
-  Widget build(BuildContext context) {
-    return _DashboardPanel(
-      title: 'Activités récentes',
-      subtitle: 'Historique des dernières actions',
-      icon: Icons.history_rounded,
-      color: AppTheme.blue,
-      child: activities.isEmpty
-          ? const _EmptyRow(
-              icon: Icons.info_outline_rounded,
-              color: AppTheme.blue,
-              title: 'Aucune activité récente',
-              subtitle: 'Les prochaines opérations apparaîtront ici.',
-            )
-          : Column(
-              children: [
-                for (var index = 0;
-                    index < activities.length && index < 5;
-                    index++) ...[
-                  _ActivityRow(item: activities[index], index: index),
-                  if (index < activities.length - 1 && index < 4)
-                    const Divider(height: 1),
-                ],
+  Widget build(BuildContext context) => AppDashboardPanel(
+    title: 'Activités récentes',
+    icon: Icons.history_rounded,
+    color: AppTheme.orange,
+    child: activities.isEmpty
+        ? const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.info_outline_rounded, color: AppTheme.muted),
+            title: Text('Aucune activité récente'),
+          )
+        : Column(
+            children: [
+              for (
+                var index = 0;
+                index < activities.length && index < 5;
+                index++
+              ) ...[
+                _ActivityRow(item: activities[index]),
+                if (index < activities.length - 1 && index < 4)
+                  const Divider(height: 1),
               ],
-            ),
-    );
-  }
+            ],
+          ),
+  );
 }
 
 class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({required this.item, required this.index});
-
+  const _ActivityRow({required this.item});
   final Map<String, dynamic> item;
-  final int index;
-
   @override
   Widget build(BuildContext context) {
-    final colors = [AppTheme.blue, AppTheme.green, AppTheme.orange, AppTheme.purple];
-    final color = colors[index % colors.length];
-    final event = '${item['event'] ?? 'Activité enregistrée'}'
-        .replaceAll('_', ' ')
-        .trim();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 11),
-      child: Row(
-        children: [
-          Container(
-            width: 9,
-            height: 9,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Text(
-              event.isEmpty ? 'Activité enregistrée' : event,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppTheme.ink,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Icon(Icons.chevron_right_rounded, color: AppTheme.muted, size: 19),
-        ],
+    final date = '${item['created_at'] ?? ''}';
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: AppTheme.orangeSoft,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: const Icon(Icons.check_rounded, color: AppTheme.orange),
       ),
+      title: Text(
+        _humanEvent('${item['event'] ?? ''}'),
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+      subtitle: date.isEmpty ? null : Text(_readableDate(date)),
     );
   }
-}
 
-class _EmptyRow extends StatelessWidget {
-  const _EmptyRow({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-  });
+  static String _humanEvent(String event) => switch (event.toLowerCase()) {
+    'project.created' => 'Projet créé',
+    'project.updated' => 'Projet modifié',
+    'project.archived' => 'Projet archivé',
+    'project.restored' => 'Projet restauré',
+    'donor.created' => 'Bailleur ajouté',
+    'donor.updated' => 'Bailleur modifié',
+    'program.created' => 'Programme ajouté',
+    'program.updated' => 'Programme modifié',
+    'user.password_changed' => 'Mot de passe modifié',
+    'user.created' => 'Utilisateur ajouté',
+    _ => 'Activité enregistrée',
+  };
 
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: .10),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 21),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppTheme.ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppTheme.muted,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DashboardPanel extends StatelessWidget {
-  const _DashboardPanel({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.child,
-    this.onViewAll,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final Widget child;
-  final VoidCallback? onViewAll;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppDashboardPanel(
-      title: title,
-      description: subtitle,
-      icon: icon,
-      color: color,
-      action: onViewAll == null ? null : TextButton(onPressed: onViewAll, child: const Text('Voir tout')),
-      child: child,
-    );
+  static String _readableDate(String value) {
+    final parsed = DateTime.tryParse(value)?.toLocal();
+    if (parsed == null) return '';
+    final day = parsed.day.toString().padLeft(2, '0');
+    final month = parsed.month.toString().padLeft(2, '0');
+    final hour = parsed.hour.toString().padLeft(2, '0');
+    final minute = parsed.minute.toString().padLeft(2, '0');
+    return '$day/$month/${parsed.year} à $hour:$minute';
   }
 }

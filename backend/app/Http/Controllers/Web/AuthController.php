@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\HealthFacility;
 use App\Models\Mission;
 use App\Models\Organization;
-use App\Models\Project;
 use App\Models\Permission;
+use App\Models\Project;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditService;
@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use App\Support\PasswordPolicy;
 use Illuminate\View\View;
 
 class AuthController extends Controller
@@ -100,11 +101,11 @@ class AuthController extends Controller
 
         return view('dashboard.index', [
             'users' => $this->scopes->users(Auth::user(), User::with('roles'))
-                ->when($request->string('search')->toString(), fn($query, $search) => $query
-                    ->where(fn($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
-                ->when($request->filled('role_id'), fn($query) => $query->whereHas('roles', fn($roles) => $roles->whereKey($request->integer('role_id'))))
-                ->when($request->get('status') === 'active', fn($query) => $query->where('is_active', true))
-                ->when($request->get('status') === 'inactive', fn($query) => $query->where('is_active', false))
+                ->when($request->string('search')->toString(), fn ($query, $search) => $query
+                    ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
+                ->when($request->filled('role_id'), fn ($query) => $query->whereHas('roles', fn ($roles) => $roles->whereKey($request->integer('role_id'))))
+                ->when($request->get('status') === 'active', fn ($query) => $query->where('is_active', true))
+                ->when($request->get('status') === 'inactive', fn ($query) => $query->where('is_active', false))
                 ->orderBy('name')->paginate(20)->withQueryString(),
             'roles' => $this->scopes->roles(Auth::user())->orderBy('name')->get(),
             'organizations' => $this->scopes->organizations(Auth::user())->orderBy('name')->get(['id', 'name']),
@@ -132,7 +133,7 @@ class AuthController extends Controller
             'project_id' => ['nullable', 'uuid', 'exists:projects,id'],
             'health_facility_id' => ['nullable', 'uuid', 'exists:health_facilities,id'],
             'dispensing_site_id' => ['nullable', 'uuid', 'exists:sites,id'],
-            'password' => ['nullable', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+            'password' => ['nullable', 'confirmed', PasswordPolicy::rule()],
             'must_change_password' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'permission_ids' => ['nullable', 'array'],
@@ -143,10 +144,11 @@ class AuthController extends Controller
         $roleCode = $this->governance->canonicalCode($role->code);
         $organization = null;
         if ($roleCode === GovernanceService::COORDINATION_ADMIN) {
-            $request->validate(['organization_id' => ['required']]);
+            $request->validate(['organization_id' => ['required'], 'mission_id' => ['required']]);
             $organization = $this->scopes->organizations($request->user())
                 ->findOrFail($data['organization_id']);
-            [$scopeType, $scopeId] = ['organization', $organization->id];
+            $mission = Mission::whereKey($data['mission_id'])->where('organization_id', $organization->id)->firstOrFail();
+            [$scopeType, $scopeId] = ['mission', $mission->id];
         } elseif (in_array($roleCode, [GovernanceService::PROJECT_ADMIN, GovernanceService::SITE_ADMIN], true)) {
             $request->validate([
                 'organization_id' => ['required'], 'mission_id' => ['required'], 'project_id' => ['required'],
@@ -175,7 +177,7 @@ class AuthController extends Controller
         $generated = empty($data['password']);
         $password = $generated ? Str::password(16, symbols: true) : $data['password'];
         $user = User::create([
-            'name' => trim($data['first_name'] . ' ' . $data['last_name']),
+            'name' => trim($data['first_name'].' '.$data['last_name']),
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
             'username' => strtolower($data['username']),
@@ -207,7 +209,7 @@ class AuthController extends Controller
                 ->with('status', "L’administrateur projet {$user->name} a été créé et affecté avec succès.")
             : redirect()->route('users.index')->with('success', "L’utilisateur {$user->name} a été créé avec succès.");
 
-        return $generated ? $response->with('temporary_password', $password) : $response;
+        return $response;
     }
 
     public function updateUser(Request $request, User $user): RedirectResponse
@@ -253,7 +255,7 @@ class AuthController extends Controller
         $user->tokens()->delete();
         $this->audit->record($request, 'user.password_reset', $user);
 
-        return back()->with('success', 'Mot de passe réinitialisé.')->with('temporary_password', $temporary);
+        return back()->with('success', 'Mot de passe réinitialisé. L’utilisateur devra le modifier lors de sa prochaine connexion.');
     }
 
     private function parseScope(string $scope): array
@@ -262,9 +264,10 @@ class AuthController extends Controller
             return ['platform', null];
         }
         [$type, $id] = array_pad(explode(':', $scope, 2), 2, null);
-        abort_unless($id && in_array($type, ['organization', 'project', 'facility', 'site'], true), 422, 'Périmètre invalide.');
+        abort_unless($id && in_array($type, ['organization', 'mission', 'project', 'facility', 'site'], true), 422, 'Périmètre invalide.');
         $exists = match ($type) {
             'organization' => Organization::whereKey($id)->exists(),
+            'mission' => Mission::whereKey($id)->exists(),
             'project' => Project::whereKey($id)->exists(),
             'facility' => HealthFacility::whereKey($id)->exists(),
             'site' => Site::whereKey($id)->exists(),

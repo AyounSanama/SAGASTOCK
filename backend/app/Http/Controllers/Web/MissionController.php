@@ -9,6 +9,7 @@ use App\Models\Organization;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\GovernanceService;
 use App\Services\UserScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class MissionController extends Controller
 {
     public function __construct(private AuditService $audit, private UserScopeService $scopes) {}
 
-    public function home(Request $request): View
+    public function home(Request $request): View|RedirectResponse
     {
         $this->allow('missions.view');
         $organizations = $this->scopes->organizations($request->user())->orderBy('name')->get();
@@ -29,6 +30,13 @@ class MissionController extends Controller
             : ($organizations->firstWhere('id', $request->user()->organization_id) ?? $organizations->first());
         abort_if(! $organization, $request->filled('organization_id') ? 404 : 403);
 
+        if (app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN) {
+            $missionId = $this->scopes->coordinationMissionIds($request->user())->first();
+            if ($missionId) {
+                return redirect()->route('organizations.missions.show', [$organization, $missionId]);
+            }
+        }
+
         return $this->index($request, $organization);
     }
 
@@ -36,7 +44,10 @@ class MissionController extends Controller
     {
         $this->allow('missions.view');
         $this->accessible($request, $organization);
-        $missionBase = $organization->missions();
+        $missionIds = $this->scopes->coordinationMissionIds($request->user());
+        $isCoordination = app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN;
+        $missionBase = $organization->missions()->when($isCoordination, fn ($query) => $query->whereIn('id', $missionIds));
+
         return view('missions.index', [
             'organization' => $organization,
             'organizations' => $this->scopes->organizations($request->user())->orderBy('name')->get(),
@@ -45,16 +56,19 @@ class MissionController extends Controller
                 'total' => (clone $missionBase)->count(),
                 'active' => (clone $missionBase)->where('is_active', true)->count(),
                 'countries' => (clone $missionBase)->distinct()->count('country_id'),
-                'projects' => $organization->projects()->count(),
+                'projects' => $isCoordination
+                    ? $organization->projects()->whereIn('mission_id', $missionIds)->count()
+                    : $organization->projects()->count(),
             ],
-            'missions' => $organization->missions()->with('country')->withCount('projects')
+            'missions' => $organization->missions()->when($isCoordination, fn ($query) => $query->whereIn('id', $missionIds))->with('country')->withCount('projects')
                 ->when($request->string('search')->toString(), fn ($query, $search) => $query->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
                 ->when($request->filled('country_id'), fn ($query) => $query->where('country_id', $request->string('country_id')->toString()))
                 ->when($request->get('status') === 'active', fn ($query) => $query->where('is_active', true))
                 ->when($request->get('status') === 'inactive', fn ($query) => $query->where('is_active', false))
                 ->orderBy('name')->paginate(12)->withQueryString(),
-            'archivedMissions' => $organization->missions()->onlyTrashed()->with('country')->latest('deleted_at')->get(),
-            'canManage' => $request->user()->hasPermission('missions.manage'),
+            'archivedMissions' => $isCoordination ? collect() : $organization->missions()->onlyTrashed()->with('country')->latest('deleted_at')->get(),
+            'canManage' => ! $isCoordination && $request->user()->hasPermission('missions.manage'),
+            'isCoordination' => $isCoordination,
         ]);
     }
 
@@ -67,6 +81,7 @@ class MissionController extends Controller
         ]);
         $country = Country::create([...$data, 'iso2' => strtoupper($data['iso2']), 'is_active' => true]);
         $this->audit->record($request, 'country.created', $country, [], $country->only(['iso2', 'name']));
+
         return back()->with('status', 'Pays ajouté.');
     }
 
@@ -75,8 +90,12 @@ class MissionController extends Controller
         $this->allow('missions.view');
         $this->accessible($request, $organization);
         abort_unless($mission->organization_id === $organization->id, 404);
+        if (app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN) {
+            abort_unless($this->scopes->coordinationMissionIds($request->user())->contains($mission->id), 404);
+        }
 
         $projectIds = $mission->projects()->pluck('id');
+
         return view('missions.show', [
             'organization' => $organization,
             'mission' => $mission->load('country'),
@@ -96,40 +115,50 @@ class MissionController extends Controller
 
     public function store(Request $request, Organization $organization): RedirectResponse
     {
+        $this->denyCoordinationMutation($request);
         $this->allow('missions.manage');
         $this->accessible($request, $organization);
         $mission = $organization->missions()->create($this->validated($request, $organization));
         $this->audit->record($request, 'mission.created', $mission, [], $mission->only(['organization_id', 'country_id', 'code', 'name', 'is_active']));
+
         return back()->with('status', 'Mission créée.');
     }
 
     public function update(Request $request, Organization $organization, Mission $mission): RedirectResponse
     {
+        $this->denyCoordinationMutation($request);
         $this->allow('missions.manage');
         $this->accessible($request, $organization);
         abort_unless($mission->organization_id === $organization->id, 404);
         $old = $mission->only(['country_id', 'code', 'name', 'starts_on', 'ends_on', 'is_active']);
         $mission->update($this->validated($request, $organization, $mission));
         $this->audit->record($request, 'mission.updated', $mission, $old, $mission->only(array_keys($old)));
+
         return back()->with('status', 'Mission mise à jour.');
     }
 
     public function destroy(Request $request, Organization $organization, Mission $mission): RedirectResponse
     {
+        $this->denyCoordinationMutation($request);
         $this->allow('missions.manage');
         $this->accessible($request, $organization);
         abort_unless($mission->organization_id === $organization->id, 404);
         $mission->delete();
         $this->audit->record($request, 'mission.archived', $mission);
+
         return back()->with('status', 'Mission archivée.');
     }
 
     public function restore(Request $request, Organization $organization, string $mission): RedirectResponse
     {
-        $this->allow('missions.manage'); $this->accessible($request, $organization);
+        $this->denyCoordinationMutation($request);
+        $this->allow('missions.manage');
+        $this->accessible($request, $organization);
         $model = $organization->missions()->onlyTrashed()->findOrFail($mission);
-        $model->restore(); $model->update(['is_active' => true]);
+        $model->restore();
+        $model->update(['is_active' => true]);
         $this->audit->record($request, 'mission.restored', $model);
+
         return back()->with('status', 'Mission restaurée.');
     }
 
@@ -151,6 +180,7 @@ class MissionController extends Controller
             'description' => ['nullable', 'string', 'max:3000'],
         ]);
         $data['is_active'] = $request->boolean('is_active', true);
+
         return $data;
     }
 
@@ -162,5 +192,13 @@ class MissionController extends Controller
     private function accessible(Request $request, Organization $organization): void
     {
         abort_unless($this->scopes->organizations($request->user())->whereKey($organization->id)->exists(), 404);
+    }
+
+    private function denyCoordinationMutation(Request $request): void
+    {
+        abort_if(
+            app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN,
+            403,
+        );
     }
 }

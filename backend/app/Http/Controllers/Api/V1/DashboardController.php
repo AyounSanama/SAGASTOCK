@@ -62,6 +62,7 @@ class DashboardController extends Controller
             'navigation' => app(ApplicationNavigationService::class)->mobileItems($user),
             'stats' => $context['stats'],
             'activities' => $activities,
+            'recent_projects' => $context['recentProjects'],
             'recent_movements' => $movements,
         ]);
     }

@@ -34,10 +34,98 @@ class StructureService {
         'offline': true,
       };
     }
+    final pagination = data['facilities'] as Map<String, dynamic>? ?? const {};
+    await _repository.cacheList(
+      collection: 'structures.facilities',
+      organizationId: organizationId,
+      values: (pagination['data'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList(growable: false),
+    );
+    await _repository.cacheList(
+      collection: 'structures.facilities.archived',
+      organizationId: organizationId,
+      values: (data['archived_facilities'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList(growable: false),
+    );
+    final remoteFacilities = (pagination['data'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
+    final remoteSites = <Map<String, dynamic>>[];
+    final remoteArchivedSites = <Map<String, dynamic>>[];
+    for (final facility in remoteFacilities) {
+      final facilitySummary = {
+        'id': facility['id'],
+        'name': facility['name'],
+        'code': facility['code'],
+      };
+      for (final raw in facility['sites'] as List<dynamic>? ?? const []) {
+        remoteSites.add({
+          ...Map<String, dynamic>.from(raw as Map),
+          'health_facility_id': facility['id'],
+          'health_facility': facilitySummary,
+        });
+      }
+      for (final raw
+          in facility['archived_sites'] as List<dynamic>? ?? const []) {
+        remoteArchivedSites.add({
+          ...Map<String, dynamic>.from(raw as Map),
+          'health_facility_id': facility['id'],
+          'health_facility': facilitySummary,
+        });
+      }
+    }
+    await _repository.cacheList(
+      collection: 'structures.sites',
+      organizationId: organizationId,
+      values: remoteSites,
+    );
+    await _repository.cacheList(
+      collection: 'structures.sites.archived',
+      organizationId: organizationId,
+      values: remoteArchivedSites,
+    );
+    final active = await _repository.localList(
+      collection: 'structures.facilities',
+      organizationId: organizationId,
+    );
+    final archived = await _repository.localList(
+      collection: 'structures.facilities.archived',
+      organizationId: organizationId,
+    );
+    final sites = await _repository.localList(
+      collection: 'structures.sites',
+      organizationId: organizationId,
+    );
+    final archivedSites = await _repository.localList(
+      collection: 'structures.sites.archived',
+      organizationId: organizationId,
+    );
+    final enrichedFacilities = active
+        .map(
+          (facility) => {
+            ...facility,
+            'sites': sites
+                .where((site) => site['health_facility_id'] == facility['id'])
+                .toList(growable: false),
+            'archived_sites': archivedSites
+                .where((site) => site['health_facility_id'] == facility['id'])
+                .toList(growable: false),
+          },
+        )
+        .toList(growable: false);
+    data['facilities'] = {...pagination, 'data': enrichedFacilities};
+    data['archived_facilities'] = archived;
+    data['sites'] = sites;
+    data['archived_sites'] = archivedSites;
     return data;
   }
 
-  Future<void> saveFacility({
+  Future<bool> saveFacility({
     required String organizationId,
     String? facilityId,
     required Map<String, dynamic> data,
@@ -45,7 +133,7 @@ class StructureService {
     final path = facilityId == null
         ? '/organizations/$organizationId/facilities'
         : '/organizations/$organizationId/facilities/$facilityId';
-    await _repository.mutate(
+    return _repository.mutate(
       collection: 'structures.facilities',
       organizationId: organizationId,
       endpoint: path,
@@ -55,8 +143,8 @@ class StructureService {
     );
   }
 
-  Future<void> archiveFacility(String organizationId, String facilityId) async {
-    await _repository.mutateEntityState(
+  Future<bool> archiveFacility(String organizationId, String facilityId) {
+    return _repository.mutateEntityState(
       collection: 'structures.facilities',
       organizationId: organizationId,
       remoteId: facilityId,
@@ -66,8 +154,8 @@ class StructureService {
     );
   }
 
-  Future<void> restoreFacility(String organizationId, String facilityId) async {
-    await _repository.mutateEntityState(
+  Future<bool> restoreFacility(String organizationId, String facilityId) {
+    return _repository.mutateEntityState(
       collection: 'structures.facilities',
       organizationId: organizationId,
       remoteId: facilityId,
@@ -77,7 +165,7 @@ class StructureService {
     );
   }
 
-  Future<void> saveChild({
+  Future<bool> saveChild({
     required String organizationId,
     required String facilityId,
     required String kind,
@@ -88,23 +176,23 @@ class StructureService {
     final path =
         '/organizations/$organizationId/facilities/$facilityId/$collection'
         '${childId == null ? '' : '/$childId'}';
-    await _repository.mutate(
+    return _repository.mutate(
       collection: 'structures.$collection',
       organizationId: organizationId,
       endpoint: path,
       method: childId == null ? 'POST' : 'PUT',
       remoteId: childId,
-      payload: data,
+      payload: {...data, if (kind == 'site') 'health_facility_id': facilityId},
     );
   }
 
-  Future<void> archiveChild({
+  Future<bool> archiveChild({
     required String organizationId,
     required String facilityId,
     required String kind,
     required String childId,
   }) async {
-    await _repository.mutateEntityState(
+    return _repository.mutateEntityState(
       collection: 'structures.${_collection(kind)}',
       organizationId: organizationId,
       remoteId: childId,
@@ -115,14 +203,14 @@ class StructureService {
     );
   }
 
-  Future<void> restoreChild({
+  Future<bool> restoreChild({
     required String organizationId,
     required String facilityId,
     required String kind,
     required String childId,
   }) async {
     final collection = _collection(kind);
-    await _repository.mutateEntityState(
+    return _repository.mutateEntityState(
       collection: 'structures.$collection',
       organizationId: organizationId,
       remoteId: childId,

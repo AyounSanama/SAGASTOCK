@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_password_field.dart';
+import '../../../core/security/password_policy.dart';
 import 'package:go_router/go_router.dart';
 import '../data/auth_service.dart';
 
@@ -25,10 +26,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   }
 
   Future<void> _submit() async {
-    if (_password.text.length < 12 || _password.text != _confirmation.text) {
+    if (PasswordPolicy.validate(_password.text) != null ||
+        _password.text != _confirmation.text) {
       setState(
         () => _error =
-            'Le mot de passe doit contenir au moins 12 caract\u00e8res et les confirmations doivent correspondre.',
+            '${PasswordPolicy.helperText} Les confirmations doivent correspondre.',
       );
       return;
     }

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\HealthFacility;
+use App\Models\Mission;
 use App\Models\Organization;
+use App\Models\Permission;
 use App\Models\Project;
 use App\Models\Role;
-use App\Models\User;
-use App\Models\HealthFacility;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\GovernanceService;
 use App\Services\UserScopeService;
@@ -18,6 +20,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use App\Support\PasswordPolicy;
 
 class UserController extends Controller
 {
@@ -33,12 +36,14 @@ class UserController extends Controller
             ->when($request->string('search')->toString(), fn ($query, $search) => $query
                 ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")))
             ->orderBy('name')->paginate(20);
+
         return response()->json($users);
     }
 
     public function show(User $user): JsonResponse
     {
         abort_unless($this->scopes->canAccess(request()->user(), $user), 404);
+
         return response()->json(['user' => $user->load(['roles.permissions', 'devices'])]);
     }
 
@@ -63,6 +68,7 @@ class UserController extends Controller
         $managedUser->restore();
         $managedUser->update(['is_active' => true]);
         $this->audit->record($request, 'user.restored', $managedUser, ['deleted_at' => $archivedAt], ['is_active' => true]);
+
         return response()->json(['user' => $managedUser->load('roles:id,code,name')]);
     }
 
@@ -75,14 +81,17 @@ class UserController extends Controller
         );
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
+            'first_name' => ['nullable', 'string', 'max:80'],
+            'last_name' => ['nullable', 'string', 'max:80'],
+            'username' => ['nullable', 'alpha_dash', 'max:80', 'unique:users,username'],
             'email' => ['required', 'email', 'max:190', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:40'],
             'role_id' => ['nullable', 'required_without:role_ids', 'integer', 'exists:roles,id'],
             'role_ids' => ['nullable', 'array'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
-            'scope_type' => ['nullable', Rule::in(['platform', 'organization', 'project', 'facility', 'site'])],
+            'scope_type' => ['nullable', Rule::in(['platform', 'organization', 'mission', 'project', 'facility', 'site'])],
             'scope_id' => ['nullable', 'uuid'],
-            'password' => ['nullable', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+            'password' => ['nullable', 'confirmed', PasswordPolicy::rule()],
             'must_change_password' => ['nullable', 'boolean'],
             'permission_ids' => ['nullable', 'array'],
             'permission_ids.*' => ['integer', 'exists:permissions,id'],
@@ -100,7 +109,9 @@ class UserController extends Controller
             $scopeId,
         )), 403);
         $user = User::create([
-            'name' => $data['name'], 'email' => $data['email'], 'phone' => $data['phone'] ?? null,
+            'name' => $data['name'], 'first_name' => $data['first_name'] ?? null,
+            'last_name' => $data['last_name'] ?? null, 'username' => $data['username'] ?? null,
+            'email' => $data['email'], 'phone' => $data['phone'] ?? null,
             'organization_id' => $this->organizationIdForScope($scopeType, $scopeId),
             'password' => $password, 'is_active' => true,
             'must_change_password' => $generated || ($data['must_change_password'] ?? false),
@@ -108,9 +119,10 @@ class UserController extends Controller
         $user->roles()->sync(collect($roleIds)->mapWithKeys(fn ($id) => [$id => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]));
         $this->syncDelegatedPermissions($request, $user, $data['permission_ids'] ?? []);
         $this->audit->record($request, 'user.created', $user, [], ['name' => $user->name, 'email' => $user->email, 'scope_type' => $scopeType, 'scope_id' => $scopeId]);
-        $response = ['user' => $user->load('roles:id,code,name')];
-        if ($generated) $response['temporary_password'] = $password;
-        return response()->json($response, 201);
+        return response()->json([
+            'user' => $user->load('roles:id,code,name'),
+            'message' => 'Compte créé avec succès. L’utilisateur devra modifier son mot de passe lors de sa première connexion.',
+        ], 201);
     }
 
     public function update(Request $request, User $user): JsonResponse
@@ -119,14 +131,17 @@ class UserController extends Controller
         $old = $user->only(['name', 'email', 'phone', 'is_active']);
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:120'],
+            'first_name' => ['nullable', 'string', 'max:80'],
+            'last_name' => ['nullable', 'string', 'max:80'],
+            'username' => ['nullable', 'alpha_dash', 'max:80', Rule::unique('users')->ignore($user->id)],
             'email' => ['sometimes', 'required', 'email', 'max:190', Rule::unique('users')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:40'], 'is_active' => ['sometimes', 'boolean'],
             'role_id' => ['nullable', 'integer', 'exists:roles,id'], 'role_ids' => ['nullable', 'array'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
-            'scope_type' => ['nullable', Rule::in(['platform', 'organization', 'project', 'facility', 'site'])], 'scope_id' => ['nullable', 'uuid'],
+            'scope_type' => ['nullable', Rule::in(['platform', 'organization', 'mission', 'project', 'facility', 'site'])], 'scope_id' => ['nullable', 'uuid'],
             'permission_ids' => ['nullable', 'array'], 'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ]);
-        $user->update(collect($data)->only(['name', 'email', 'phone', 'is_active'])->all());
+        $user->update(collect($data)->only(['name', 'first_name', 'last_name', 'username', 'email', 'phone', 'is_active'])->all());
         if (array_key_exists('role_id', $data) || array_key_exists('role_ids', $data)) {
             [$scopeType, $scopeId] = $this->scope($data['scope_type'] ?? 'platform', $data['scope_id'] ?? null);
             abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
@@ -145,6 +160,7 @@ class UserController extends Controller
             $this->syncDelegatedPermissions($request, $user, $data['permission_ids']);
         }
         $this->audit->record($request, 'user.updated', $user, $old, $user->only(['name', 'email', 'phone', 'is_active']));
+
         return response()->json(['user' => $user->load('roles:id,code,name')]);
     }
 
@@ -155,7 +171,10 @@ class UserController extends Controller
         $user->update(['password' => Hash::make($temporary), 'must_change_password' => true]);
         $user->tokens()->delete();
         $this->audit->record($request, 'user.password_reset', $user);
-        return response()->json(['temporary_password' => $temporary]);
+
+        return response()->json([
+            'message' => 'Mot de passe réinitialisé. L’utilisateur devra le modifier lors de sa prochaine connexion.',
+        ]);
     }
 
     public function destroy(Request $request, User $user): JsonResponse
@@ -172,6 +191,7 @@ class UserController extends Controller
         $user->update(['is_active' => false]);
         $user->delete();
         $this->audit->record($request, 'user.archived', $user);
+
         return response()->json(status: 204);
     }
 
@@ -191,16 +211,20 @@ class UserController extends Controller
 
     private function scope(string $type, ?string $id): array
     {
-        if ($type === 'platform') return [$type, null];
+        if ($type === 'platform') {
+            return [$type, null];
+        }
         abort_unless($id, 422, 'Le périmètre doit être renseigné.');
         $exists = match ($type) {
             'organization' => Organization::whereKey($id)->exists(),
+            'mission' => Mission::whereKey($id)->exists(),
             'project' => Project::whereKey($id)->exists(),
             'facility' => HealthFacility::whereKey($id)->exists(),
             'site' => Site::whereKey($id)->exists(),
             default => false,
         };
         abort_unless($exists, 422, 'Périmètre introuvable.');
+
         return [$type, $id];
     }
 
@@ -208,6 +232,7 @@ class UserController extends Controller
     {
         return match ($type) {
             'organization' => $id,
+            'mission' => Mission::whereKey($id)->value('organization_id'),
             'project' => Project::whereKey($id)->value('organization_id'),
             'facility' => HealthFacility::whereKey($id)->value('organization_id'),
             'site' => Site::whereKey($id)->value('organization_id'),
@@ -221,11 +246,12 @@ class UserController extends Controller
         if ($actorRole !== GovernanceService::SITE_ADMIN) {
             abort_unless($permissionIds === [], 403);
             $user->directPermissions()->sync([]);
+
             return;
         }
         $targetRole = $this->governance->roleCode($user);
         abort_unless($targetRole === GovernanceService::SITE_USER, 403);
-        $allowed = \App\Models\Permission::whereIn(
+        $allowed = Permission::whereIn(
             'code',
             GovernanceService::SITE_DELEGABLE_PERMISSIONS,
         )->whereIn('id', $permissionIds)->pluck('id');

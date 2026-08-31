@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use Illuminate\Routing\Exceptions\UrlGenerationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 
@@ -10,31 +11,31 @@ class ApplicationNavigationService
 {
     /** Manifeste unique : chaque entrée dépend exclusivement d'une permission. */
     private const ITEMS = [
-        ['key'=>'dashboard','label'=>'Tableau de bord','route'=>'dashboard','path'=>'/dashboard','icon'=>'dashboard','permission'=>null],
-        ['key'=>'missions','label'=>'Missions','route'=>'modules.missions','path'=>'/missions','icon'=>'missions','permission'=>'missions.view'],
-        ['key'=>'projects','label'=>'Projet actuel','route'=>'modules.projects','path'=>'/projects','icon'=>'projects','permission'=>'projects.view'],
-        ['key'=>'configuration','label'=>'Configuration','route'=>'configuration.index','path'=>'/configuration','icon'=>'configuration','permission'=>'configuration.view'],
-        ['key'=>'organizations','label'=>'Organisations','route'=>'organizations.index','path'=>'/organizations','icon'=>'organizations','permission'=>'organizations.view'],
-        ['key'=>'funding','label'=>'Bailleurs et programmes','route'=>'modules.funding','path'=>'/funding','icon'=>'funding','permission'=>'funding.view'],
-        ['key'=>'facilities','label'=>'Formations sanitaires','route'=>'modules.health-facilities','path'=>'/health-facilities','icon'=>'facilities','permission'=>'health_facilities.view'],
-        ['key'=>'sites','label'=>'Sites de dispensation','route'=>'modules.dispensing-sites','path'=>'/dispensing-sites','icon'=>'sites','permission'=>'dispensing_sites.view'],
-        ['key'=>'users','label'=>'Utilisateurs','route'=>'users.index','path'=>'/users','icon'=>'users','permission'=>'users.view'],
-        ['key'=>'standard-lists','label'=>'Listes standards de médicaments','route'=>'modules.standard-lists','path'=>'/standard-lists','icon'=>'standard_lists','permission'=>'standard_lists.view'],
-        ['key'=>'products','label'=>'Produits','route'=>'modules.products','path'=>'/products','icon'=>'products','permission'=>'products.view'],
-        ['key'=>'stocks','label'=>'Stocks','route'=>'modules.stocks','path'=>'/stocks','icon'=>'stocks','permission'=>'stocks.view'],
-        ['key'=>'receipts','label'=>'Entrées en stock','route'=>'modules.receipts','path'=>'/receipts','icon'=>'receipts','permission'=>'receipts.view'],
-        ['key'=>'dispensing','label'=>'Dispensation de médicaments','route'=>'modules.dispensing','path'=>'/dispensations','icon'=>'dispensing','permission'=>'dispensing.view'],
-        ['key'=>'inventory-orders','label'=>'Inventaires & Commandes','route'=>'modules.inventories','path'=>'/inventories','icon'=>'inventories','permission'=>'inventories.view'],
-        ['key'=>'inventories','label'=>'Inventaires','route'=>'modules.inventories','path'=>'/inventories','icon'=>'inventories','permission'=>'inventories.view'],
-        ['key'=>'orders','label'=>'Commandes','route'=>'modules.orders','path'=>'/orders','icon'=>'orders','permission'=>'orders.view'],
-        ['key'=>'reports','label'=>'Rapports','route'=>'modules.reports','path'=>'/reports','icon'=>'reports','permission'=>'reports.view'],
-        ['key'=>'synchronization','label'=>'Synchronisation','route'=>'modules.synchronization','path'=>'/synchronization','icon'=>'synchronization','permission'=>'synchronization.view'],
-        ['key'=>'settings','label'=>'Paramètres organisation','route'=>'modules.settings','path'=>'/settings','icon'=>'settings','permission'=>'settings.view'],
-        ['key'=>'project_settings','label'=>'Paramètres du projet','route'=>'modules.project-settings','path'=>'/project-settings','icon'=>'settings','permission'=>'project_settings.view'],
-        ['key'=>'site_settings','label'=>'Paramètres du site','route'=>'modules.site-settings','path'=>'/site-settings','icon'=>'settings','permission'=>'site_settings.view'],
-        ['key'=>'activity_logs','label'=>'Journal des activités','route'=>'modules.activity-log','path'=>'/activity-log','icon'=>'activity_logs','permission'=>'activity_logs.view'],
-        ['key'=>'local_activity_logs','label'=>'Journal local','route'=>'modules.activity-log-local','path'=>'/activity-log-local','icon'=>'activity_logs','permission'=>'activity_logs.view_local'],
-        ['key'=>'profile','label'=>'Mon profil','route'=>'profile.show','path'=>'/profile','icon'=>'profile','permission'=>null],
+        ['key' => 'dashboard', 'label' => 'Tableau de bord', 'route' => 'dashboard', 'path' => '/dashboard', 'icon' => 'dashboard', 'permission' => null],
+        ['key' => 'missions', 'label' => 'Missions', 'route' => 'modules.missions', 'path' => '/missions', 'icon' => 'missions', 'permission' => 'missions.view'],
+        ['key' => 'projects', 'label' => 'Projet actuel', 'route' => 'modules.projects', 'path' => '/projects', 'icon' => 'projects', 'permission' => 'projects.view'],
+        ['key' => 'configuration', 'label' => 'Configuration', 'route' => 'configuration.index', 'path' => '/configuration', 'icon' => 'configuration', 'permission' => 'configuration.view'],
+        ['key' => 'organizations', 'label' => 'Organisations', 'route' => 'organizations.index', 'path' => '/organizations', 'icon' => 'organizations', 'permission' => 'organizations.view'],
+        ['key' => 'funding', 'label' => 'Bailleurs et programmes', 'route' => 'modules.funding', 'path' => '/funding', 'icon' => 'funding', 'permission' => 'funding.view'],
+        ['key' => 'facilities', 'label' => 'Formations sanitaires', 'route' => 'modules.health-facilities', 'path' => '/health-facilities', 'icon' => 'facilities', 'permission' => 'health_facilities.view'],
+        ['key' => 'sites', 'label' => 'Sites de dispensation', 'route' => 'modules.dispensing-sites', 'path' => '/dispensing-sites', 'icon' => 'sites', 'permission' => 'dispensing_sites.view'],
+        ['key' => 'users', 'label' => 'Utilisateurs', 'route' => 'users.index', 'path' => '/users', 'icon' => 'users', 'permission' => 'users.view'],
+        ['key' => 'standard-lists', 'label' => 'Listes standards de médicaments', 'route' => 'modules.standard-lists', 'path' => '/standard-lists', 'icon' => 'standard_lists', 'permission' => 'standard_lists.view'],
+        ['key' => 'products', 'label' => 'Produits', 'route' => 'modules.products', 'path' => '/products', 'icon' => 'products', 'permission' => 'products.view'],
+        ['key' => 'stocks', 'label' => 'Stocks', 'route' => 'modules.stocks', 'path' => '/stocks', 'icon' => 'stocks', 'permission' => 'stocks.view'],
+        ['key' => 'receipts', 'label' => 'Entrées en stock', 'route' => 'modules.receipts', 'path' => '/receipts', 'icon' => 'receipts', 'permission' => 'receipts.view'],
+        ['key' => 'dispensing', 'label' => 'Dispensation de médicaments', 'route' => 'modules.dispensing', 'path' => '/dispensations', 'icon' => 'dispensing', 'permission' => 'dispensing.view'],
+        ['key' => 'inventory-orders', 'label' => 'Inventaires & Commandes', 'route' => 'modules.inventories', 'path' => '/inventories', 'icon' => 'inventories', 'permission' => 'inventories.view'],
+        ['key' => 'inventories', 'label' => 'Inventaires', 'route' => 'modules.inventories', 'path' => '/inventories', 'icon' => 'inventories', 'permission' => 'inventories.view'],
+        ['key' => 'orders', 'label' => 'Commandes', 'route' => 'modules.orders', 'path' => '/orders', 'icon' => 'orders', 'permission' => 'orders.view'],
+        ['key' => 'reports', 'label' => 'Rapports', 'route' => 'modules.reports', 'path' => '/reports', 'icon' => 'reports', 'permission' => 'reports.view'],
+        ['key' => 'synchronization', 'label' => 'Synchronisation', 'route' => 'modules.synchronization', 'path' => '/synchronization', 'icon' => 'synchronization', 'permission' => 'synchronization.view'],
+        ['key' => 'settings', 'label' => 'Paramètres organisation', 'route' => 'modules.settings', 'path' => '/settings', 'icon' => 'settings', 'permission' => 'settings.view'],
+        ['key' => 'project_settings', 'label' => 'Paramètres du projet', 'route' => 'modules.project-settings', 'path' => '/project-settings', 'icon' => 'settings', 'permission' => 'project_settings.view'],
+        ['key' => 'site_settings', 'label' => 'Paramètres du site', 'route' => 'modules.site-settings', 'path' => '/site-settings', 'icon' => 'settings', 'permission' => 'site_settings.view'],
+        ['key' => 'activity_logs', 'label' => 'Journal des activités', 'route' => 'modules.activity-log', 'path' => '/activity-log', 'icon' => 'activity_logs', 'permission' => 'activity_logs.view'],
+        ['key' => 'local_activity_logs', 'label' => 'Journal local', 'route' => 'modules.activity-log-local', 'path' => '/activity-log-local', 'icon' => 'activity_logs', 'permission' => 'activity_logs.view_local'],
+        ['key' => 'profile', 'label' => 'Mon profil', 'route' => 'profile.show', 'path' => '/profile', 'icon' => 'profile', 'permission' => null],
     ];
 
     public function permissions(User $user): Collection
@@ -52,7 +53,7 @@ class ApplicationNavigationService
         $allowedKeys = $this->allowedKeys($role);
         $items = collect(self::ITEMS)
             ->filter(fn (array $item) => $allowedKeys === null || in_array($item['key'], $allowedKeys, true))
-            ->filter(fn(array $item) => $this->isVisible($item, $permissions));
+            ->filter(fn (array $item) => $this->isVisible($item, $permissions));
 
         return $items
             ->map(function (array $item) use ($role): array {
@@ -60,7 +61,23 @@ class ApplicationNavigationService
                     $item['route'] = 'sago.dashboard';
                     $item['path'] = '/sago/dashboard';
                 }
+                if ($role === GovernanceService::COORDINATION_ADMIN && $item['key'] === 'missions') {
+                    $item['label'] = 'Ma Coordination';
+                }
+                if ($role === GovernanceService::COORDINATION_ADMIN && $item['key'] === 'standard-lists') {
+                    $item['label'] = 'Liste standard du projet';
+                }
+                if ($role === GovernanceService::COORDINATION_ADMIN && $item['key'] === 'projects') {
+                    $item['label'] = 'Configuration des projets';
+                }
+                if ($role === GovernanceService::PROJECT_ADMIN && $item['key'] === 'projects') {
+                    $item['label'] = 'Mon projet';
+                }
+                if ($role === GovernanceService::PROJECT_ADMIN && $item['key'] === 'standard-lists') {
+                    $item['label'] = 'Liste standard';
+                }
                 $item['url'] = $this->buildUrl($item['route']);
+
                 return $item;
             })->values()->all();
     }
@@ -70,13 +87,10 @@ class ApplicationNavigationService
         return match ($role) {
             GovernanceService::SAGO_ADMIN => ['dashboard', 'configuration', 'profile'],
             GovernanceService::COORDINATION_ADMIN => [
-                'dashboard', 'missions', 'projects', 'facilities', 'sites', 'users',
-                'standard-lists', 'products', 'stocks', 'receipts', 'dispensing',
-                'inventory-orders', 'reports', 'synchronization', 'profile',
+                ...config('pharmacare_v1.navigation.coordination_admin'),
             ],
             GovernanceService::PROJECT_ADMIN => [
-                'dashboard', 'projects', 'standard-lists', 'products', 'stocks', 'receipts', 'dispensing',
-                'inventory-orders', 'reports', 'synchronization', 'profile',
+                ...config('pharmacare_v1.navigation.project_admin'),
             ],
             GovernanceService::SITE_ADMIN,
             GovernanceService::SITE_USER => [
@@ -95,7 +109,7 @@ class ApplicationNavigationService
 
         try {
             return route($route);
-        } catch (\Illuminate\Routing\Exceptions\UrlGenerationException $exception) {
+        } catch (UrlGenerationException $exception) {
             return null;
         }
     }
@@ -107,6 +121,7 @@ class ApplicationNavigationService
         }
 
         $permission = $item['permission'];
+
         return $permissions->contains($permission) || $permissions->contains($this->compatibilityPermission($permission));
     }
 
@@ -123,8 +138,9 @@ class ApplicationNavigationService
     public function mobileItems(User $user): array
     {
         $sago = app(GovernanceService::class)->roleCode($user) === GovernanceService::SAGO_ADMIN;
+
         return collect($this->items($user))->whereNotNull('path')
-            ->map(fn(array $item) => [
+            ->map(fn (array $item) => [
                 'key' => $item['key'],
                 'label' => $item['label'],
                 'path' => $item['key'] === 'dashboard' && ! $sago ? '/home' : $item['path'],
@@ -136,9 +152,11 @@ class ApplicationNavigationService
     public function scope(User $user): array
     {
         $scopes = app(UserScopeService::class);
+
         return [
             'platform' => $scopes->isPlatform($user),
             'organization_ids' => $scopes->organizationIds($user)->values()->all(),
+            'mission_ids' => $scopes->coordinationMissionIds($user)->values()->all(),
             'project_ids' => $scopes->projectIds($user)->values()->all(),
             'facility_ids' => $scopes->facilityIds($user)->values()->all(),
             'site_ids' => $scopes->siteIds($user)->values()->all(),

@@ -1,70 +1,81 @@
 @extends('layouts.portal')
-
-@section('title', 'Projets · PharmaCare')
-@section('page-title', 'Projets')
-
+@section('title', ($projectMode ? 'Mon projet' : 'Configuration des projets').' · PharmaCare')
+@section('page-title', $projectMode ? 'Mon projet' : 'Configuration des projets')
 @section('content')
-<x-app-page-header title="Projets" description="Consultez les projets autorisés dans votre périmètre.">
-    <x-slot:actions>
-        @if(auth()->user()->hasPermission('projects.manage') && auth()->user()->hasPermission('missions.view'))
-            <a class="app-button app-button--primary" href="{{ route('modules.missions') }}">
-                <span class="material-symbols-outlined">add</span> Nouveau projet
-            </a>
-        @endif
-    </x-slot:actions>
+<x-app-page-header :title="$projectMode ? 'Mon projet' : 'Configuration des projets'" :description="$projectMode ? 'Consultez les informations et paramètres autorisés du projet qui vous est affecté.' : 'Gérez les projets de votre coordination, leurs responsables, leurs bailleurs et leur configuration.'">
+ <x-slot:actions>@if($canCreateProject)<a class="app-button app-button--secondary" href="{{ route('modules.funding') }}">Bailleurs &amp; Programmes</a><x-app-button type="button" icon="add" data-project-sheet-open>Créer un projet</x-app-button>@endif</x-slot:actions>
 </x-app-page-header>
-
-<section class="app-kpi-grid" aria-label="Indicateurs des projets">
-    <x-app-kpi-card label="Projets accessibles" :value="$projects->count()" icon="account_tree" caption="Dans votre périmètre" tone="green" />
-    <x-app-kpi-card label="Projets actifs" :value="$projects->where('is_active', true)->count()" icon="verified" caption="Actuellement actifs" tone="green" />
-    <x-app-kpi-card label="Missions concernées" :value="$projects->pluck('mission_id')->unique()->count()" icon="flag" caption="Missions rattachées" tone="blue" />
-    <x-app-kpi-card label="Formations sanitaires" :value="$projects->flatMap->healthFacilities->unique('id')->count()" icon="local_hospital" caption="Structures rattachées" tone="orange" />
+@unless($projectMode)
+ @include('projects.partials.configuration-tabs', ['activeTab' => 'projects'])
+@endunless
+@if(session('status'))<div class="project-alert success">{{ session('status') }}</div>@endif
+@if($errors->any())<div class="project-alert error"><strong>Le formulaire contient des erreurs.</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+<section class="app-kpi-grid">
+ <x-app-kpi-card label="Total projets" :value="$projects->count()" icon="account_tree" caption="Dans votre coordination" tone="blue" />
+ <x-app-kpi-card label="Projets actifs" :value="$projects->where('is_active', true)->count()" icon="verified" caption="Actuellement actifs" tone="green" />
+ <x-app-kpi-card label="Bailleurs associés" :value="$projects->flatMap->donors->unique('id')->count()" icon="handshake" caption="Financements" tone="orange" />
+ <x-app-kpi-card label="Projets archivés" :value="$archivedProjects->count()" icon="archive" caption="Historique conservé" tone="purple" />
 </section>
-
-<x-app-card class="projects-workspace">
-    <x-app-filter-bar :action="route('modules.projects')">
-        <x-app-search-input name="search" :value="request('search')" placeholder="Rechercher un projet…" />
-        <x-slot:actions>
-            <x-app-button type="submit" variant="secondary" icon="filter_alt">Filtrer</x-app-button>
-            @if(request('search'))<a class="app-button app-button--ghost" href="{{ route('modules.projects') }}">Réinitialiser</a>@endif
-        </x-slot:actions>
-    </x-app-filter-bar>
-
-    @if($projects->isEmpty())
-        <x-app-empty-state icon="account_tree" title="Aucun projet accessible" description="Aucun projet ne correspond à votre périmètre ou à votre recherche." />
-    @else
-        <div class="projects-grid">
-            @foreach($projects as $project)
-                <article class="project-card">
-                    <header>
-                        <span class="project-card__icon material-symbols-outlined">account_tree</span>
-                        <div><h2>{{ $project->name }}</h2><p>{{ $project->code }}</p></div>
-                        <x-app-badge :variant="$project->is_active ? 'success' : 'warning'">{{ $project->is_active ? 'Actif' : 'Inactif' }}</x-app-badge>
-                    </header>
-                    <dl>
-                        <div><dt>Mission</dt><dd>{{ $project->mission->name }}</dd></div>
-                        <div><dt>Pays</dt><dd>{{ $project->mission->country->name }}</dd></div>
-                        <div><dt>Organisation</dt><dd>{{ $project->organization->name }}</dd></div>
-                        <div><dt>Formations sanitaires</dt><dd>{{ $project->healthFacilities->count() }}</dd></div>
-                    </dl>
-                    @if($project->description)<p class="project-card__description">{{ $project->description }}</p>@endif
-                </article>
-            @endforeach
-        </div>
-    @endif
+<x-app-card class="project-workspace">
+ <x-app-filter-bar :action="route('modules.projects')">
+  <x-app-search-input name="search" :value="request('search')" placeholder="Rechercher par nom ou code…" />
+  <select class="project-select" name="status"><option value="">Tous les statuts</option><option value="active" @selected(request('status')==='active')>Actifs</option><option value="inactive" @selected(request('status')==='inactive')>Inactifs</option></select>
+  <x-slot:actions><x-app-button type="submit" variant="secondary" icon="filter_alt">Filtrer</x-app-button>@if(request('search') || request('status'))<a class="app-button app-button--ghost" href="{{ route('modules.projects') }}">Réinitialiser</a>@endif</x-slot:actions>
+ </x-app-filter-bar>
+ @if($projects->isEmpty())
+  <x-app-empty-state icon="account_tree" title="Aucun projet" description="Créez le premier projet de votre coordination avec son responsable et ses financements." />
+ @else
+ <div class="project-table-wrap"><table class="project-table"><thead><tr><th>Projet</th><th>Coordination / Pays</th><th>Bailleurs & programme</th><th>Admin Projet</th><th>Période</th><th>Statut</th><th>Actions</th></tr></thead><tbody>
+ @foreach($projects as $project)<tr>
+  <td><strong>{{ $project->name }}</strong><small>{{ $project->code }}</small></td>
+  <td>{{ $project->mission->name }}<small>{{ $project->mission->country->name }}</small></td>
+  <td>{{ $project->donors->pluck('name')->join(', ') ?: 'Aucun bailleur' }}<small>{{ $project->programs->pluck('name')->join(', ') ?: 'Aucun programme' }}</small><small>Commandes : {{ $project->order_period_months ? $project->order_period_months.' mois' : '—' }} · Délai : {{ $project->delivery_lead_time_months ? $project->delivery_lead_time_months.' mois' : '—' }} · Sécurité : {{ $project->safety_stock_months ? $project->safety_stock_months.' mois' : '—' }}</small></td>
+  <td>{{ $project->administrators->first()?->name ?? 'Non affecté' }}<small>{{ $project->administrators->first()?->email }}</small></td>
+  <td>{{ $project->starts_on?->format('d/m/Y') ?? '—' }}<small>au {{ $project->ends_on?->format('d/m/Y') ?? '—' }}</small></td>
+  <td><x-app-badge :variant="$project->is_active ? 'success' : 'warning'">{{ $project->is_active ? 'Actif' : 'Inactif' }}</x-app-badge></td>
+  <td><div class="project-actions"><a class="app-icon-button" title="Voir et configurer" href="{{ route('organizations.projects.funding.index', [$project->organization_id, $project]) }}"><span class="material-symbols-outlined">visibility</span></a>@if(auth()->user()->hasPermission('projects.manage'))<button type="button" class="app-icon-button" title="Modifier" onclick="document.getElementById('edit-project-{{ $project->id }}').showModal()"><span class="material-symbols-outlined">edit</span></button><form method="post" action="{{ route('organizations.projects.destroy', [$project->organization_id, $project]) }}" onsubmit="return confirm('Archiver ce projet ? Son historique sera conservé.')">@csrf @method('DELETE')<button class="app-icon-button danger" title="Archiver"><span class="material-symbols-outlined">archive</span></button></form>@endif</div></td>
+ </tr>@endforeach
+ </tbody></table></div>
+ @endif
 </x-app-card>
+@if(auth()->user()->hasPermission('projects.manage'))
+@foreach($projects as $project)<dialog class="project-edit-dialog" id="edit-project-{{ $project->id }}"><form method="post" action="{{ route('organizations.projects.update', [$project->organization_id, $project]) }}">@csrf @method('PUT')<header><div><span class="eyebrow">Projet {{ $project->code }}</span><h2>Modifier le projet</h2></div><button type="button" class="app-icon-button" onclick="this.closest('dialog').close()"><span class="material-symbols-outlined">close</span></button></header><div class="form-grid"><input type="hidden" name="mission_id" value="{{ $project->mission_id }}"><label>Code *<input name="code" value="{{ $project->code }}" required></label><label>Nom *<input name="name" value="{{ $project->name }}" required></label><label>Date de début<input type="date" name="starts_on" value="{{ $project->starts_on?->format('Y-m-d') }}"></label><label>Date de fin<input type="date" name="ends_on" value="{{ $project->ends_on?->format('Y-m-d') }}"></label><label>Périodicité (mois)<input type="number" min="1" max="24" name="order_period_months" value="{{ $project->order_period_months }}"></label><label>Délai de livraison (mois)<input type="number" min="1" max="24" name="delivery_lead_time_months" value="{{ $project->delivery_lead_time_months }}"></label><label>Stock de sécurité (mois)<input type="number" min="1" max="24" name="safety_stock_months" value="{{ $project->safety_stock_months }}"></label><label class="wide">Description<textarea name="description" rows="3">{{ $project->description }}</textarea></label><label class="check"><input type="checkbox" name="is_active" value="1" @checked($project->is_active)> Projet actif</label></div><footer><x-app-button type="button" variant="danger-outline" onclick="this.closest('dialog').close()">Annuler</x-app-button><x-app-button type="submit" icon="save">Enregistrer</x-app-button></footer></form></dialog>@endforeach
+@endif
+@if($archivedProjects->isNotEmpty())<details class="project-archives"><summary>Projets archivés ({{ $archivedProjects->count() }})</summary>@foreach($archivedProjects as $project)<div><span><strong>{{ $project->name }}</strong> · {{ $project->code }}</span><form method="post" action="{{ route('organizations.projects.restore', [$project->organization_id, $project->id]) }}" onsubmit="return confirm('Restaurer ce projet ?')">@csrf <x-app-button type="submit" variant="secondary" icon="restore">Restaurer</x-app-button></form></div>@endforeach</details>@endif
+
+@if($canCreateProject)
+<div class="project-sheet" data-project-sheet @if(!$errors->any()) hidden @endif><button class="backdrop" type="button" aria-label="Fermer" data-project-sheet-close></button><aside class="panel" role="dialog" aria-modal="true" aria-labelledby="project-sheet-title">
+ <header><div><span class="eyebrow">Nouveau projet</span><h2 id="project-sheet-title">Créer un projet</h2><p>Le projet et son premier Admin Projet seront créés dans une opération sécurisée.</p></div><button type="button" class="app-icon-button" data-project-sheet-close><span class="material-symbols-outlined">close</span></button></header>
+ <form method="post" action="{{ route('organizations.projects.store', $organization) }}" class="project-form">@csrf
+  <section><h3>Informations générales</h3><div class="form-grid">
+   <label>Organisation<input value="{{ $organization->name }}" readonly></label><label>Coordination / Pays<input value="{{ $coordination->name }} · {{ $coordination->country->name }}" readonly></label><input type="hidden" name="mission_id" value="{{ $coordination->id }}">
+   <label>Code projet *<input name="code" value="{{ old('code') }}" required maxlength="50"></label><label>Nom / titre du projet *<input name="name" value="{{ old('name') }}" required maxlength="180"></label>
+   <label>Date de début<input type="date" name="starts_on" value="{{ old('starts_on') }}"></label><label>Date de fin<input type="date" name="ends_on" value="{{ old('ends_on') }}"></label>
+   <label class="wide">Description<textarea name="description" rows="3">{{ old('description') }}</textarea></label><input type="hidden" name="is_active" value="1">
+  </div></section>
+  <section><h3>Bailleurs et programme</h3><div class="form-grid">
+   <fieldset class="funding-picker"><legend>Bailleur(s)</legend>@forelse($donors as $donor)<label><input type="checkbox" name="donor_ids[]" value="{{ $donor->id }}" @checked(in_array($donor->id, old('donor_ids', [])))><span>{{ $donor->name }} <small>{{ $donor->code }}</small></span></label>@empty<p>Aucun bailleur disponible. <a href="{{ route('modules.funding') }}">Ajouter un bailleur</a></p>@endforelse</fieldset>
+   <fieldset class="funding-picker"><legend>Programme(s)</legend>@forelse($programs as $program)<label><input type="checkbox" name="program_ids[]" value="{{ $program->id }}" @checked(in_array($program->id, old('program_ids', [])))><span>{{ $program->name }} <small>{{ $program->code }}</small></span></label>@empty<p>Aucun programme disponible. <a href="{{ route('modules.funding') }}">Ajouter un programme</a></p>@endforelse</fieldset>
+  </div></section>
+  <section><h3>Paramètres d’approvisionnement</h3><div class="form-grid">
+   <label>Périodicité des commandes<select name="order_period_months"><option value="">Non renseigné</option>@foreach([1,2,3,4,6,12] as $month)<option value="{{ $month }}" @selected(old('order_period_months')==$month)>{{ $month }} mois</option>@endforeach</select></label>
+   <label>Délai de livraison<select name="delivery_lead_time_months"><option value="">Non renseigné</option>@foreach([1,2,3,4,6,12] as $month)<option value="{{ $month }}" @selected(old('delivery_lead_time_months')==$month)>{{ $month }} mois</option>@endforeach</select></label>
+   <label>Stock de sécurité<select name="safety_stock_months"><option value="">Non renseigné</option>@foreach([1,2,3,4,6,12] as $month)<option value="{{ $month }}" @selected(old('safety_stock_months')==$month)>{{ $month }} mois</option>@endforeach</select></label>
+  </div></section>
+  <section><h3>Responsable du projet</h3><p>Créez le premier compte administrateur rattaché à ce projet. Le rôle Admin Projet est automatique.</p><div class="form-grid">
+   <label>Prénom *<input name="admin[first_name]" value="{{ old('admin.first_name') }}" required></label><label>Nom *<input name="admin[last_name]" value="{{ old('admin.last_name') }}" required></label>
+   <label>Email de connexion *<input type="email" name="admin[email]" value="{{ old('admin.email') }}" required></label><label>Téléphone<input name="admin[phone]" value="{{ old('admin.phone') }}"></label>
+   <label>Identifiant<input name="admin[username]" value="{{ old('admin.username') }}"></label><label>Rôle<input value="Admin Projet" readonly></label>
+   <label>Mot de passe *<input type="password" name="admin[password]" required autocomplete="new-password"></label><label>Confirmation *<input type="password" name="admin[password_confirmation]" required autocomplete="new-password"></label>
+  </div></section>
+  <footer><x-app-button type="button" variant="danger-outline" data-project-sheet-close>Annuler</x-app-button><x-app-button type="submit" icon="add">Créer le projet</x-app-button></footer>
+ </form>
+</aside></div>
+@endif
 @endsection
 
-@push('styles')
-<style>
-.projects-workspace{margin-top:var(--pc-space-5)}
-.projects-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pc-space-4);margin-top:var(--pc-space-4)}
-.project-card{padding:var(--pc-space-5);border:1px solid var(--pc-color-border);border-radius:var(--pc-radius-lg);background:var(--pc-color-surface);box-shadow:var(--pc-shadow-card)}
-.project-card header{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px}
-.project-card__icon{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:#eaf8ef;color:var(--pc-color-success)}
-.project-card h2{margin:0;font-size:16px}.project-card header p,.project-card__description{margin:4px 0 0;color:var(--pc-color-text-muted);font-size:12px}
-.project-card dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0 0}.project-card dl div{padding:11px;border-radius:11px;background:var(--pc-color-background)}
-.project-card dt{color:var(--pc-color-text-muted);font-size:11px}.project-card dd{margin:4px 0 0;font-weight:750;font-size:13px}
-@media(max-width:760px){.projects-grid,.project-card dl{grid-template-columns:1fr}.project-card header{grid-template-columns:auto minmax(0,1fr)}.project-card header .app-badge{grid-column:2}}
-</style>
-@endpush
+@push('styles')<style>
+.project-alert{margin:0 0 16px;padding:14px 16px;border-radius:12px;border:1px solid}.project-alert.success{background:#edf9f1;border-color:#bfe8cd;color:#167337}.project-alert.error{background:#fff1f0;border-color:#ffc9c5;color:#b42318}.project-workspace{margin-top:20px}.project-select,.project-form input,.project-form select,.project-form textarea,.project-edit-dialog input,.project-edit-dialog textarea{width:100%;min-height:46px;border:1px solid var(--pc-color-border);border-radius:12px;background:#fff;padding:10px 12px;font:inherit;color:var(--pc-color-text)}.project-table-wrap{overflow-x:auto;margin-top:16px}.project-table{width:100%;border-collapse:collapse;min-width:1050px}.project-table th,.project-table td{padding:14px 12px;text-align:left;border-bottom:1px solid var(--pc-color-border);vertical-align:middle}.project-table th{font-size:11px;text-transform:uppercase;color:var(--pc-color-text-muted);background:var(--pc-color-background)}.project-table td{font-size:13px}.project-table small{display:block;margin-top:4px;color:var(--pc-color-text-muted)}.project-actions{display:flex;gap:6px}.project-actions form{margin:0}.project-actions .danger{color:#e53935}.project-archives{margin-top:18px;padding:16px;border:1px solid var(--pc-color-border);border-radius:14px;background:#fff}.project-archives summary{font-weight:800;cursor:pointer}.project-archives>div{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--pc-color-border)}.project-sheet[hidden]{display:none}.project-sheet{position:fixed;inset:0;z-index:1000;display:flex;justify-content:flex-end}.project-sheet .backdrop{position:absolute;inset:0;border:0;background:rgba(15,30,55,.42)}.project-sheet .panel{position:relative;width:min(720px,100%);height:100%;overflow:auto;background:#f7f9fc;box-shadow:-20px 0 50px rgba(20,40,70,.18)}.project-sheet .panel>header{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;gap:16px;padding:24px;background:#fff;border-bottom:1px solid var(--pc-color-border)}.project-sheet h2{margin:4px 0;font-size:24px}.project-sheet p{margin:0;color:var(--pc-color-text-muted)}.eyebrow{color:var(--pc-color-primary);font-size:11px;font-weight:800;text-transform:uppercase}.project-form{padding:20px}.project-form section{padding:20px;margin-bottom:16px;border:1px solid var(--pc-color-border);border-radius:16px;background:#fff}.project-form h3{margin:0 0 16px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.project-form label,.project-edit-dialog label{font-size:12px;font-weight:700}.project-form label small{font-weight:400;color:var(--pc-color-text-muted)}.project-form input,.project-form select,.project-form textarea{display:block;margin-top:6px}.project-form input[readonly]{background:#f1f4f8;color:#607089}.form-grid .wide{grid-column:1/-1}.project-form footer{position:sticky;bottom:0;display:flex;justify-content:flex-end;gap:10px;padding:16px 0;background:#f7f9fc}.project-edit-dialog{width:min(620px,calc(100% - 24px));border:0;border-radius:18px;padding:0;box-shadow:0 24px 70px rgba(15,30,55,.24)}.project-edit-dialog::backdrop{background:rgba(15,30,55,.45)}.project-edit-dialog form{padding:22px}.project-edit-dialog header,.project-edit-dialog footer{display:flex;justify-content:space-between;align-items:center;gap:12px}.project-edit-dialog h2{margin:4px 0 18px}.project-edit-dialog footer{justify-content:flex-end;margin-top:20px}.project-edit-dialog .check{display:flex;align-items:center;gap:8px}.project-edit-dialog .check input{width:auto;min-height:auto}@media(max-width:700px){.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}.project-sheet .panel>header{padding:18px}.project-form{padding:12px}.project-form section{padding:16px}.project-form footer .app-button{flex:1}}
+.funding-picker{min-width:0;margin:0;padding:12px;border:1px solid var(--pc-color-border);border-radius:12px}.funding-picker legend{padding:0 6px;font-size:12px;font-weight:800}.funding-picker label{display:flex;align-items:center;gap:10px;padding:9px;border-radius:9px;cursor:pointer}.funding-picker label:hover{background:#fff3e8}.funding-picker input{width:18px;min-height:18px;margin:0;accent-color:var(--pc-color-primary)}.funding-picker span{min-width:0}.funding-picker small{display:inline;margin-left:6px}.funding-picker p{margin:8px;color:var(--pc-color-text-muted)}
+</style>@endpush
+@push('scripts')<script>document.addEventListener('DOMContentLoaded',()=>{const s=document.querySelector('[data-project-sheet]');if(!s)return;const o=()=>{s.hidden=false;document.body.style.overflow='hidden'},c=()=>{s.hidden=true;document.body.style.overflow=''};document.querySelectorAll('[data-project-sheet-open]').forEach(e=>e.addEventListener('click',o));s.querySelectorAll('[data-project-sheet-close]').forEach(e=>e.addEventListener('click',c));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!s.hidden)c()});if(new URLSearchParams(location.search).get('create')==='1')o();if(!s.hidden)document.body.style.overflow='hidden'});</script>@endpush

@@ -11,12 +11,18 @@ class MissionsPage extends StatefulWidget {
     required this.organizationId,
     required this.organizationName,
     this.allowedCountries = const [],
+    this.readOnly = false,
+    this.canCreateProject = false,
+    this.initialCoordination,
     super.key,
   });
 
   final String organizationId;
   final String organizationName;
   final List<Map<String, dynamic>> allowedCountries;
+  final bool readOnly;
+  final bool canCreateProject;
+  final Map<String, dynamic>? initialCoordination;
 
   @override
   State<MissionsPage> createState() => _MissionsPageState();
@@ -71,11 +77,16 @@ class _MissionsPageState extends State<MissionsPage> {
       });
     } on DioException catch (error) {
       if (mounted) {
-        setState(
-          () => _error = error.response?.statusCode == 403
-              ? 'Vous n’avez pas la permission de consulter les missions.'
-              : 'Impossible de charger les missions.',
-        );
+        setState(() {
+          if (widget.readOnly && widget.initialCoordination != null) {
+            _missions = [widget.initialCoordination!];
+            _error = null;
+          } else {
+            _error = error.response?.statusCode == 403
+                ? 'Vous n’avez pas la permission de consulter les missions.'
+                : 'Impossible de charger les missions.';
+          }
+        });
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -212,7 +223,7 @@ class _MissionsPageState extends State<MissionsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.organizationName)),
-      floatingActionButton: _archived
+      floatingActionButton: widget.readOnly || _archived
           ? null
           : AppFab(
               onPressed: _loading ? null : _openForm,
@@ -225,93 +236,109 @@ class _MissionsPageState extends State<MissionsPage> {
           padding: const EdgeInsets.all(16),
           children: [
             Text(
-              'Missions et pays d’intervention',
+              widget.readOnly
+                  ? 'Ma Coordination'
+                  : 'Missions et pays d’intervention',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 6),
             Text(
-              'Ajoutez, consultez et modifiez les missions de cette organisation.',
+              widget.readOnly
+                  ? 'Consultez la coordination pays à laquelle votre compte est affecté.'
+                  : 'Ajoutez, consultez et modifiez les missions de cette organisation.',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+            if (widget.readOnly && widget.canCreateProject) ...[
+              const SizedBox(height: 14),
+              AppButton.add(
+                label: 'Créer un projet',
+                onPressed: () => context.push('/projects?create=1'),
+              ),
+            ],
             const SizedBox(height: 16),
-            TextField(
-              controller: _search,
-              textInputAction: TextInputAction.search,
-              onSubmitted: (_) => _load(),
-              decoration: InputDecoration(
-                hintText: 'Rechercher une mission…',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: IconButton(
-                  tooltip: 'Rechercher',
-                  onPressed: _load,
-                  icon: const Icon(Icons.arrow_forward_rounded),
+            if (!widget.readOnly)
+              TextField(
+                controller: _search,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _load(),
+                decoration: InputDecoration(
+                  hintText: 'Rechercher une mission…',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    tooltip: 'Rechercher',
+                    onPressed: _load,
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                ChoiceChip(
-                  label: const Text('Missions actives'),
-                  selected: !_archived,
-                  onSelected: (_) {
-                    setState(() => _archived = false);
-                    _load();
-                  },
-                ),
-                ChoiceChip(
-                  label: const Text('Archives'),
-                  selected: _archived,
-                  onSelected: (_) {
-                    setState(() => _archived = true);
-                    _load();
-                  },
-                ),
-                if (!_archived)
-                  DropdownButton<String>(
-                    value: _status,
-                    items: const [
-                      DropdownMenuItem(
-                        value: '',
-                        child: Text('Tous les statuts'),
-                      ),
-                      DropdownMenuItem(value: 'active', child: Text('Actives')),
-                      DropdownMenuItem(
-                        value: 'inactive',
-                        child: Text('Inactives'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setState(() => _status = value ?? '');
+            if (!widget.readOnly) const SizedBox(height: 12),
+            if (!widget.readOnly)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Missions actives'),
+                    selected: !_archived,
+                    onSelected: (_) {
+                      setState(() => _archived = false);
                       _load();
                     },
                   ),
-                if (!_archived && _countries.isNotEmpty)
-                  DropdownButton<String>(
-                    value: _countryId,
-                    items: [
-                      const DropdownMenuItem(
-                        value: '',
-                        child: Text('Tous les pays'),
-                      ),
-                      for (final country in _countries)
+                  ChoiceChip(
+                    label: const Text('Archives'),
+                    selected: _archived,
+                    onSelected: (_) {
+                      setState(() => _archived = true);
+                      _load();
+                    },
+                  ),
+                  if (!_archived)
+                    DropdownButton<String>(
+                      value: _status,
+                      items: const [
                         DropdownMenuItem(
-                          value: '${country['id']}',
-                          child: Text('${country['name']}'),
+                          value: '',
+                          child: Text('Tous les statuts'),
                         ),
-                    ],
-                    onChanged: (value) {
-                      setState(() => _countryId = value ?? '');
-                      _load();
-                    },
-                  ),
-              ],
-            ),
+                        DropdownMenuItem(
+                          value: 'active',
+                          child: Text('Actives'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'inactive',
+                          child: Text('Inactives'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _status = value ?? '');
+                        _load();
+                      },
+                    ),
+                  if (!_archived && _countries.isNotEmpty)
+                    DropdownButton<String>(
+                      value: _countryId,
+                      items: [
+                        const DropdownMenuItem(
+                          value: '',
+                          child: Text('Tous les pays'),
+                        ),
+                        for (final country in _countries)
+                          DropdownMenuItem(
+                            value: '${country['id']}',
+                            child: Text('${country['name']}'),
+                          ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _countryId = value ?? '');
+                        _load();
+                      },
+                    ),
+                ],
+              ),
             const SizedBox(height: 16),
             if (_loading)
               const Center(
@@ -349,7 +376,7 @@ class _MissionsPageState extends State<MissionsPage> {
                             : 'Aucune mission enregistrée.',
                       ),
                       const SizedBox(height: 14),
-                      if (!_archived)
+                      if (!widget.readOnly && !_archived)
                         AppButton.add(
                           label: 'Ajouter une mission',
                           onPressed: _openForm,
@@ -384,31 +411,34 @@ class _MissionsPageState extends State<MissionsPage> {
                         ],
                       ],
                     ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (!_archived)
-                          AppIconAction(
-                            icon: Icons.edit_outlined,
-                            tooltip: 'Modifier la mission',
-                            color: AppActionColor.orange,
-                            onPressed: () => _openForm(mission),
+                    trailing: widget.readOnly
+                        ? null
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!widget.readOnly && !_archived)
+                                AppIconAction(
+                                  icon: Icons.edit_outlined,
+                                  tooltip: 'Modifier la mission',
+                                  color: AppActionColor.orange,
+                                  onPressed: () => _openForm(mission),
+                                ),
+                              const SizedBox(width: 4),
+                              if (!widget.readOnly)
+                                AppIconAction(
+                                  icon: _archived
+                                      ? Icons.restore_rounded
+                                      : Icons.archive_outlined,
+                                  tooltip: _archived
+                                      ? 'Restaurer la mission'
+                                      : 'Archiver la mission',
+                                  color: _archived
+                                      ? AppActionColor.green
+                                      : AppActionColor.red,
+                                  onPressed: () => _changeArchiveState(mission),
+                                ),
+                            ],
                           ),
-                        const SizedBox(width: 4),
-                        AppIconAction(
-                          icon: _archived
-                              ? Icons.restore_rounded
-                              : Icons.archive_outlined,
-                          tooltip: _archived
-                              ? 'Restaurer la mission'
-                              : 'Archiver la mission',
-                          color: _archived
-                              ? AppActionColor.green
-                              : AppActionColor.red,
-                          onPressed: () => _changeArchiveState(mission),
-                        ),
-                      ],
-                    ),
                     onTap: _archived
                         ? null
                         : () => context.push(

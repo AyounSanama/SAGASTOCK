@@ -1352,7 +1352,7 @@
             @else
                 @foreach ($navigationItems as $item)
                     @continue(!$item['url'] || $item['key'] === 'profile')
-                    @php($active = request()->routeIs($item['route']) || request()->routeIs($item['route'] . '*'))
+                    @php($active = request()->routeIs($item['route']) || request()->routeIs($item['route'] . '*') || ($item['key'] === 'projects' && request()->routeIs('modules.funding')))
                     <a class="{{ $active ? 'active' : '' }}" href="{{ $item['url'] }}">
                         <span class="nav-icon material-symbols-outlined">{{ $materialIcons[$item['icon']] ?? 'circle' }}</span>
                         <span class="nav-text">{{ $item['label'] }}</span>

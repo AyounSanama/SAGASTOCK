@@ -14,11 +14,11 @@ class Project extends Model
 
     public $incrementing = false;
     protected $keyType = 'string';
-    protected $fillable = ['organization_id', 'mission_id', 'code', 'name', 'description', 'starts_on', 'ends_on', 'is_active'];
+    protected $fillable = ['organization_id', 'mission_id', 'code', 'name', 'description', 'starts_on', 'ends_on', 'order_period_months', 'delivery_lead_time_months', 'safety_stock_months', 'is_active'];
 
     protected function casts(): array
     {
-        return ['starts_on' => 'date', 'ends_on' => 'date', 'is_active' => 'boolean'];
+        return ['starts_on' => 'date', 'ends_on' => 'date', 'order_period_months' => 'integer', 'delivery_lead_time_months' => 'integer', 'safety_stock_months' => 'integer', 'is_active' => 'boolean'];
     }
 
     public function organization(): BelongsTo
@@ -45,5 +45,13 @@ class Project extends Model
     public function healthFacilities(): BelongsToMany
     {
         return $this->belongsToMany(HealthFacility::class)->withTimestamps();
+    }
+
+    public function administrators(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'role_user', 'scope_id', 'user_id')
+            ->wherePivot('scope_type', 'project')
+            ->whereHas('roles', fn ($query) => $query->where('code', 'project_admin'))
+            ->withTimestamps();
     }
 }

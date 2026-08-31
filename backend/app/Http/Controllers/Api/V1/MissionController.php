@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Mission;
 use App\Models\Organization;
 use App\Services\AuditService;
+use App\Services\GovernanceService;
 use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,19 +19,23 @@ class MissionController extends Controller
     public function index(Request $request, Organization $organization): JsonResponse
     {
         $this->accessible($request, $organization);
-        $missions = $organization->missions()->with('country:id,iso2,name')
+        $missionIds = $this->scopes->coordinationMissionIds($request->user());
+        $isCoordination = app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN;
+        $missions = $organization->missions()->when($isCoordination, fn ($query) => $query->whereIn('id', $missionIds))->with('country:id,iso2,name')
             ->when($request->string('search')->toString(), fn ($query, $search) => $query
                 ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
             ->when($request->filled('country_id'), fn ($query) => $query->where('country_id', $request->string('country_id')->toString()))
             ->when($request->get('status') === 'active', fn ($query) => $query->where('is_active', true))
             ->when($request->get('status') === 'inactive', fn ($query) => $query->where('is_active', false))
             ->orderBy('name')->paginate(20);
+
         return response()->json($missions);
     }
 
     public function archived(Request $request, Organization $organization): JsonResponse
     {
         $this->accessible($request, $organization);
+        $this->denyCoordinationMutation($request);
         $missions = $organization->missions()->onlyTrashed()->with('country:id,iso2,name')
             ->when($request->string('search')->toString(), fn ($query, $search) => $query
                 ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
@@ -41,6 +46,7 @@ class MissionController extends Controller
 
     public function store(Request $request, Organization $organization): JsonResponse
     {
+        $this->denyCoordinationMutation($request);
         $this->accessible($request, $organization);
         $mission = $organization->missions()->create($this->validated($request, $organization));
         $this->audit->record($request, 'mission.created', $mission, [], $mission->only([
@@ -48,11 +54,13 @@ class MissionController extends Controller
             'ends_on', 'address', 'manager_name', 'phone', 'email',
             'description', 'is_active',
         ]));
+
         return response()->json(['mission' => $mission->load('country:id,iso2,name')], 201);
     }
 
     public function update(Request $request, Organization $organization, Mission $mission): JsonResponse
     {
+        $this->denyCoordinationMutation($request);
         $this->accessible($request, $organization);
         abort_unless($mission->organization_id === $organization->id, 404);
         $old = $mission->only([
@@ -61,24 +69,30 @@ class MissionController extends Controller
         ]);
         $mission->update($this->validated($request, $organization, $mission));
         $this->audit->record($request, 'mission.updated', $mission, $old, $mission->only(array_keys($old)));
+
         return response()->json(['mission' => $mission->load('country:id,iso2,name')]);
     }
 
     public function destroy(Request $request, Organization $organization, Mission $mission): JsonResponse
     {
+        $this->denyCoordinationMutation($request);
         $this->accessible($request, $organization);
         abort_unless($mission->organization_id === $organization->id, 404);
         $mission->delete();
         $this->audit->record($request, 'mission.archived', $mission);
+
         return response()->json(status: 204);
     }
 
     public function restore(Request $request, Organization $organization, string $mission): JsonResponse
     {
+        $this->denyCoordinationMutation($request);
         $this->accessible($request, $organization);
         $model = $organization->missions()->onlyTrashed()->findOrFail($mission);
-        $model->restore(); $model->update(['is_active' => true]);
+        $model->restore();
+        $model->update(['is_active' => true]);
         $this->audit->record($request, 'mission.restored', $model);
+
         return response()->json(['mission' => $model->load('country')]);
     }
 
@@ -105,5 +119,13 @@ class MissionController extends Controller
     private function accessible(Request $request, Organization $organization): void
     {
         abort_unless($this->scopes->organizations($request->user())->whereKey($organization->id)->exists(), 404);
+    }
+
+    private function denyCoordinationMutation(Request $request): void
+    {
+        abort_if(
+            app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN,
+            403,
+        );
     }
 }

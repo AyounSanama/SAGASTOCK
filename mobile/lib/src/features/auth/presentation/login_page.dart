@@ -155,11 +155,6 @@ class _LoginPageState extends State<LoginPage> {
                         expanded: true,
                         onPressed: _submit,
                       ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Mode hors connexion disponible apr\u00e8s une premi\u00e8re connexion r\u00e9ussie.',
-                        textAlign: TextAlign.center,
-                      ),
                     ],
                   ),
                 ),

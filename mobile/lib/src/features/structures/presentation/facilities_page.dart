@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
+import '../../organizations/data/organization_service.dart';
 import '../data/structure_service.dart';
 
 class FacilitiesPage extends StatefulWidget {
@@ -23,10 +24,13 @@ class FacilitiesPage extends StatefulWidget {
 class _FacilitiesPageState extends State<FacilitiesPage>
     with SingleTickerProviderStateMixin {
   final _service = StructureService();
+  final _organizationService = OrganizationService();
   final _search = TextEditingController();
   late final TabController _tabs;
   List<Map<String, dynamic>> _active = [];
   List<Map<String, dynamic>> _archived = [];
+  List<Map<String, dynamic>> _missions = [];
+  List<Map<String, dynamic>> _projects = [];
   bool _loading = true;
   bool _offline = false;
   String? _error;
@@ -51,20 +55,23 @@ class _FacilitiesPageState extends State<FacilitiesPage>
       _error = null;
     });
     try {
-      final result = await _service.list(
-        widget.organizationId,
-        search: _search.text.trim(),
-      );
+      final values = await Future.wait([
+        _service.list(widget.organizationId, search: _search.text.trim()),
+        _organizationService.missions(widget.organizationId),
+        _organizationService.projects(organizationId: widget.organizationId),
+      ]);
+      final result = values[0] as Map<String, dynamic>;
       final pagination =
           result['facilities'] as Map<String, dynamic>? ?? const {};
       if (!mounted) return;
       setState(() {
         _active = (pagination['data'] as List<dynamic>? ?? [])
             .cast<Map<String, dynamic>>();
-        _archived =
-            (result['archived_facilities'] as List<dynamic>? ?? [])
-                .cast<Map<String, dynamic>>();
+        _archived = (result['archived_facilities'] as List<dynamic>? ?? [])
+            .cast<Map<String, dynamic>>();
         _offline = result['offline'] == true;
+        _missions = values[1] as List<Map<String, dynamic>>;
+        _projects = values[2] as List<Map<String, dynamic>>;
       });
     } on DioException catch (error) {
       if (mounted) {
@@ -80,22 +87,25 @@ class _FacilitiesPageState extends State<FacilitiesPage>
   }
 
   Future<void> _openFacilityForm([Map<String, dynamic>? facility]) async {
-    final saved = await showAppFormSheet<bool>(
+    final saved = await showAppFormSheet<String>(
       context: context,
       title: facility == null
           ? 'Nouvelle formation sanitaire'
           : 'Modifier la formation sanitaire',
-      description:
-          'Informations administratives et niveau de prise en charge.',
+      description: 'Informations administratives et niveau de prise en charge.',
       builder: (sheetContext) => _FacilityForm(
         organizationId: widget.organizationId,
         facility: facility,
         service: _service,
+        missions: _missions,
+        projects: _projects,
       ),
     );
-    if (saved == true) {
+    if (saved != null) {
       _success(
-        facility == null
+        saved == 'pending'
+            ? 'Formation enregistrée hors connexion. Synchronisation en attente.'
+            : facility == null
             ? 'Formation sanitaire créée.'
             : 'Formation sanitaire modifiée.',
       );
@@ -136,7 +146,7 @@ class _FacilitiesPageState extends State<FacilitiesPage>
     );
   }
 
-  Future<void> _run(Future<void> Function() action, String message) async {
+  Future<void> _run(Future<Object?> Function() action, String message) async {
     try {
       await action();
       _success(message);
@@ -219,12 +229,10 @@ class _FacilitiesPageState extends State<FacilitiesPage>
           ],
         ),
       ),
-      floatingActionButton: _offline
-          ? null
-          : AppFab(
-              tooltip: 'Ajouter une formation sanitaire',
-              onPressed: _openFacilityForm,
-            ),
+      floatingActionButton: AppFab(
+        tooltip: 'Ajouter une formation sanitaire',
+        onPressed: _openFacilityForm,
+      ),
       body: Column(
         children: [
           if (_offline)
@@ -234,15 +242,11 @@ class _FacilitiesPageState extends State<FacilitiesPage>
               color: AppTheme.blue.withValues(alpha: .09),
               child: const Row(
                 children: [
-                  Icon(
-                    Icons.cloud_off_rounded,
-                    color: AppTheme.blue,
-                    size: 18,
-                  ),
+                  Icon(Icons.cloud_off_rounded, color: AppTheme.blue, size: 18),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Consultation hors connexion — modifications désactivées.',
+                      'Mode hors connexion — les modifications seront synchronisées automatiquement.',
                       style: TextStyle(
                         color: AppTheme.blue,
                         fontWeight: FontWeight.w600,
@@ -325,11 +329,15 @@ class _FacilityForm extends StatefulWidget {
   const _FacilityForm({
     required this.organizationId,
     required this.service,
+    required this.missions,
+    required this.projects,
     this.facility,
   });
 
   final String organizationId;
   final StructureService service;
+  final List<Map<String, dynamic>> missions;
+  final List<Map<String, dynamic>> projects;
   final Map<String, dynamic>? facility;
 
   @override
@@ -345,6 +353,9 @@ class _FacilityFormState extends State<_FacilityForm> {
   late final TextEditingController _phone;
   late final TextEditingController _address;
   late String _type;
+  String? _missionId;
+  late Set<String> _projectIds;
+  bool _isActive = true;
   bool _saving = false;
 
   static const _types = {
@@ -367,6 +378,19 @@ class _FacilityFormState extends State<_FacilityForm> {
     _phone = TextEditingController(text: '${value['phone'] ?? ''}');
     _address = TextEditingController(text: '${value['address'] ?? ''}');
     _type = '${value['facility_type'] ?? 'health_center'}';
+    final savedMissionId = value['mission_id']?.toString();
+    _missionId =
+        widget.missions.any((mission) => '${mission['id']}' == savedMissionId)
+        ? savedMissionId
+        : null;
+    final availableProjectIds = widget.projects
+        .map((project) => '${project['id']}')
+        .toSet();
+    _projectIds = (value['projects'] as List<dynamic>? ?? const [])
+        .map((item) => '${(item as Map)['id']}')
+        .where(availableProjectIds.contains)
+        .toSet();
+    _isActive = value['is_active'] != false;
   }
 
   @override
@@ -384,7 +408,7 @@ class _FacilityFormState extends State<_FacilityForm> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
     try {
-      await widget.service.saveFacility(
+      final synchronized = await widget.service.saveFacility(
         organizationId: widget.organizationId,
         facilityId: widget.facility?['id'] as String?,
         data: {
@@ -395,10 +419,14 @@ class _FacilityFormState extends State<_FacilityForm> {
           'email': _email.text.trim(),
           'phone': _phone.text.trim(),
           'address': _address.text.trim(),
-          'is_active': true,
+          'mission_id': _missionId,
+          'project_ids': _projectIds.toList(growable: false),
+          'is_active': _isActive,
         },
       );
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) {
+        Navigator.pop(context, synchronized ? 'saved' : 'pending');
+      }
     } on DioException catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -465,6 +493,62 @@ class _FacilityFormState extends State<_FacilityForm> {
               ),
               validator: _required,
             ),
+            if (widget.missions.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String?>(
+                initialValue: _missionId,
+                decoration: const InputDecoration(
+                  labelText: 'Mission de rattachement',
+                  prefixIcon: Icon(Icons.public_outlined),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Aucune mission'),
+                  ),
+                  for (final mission in widget.missions)
+                    DropdownMenuItem<String?>(
+                      value: '${mission['id']}',
+                      child: Text('${mission['name']}'),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _missionId = value),
+              ),
+            ],
+            if (widget.projects.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Projets associés',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.projects
+                      .map((project) {
+                        final id = '${project['id']}';
+                        return FilterChip(
+                          label: Text('${project['name']}'),
+                          selected: _projectIds.contains(id),
+                          onSelected: (selected) => setState(() {
+                            if (selected) {
+                              _projectIds.add(id);
+                            } else {
+                              _projectIds.remove(id);
+                            }
+                          }),
+                        );
+                      })
+                      .toList(growable: false),
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             TextFormField(
               controller: _careLevel,
@@ -502,6 +586,14 @@ class _FacilityFormState extends State<_FacilityForm> {
                 prefixIcon: Icon(Icons.location_on_outlined),
               ),
             ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Formation sanitaire active'),
+              value: _isActive,
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _isActive = value),
+            ),
             const SizedBox(height: 20),
             Row(
               children: [
@@ -512,10 +604,7 @@ class _FacilityFormState extends State<_FacilityForm> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: AppButton.save(
-                    loading: _saving,
-                    onPressed: _save,
-                  ),
+                  child: AppButton.save(loading: _saving, onPressed: _save),
                 ),
               ],
             ),
@@ -585,10 +674,7 @@ class _FacilityDetailsPageState extends State<FacilityDetailsPage> {
     if (saved == true) await _refresh();
   }
 
-  Future<void> _archiveChild(
-    String kind,
-    Map<String, dynamic> child,
-  ) async {
+  Future<void> _archiveChild(String kind, Map<String, dynamic> child) async {
     final confirmed =
         await showAppDialogAsFormSheet<bool>(
           context: context,
@@ -620,10 +706,7 @@ class _FacilityDetailsPageState extends State<FacilityDetailsPage> {
     await _refresh();
   }
 
-  Future<void> _restoreChild(
-    String kind,
-    Map<String, dynamic> child,
-  ) async {
+  Future<void> _restoreChild(String kind, Map<String, dynamic> child) async {
     await widget.service.restoreChild(
       organizationId: widget.organizationId,
       facilityId: _facility['id'] as String,
@@ -857,10 +940,7 @@ class _ChildFormState extends State<_ChildForm> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: AppButton.save(
-                    loading: _saving,
-                    onPressed: _save,
-                  ),
+                  child: AppButton.save(loading: _saving, onPressed: _save),
                 ),
               ],
             ),
@@ -1029,10 +1109,7 @@ class _FacilityCard extends StatelessWidget {
                     'Projet : ${projects.map((item) => item['name']).join(', ')}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppTheme.muted,
-                      fontSize: 11,
-                    ),
+                    style: const TextStyle(color: AppTheme.muted, fontSize: 11),
                   ),
                 ),
               ],
@@ -1049,15 +1126,9 @@ class _FacilityCard extends StatelessWidget {
                         ),
                       ]
                     : [
-                        AppButton.edit(
-                          compact: true,
-                          onPressed: onEdit,
-                        ),
+                        AppButton.edit(compact: true, onPressed: onEdit),
                         const SizedBox(width: 8),
-                        AppButton.archive(
-                          compact: true,
-                          onPressed: onArchive,
-                        ),
+                        AppButton.archive(compact: true, onPressed: onArchive),
                       ],
               ),
             ],
@@ -1190,9 +1261,8 @@ class _ChildSection extends StatelessWidget {
                   subtitle: Text('${value['code']}'),
                   trailing: PopupMenuButton<String>(
                     tooltip: 'Actions',
-                    onSelected: (action) => action == 'edit'
-                        ? onEdit(value)
-                        : onArchive(value),
+                    onSelected: (action) =>
+                        action == 'edit' ? onEdit(value) : onArchive(value),
                     itemBuilder: (_) => const [
                       PopupMenuItem(
                         value: 'edit',
@@ -1333,7 +1403,10 @@ class _EmptyState extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(color: AppTheme.muted),
         ),
-        if (action != null) ...[const SizedBox(height: 18), Center(child: action)],
+        if (action != null) ...[
+          const SizedBox(height: 18),
+          Center(child: action),
+        ],
       ],
     );
   }
@@ -1342,7 +1415,8 @@ class _EmptyState extends StatelessWidget {
 int _count(Map<String, dynamic> value, String key) =>
     (value[key] as List<dynamic>? ?? []).length;
 
-String _facilityType(String type) => const {
+String _facilityType(String type) =>
+    const {
       'hospital': 'Hôpital',
       'health_center': 'Centre de santé',
       'clinic': 'Clinique',
@@ -1352,7 +1426,8 @@ String _facilityType(String type) => const {
     }[type] ??
     type;
 
-String _kindLabel(String kind) => const {
+String _kindLabel(String kind) =>
+    const {
       'department': 'Département',
       'pharmacy': 'Pharmacie',
       'site': 'Site',

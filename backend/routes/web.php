@@ -8,6 +8,7 @@ use App\Http\Controllers\Web\OrganizationController;
 use App\Http\Controllers\Web\PasswordResetController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\ProjectController;
+use App\Http\Controllers\Web\ProjectStandardListController;
 use App\Http\Controllers\Web\ReceiptController;
 use App\Http\Controllers\Web\SecurityController;
 use App\Http\Controllers\Web\ModulePlaceholderController;
@@ -80,6 +81,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/sago/dashboard', [DashboardController::class, 'index'])->middleware('role:sago_admin')->name('sago.dashboard');
     Route::get('/projects', [ProjectController::class, 'home'])->middleware('permission:projects.view')->name('modules.projects');
+    Route::get('/projects/{project}/standard-list', [ProjectStandardListController::class, 'show'])->middleware('permission:standard_lists.view')->name('projects.standard-list.show');
+    Route::post('/projects/{project}/standard-list/generate', [ProjectStandardListController::class, 'generate'])->middleware('permission:standard_lists.manage')->name('projects.standard-list.generate');
+    Route::post('/projects/{project}/standard-list', [ProjectStandardListController::class, 'save'])->middleware('permission:standard_lists.manage')->name('projects.standard-list.save');
+    Route::post('/projects/{project}/standard-list/{list}/publish', [ProjectStandardListController::class, 'publish'])->middleware('permission:standard_lists.manage')->name('projects.standard-list.publish');
     Route::get('/missions', [MissionController::class, 'home'])->middleware('permission:missions.view')->name('modules.missions');
     Route::get('/funding', [FundingController::class, 'home'])->middleware('permission:funding.view')->name('modules.funding');
     Route::get('/health-facilities', [StructureController::class, 'home'])->middleware('permission:health_facilities.view')->name('modules.health-facilities');

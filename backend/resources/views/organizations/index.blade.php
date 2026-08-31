@@ -445,9 +445,6 @@
     @if (session('status'))
         <div class="notice">{{ session('status') }}</div>
     @endif
-    @if (session('temporary_password'))
-        <div class="notice">Mot de passe temporaire de l'Admin Coordination : <strong>{{ session('temporary_password') }}</strong>. Copiez-le maintenant ; il devra être modifié à la première connexion.</div>
-    @endif
 
     @if ($errors->any())
         <div class="notice error">{{ $errors->first() }}</div>

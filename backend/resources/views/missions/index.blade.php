@@ -1,10 +1,10 @@
 @extends('layouts.portal')
 
-@section('title', 'Missions · PharmaCare')
-@section('page-title', 'Missions')
+@section('title', ($isCoordination ? 'Ma Coordination' : 'Missions').' · PharmaCare')
+@section('page-title', $isCoordination ? 'Ma Coordination' : 'Missions')
 
 @section('content')
-<x-app-page-header title="Missions" description="Gérez les missions de votre organisation dans les pays autorisés.">
+<x-app-page-header :title="$isCoordination ? 'Ma Coordination' : 'Missions'" :description="$isCoordination ? 'Consultez la coordination pays à laquelle votre compte est affecté.' : 'Gérez les missions de votre organisation dans les pays autorisés.'">
     @if($canManage)
         <x-slot:actions><x-app-button icon="add" data-sheet-open="mission-create-sheet">Nouvelle mission</x-app-button></x-slot:actions>
     @endif
@@ -21,7 +21,7 @@
 </section>
 
 <x-app-card class="mission-workspace">
-    <x-app-filter-bar :action="route('modules.missions')">
+    @unless($isCoordination)<x-app-filter-bar :action="route('modules.missions')">
         <x-app-search-input name="search" :value="request('search')" placeholder="Rechercher une mission…" />
         @if($organizations->count() > 1)
             <label class="app-filter-field"><span>Organisation</span><select name="organization_id"><option value="">Sélectionner</option>@foreach($organizations as $item)<option value="{{ $item->id }}" @selected($organization->id===$item->id)>{{ $item->name }}</option>@endforeach</select></label>
@@ -32,7 +32,7 @@
             <x-app-button type="submit" variant="secondary" icon="filter_alt">Filtrer</x-app-button>
             <x-app-button href="{{ route('modules.missions') }}" variant="ghost">Réinitialiser</x-app-button>
         </x-slot:actions>
-    </x-app-filter-bar>
+    </x-app-filter-bar>@endunless
 
     <div class="missions-desktop">
         <x-app-data-table>
@@ -54,7 +54,7 @@
                     </div></td>
                 </tr>
             @empty
-                <tr><td colspan="7"><x-app-empty-state icon="flag" title="Aucune mission" description="Aucune mission ne correspond aux critères." /></td></tr>
+                <tr><td colspan="7"><x-app-empty-state icon="flag" :title="$isCoordination ? 'Aucune coordination affectée' : 'Aucune mission'" :description="$isCoordination ? 'Contactez un Admin Sago pour rattacher ce compte à une coordination pays.' : 'Aucune mission ne correspond aux critères.'" /></td></tr>
             @endforelse
             </tbody>
         </x-app-data-table>
@@ -68,7 +68,7 @@
                 <x-app-button href="{{ route('organizations.missions.show',[$organization,$mission]) }}" variant="secondary" icon="visibility" expanded>Consulter</x-app-button>
             </article>
         @empty
-            <x-app-empty-state icon="flag" title="Aucune mission" description="Créez la première mission de votre organisation." />
+            <x-app-empty-state icon="flag" :title="$isCoordination ? 'Aucune coordination affectée' : 'Aucune mission'" :description="$isCoordination ? 'Contactez un Admin Sago pour rattacher ce compte à une coordination pays.' : 'Créez la première mission de votre organisation.'" />
         @endforelse
     </div>
     <x-app-pagination :paginator="$missions" />

@@ -10,14 +10,17 @@ use App\Models\SetupProgress;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\ConfigurationWorkflowService;
+use App\Services\CoordinationProvisioningService;
 use App\Services\GovernanceService;
 use App\Services\UserScopeService;
+use App\Support\PasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class OrganizationConfigurationController extends Controller
@@ -26,6 +29,7 @@ class OrganizationConfigurationController extends Controller
         private readonly AuditService $audit,
         private readonly UserScopeService $scopes,
         private readonly ConfigurationWorkflowService $workflows,
+        private readonly CoordinationProvisioningService $coordinations,
     ) {}
 
     public function show(Request $request): View
@@ -62,6 +66,10 @@ class OrganizationConfigurationController extends Controller
         [$organization, $administrator, $temporaryPassword] = DB::transaction(function () use ($request, $data, $progress): array {
             $model = Organization::create($this->payload($request, $data));
             $model->countries()->sync($data['country_ids']);
+            $missions = $this->coordinations->provision($model, $data['country_ids']);
+            $primaryCountryId = $data['geographic_access_type'] === 'single_country'
+                ? $data['country_ids'][0]
+                : $data['admin_country_id'];
             $temporaryPassword = $data['activation_mode'] === 'invitation'
                 ? Str::password(16, symbols: true)
                 : $data['admin_password'];
@@ -80,8 +88,8 @@ class OrganizationConfigurationController extends Controller
             $role = Role::query()->where('code', GovernanceService::COORDINATION_ADMIN)
                 ->where('is_active', true)->firstOrFail();
             $administrator->roles()->attach($role, [
-                'scope_type' => 'organization',
-                'scope_id' => $model->id,
+                'scope_type' => 'mission',
+                'scope_id' => $missions->get($primaryCountryId)->id,
             ]);
             $this->workflows->complete($progress, 1);
             $version = ((int) SetupProgress::query()
@@ -113,8 +121,7 @@ class OrganizationConfigurationController extends Controller
         return redirect()->route(
             'configuration.organization',
             $this->workflows->requestParameters($request, $progress),
-        )->with('success', 'Organisation et Admin Coordination créés avec succès.')
-            ->with('temporary_password', $data['activation_mode'] === 'invitation' ? $temporaryPassword : null);
+        )->with('success', 'Organisation et compte Admin Coordination créés avec succès. L’utilisateur devra modifier son mot de passe lors de sa première connexion.');
     }
 
     public function update(Request $request, Organization $organization): RedirectResponse
@@ -127,6 +134,7 @@ class OrganizationConfigurationController extends Controller
         DB::transaction(function () use ($request, $organization, $data): void {
             $organization->update($this->payload($request, $data, $organization));
             $organization->countries()->sync($data['country_ids']);
+            $this->coordinations->provision($organization, $data['country_ids']);
         });
         $this->audit->record(
             $request,
@@ -170,7 +178,6 @@ class OrganizationConfigurationController extends Controller
             'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
             'phone' => ['nullable', 'string', 'max:40', 'regex:/^[0-9+().\\s-]+$/'],
             'email' => ['nullable', 'email:rfc', 'max:190'],
-            'default_language' => ['required', Rule::in(array_keys(config('pharmacare_languages.catalog', [])))],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'description' => ['nullable', 'string', 'max:3000'],
             'admin_first_name' => [Rule::requiredIf($organization === null), 'nullable', 'string', 'max:80'],
@@ -179,15 +186,40 @@ class OrganizationConfigurationController extends Controller
             'admin_phone' => ['nullable', 'string', 'max:40', 'regex:/^[0-9+().\\s-]+$/'],
             'admin_username' => [Rule::requiredIf($organization === null), 'nullable', 'alpha_dash', 'max:80', Rule::unique('users', 'username')],
             'activation_mode' => [Rule::requiredIf($organization === null), 'nullable', Rule::in(['temporary_password', 'invitation'])],
-            'admin_password' => [Rule::requiredIf($organization === null && $request->input('activation_mode') === 'temporary_password'), 'nullable', 'string', 'min:10', 'confirmed'],
+            'admin_password' => [Rule::requiredIf($organization === null && $request->input('activation_mode') === 'temporary_password'), 'nullable', 'string', PasswordPolicy::rule(), 'confirmed'],
             'admin_status' => [Rule::requiredIf($organization === null), 'nullable', Rule::in(['active', 'inactive'])],
+            'admin_country_id' => [
+                Rule::requiredIf($organization === null && $request->input('geographic_access_type') === 'multi_country'),
+                'nullable', 'uuid', 'exists:countries,id',
+            ],
         ]);
 
         if (($data['geographic_access_type'] ?? null) === 'single_country'
             && count($data['country_ids'] ?? []) !== 1) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'country_ids' => 'Une organisation Unipays doit avoir exactement un pays principal.',
             ]);
+        }
+        if ($organization === null
+            && ($data['geographic_access_type'] ?? null) === 'multi_country'
+            && ! in_array($data['admin_country_id'] ?? null, $data['country_ids'] ?? [], true)) {
+            throw ValidationException::withMessages([
+                'admin_country_id' => 'La coordination principale doit correspondre à un pays autorisé.',
+            ]);
+        }
+
+        if ($organization !== null) {
+            $outsideCountryCount = $organization->missions()
+                ->where('is_active', true)
+                ->whereNull('deleted_at')
+                ->whereNotIn('country_id', $data['country_ids'] ?? [])
+                ->count();
+
+            if ($outsideCountryCount > 0) {
+                throw ValidationException::withMessages([
+                    'country_ids' => 'Archivez d’abord les coordinations actives des pays retirés avant de modifier le périmètre géographique.',
+                ]);
+            }
         }
 
         return $data;
@@ -201,7 +233,9 @@ class OrganizationConfigurationController extends Controller
         $logoPath = $organization?->logo_path;
         if ($request->hasFile('logo')) {
             $newPath = $request->file('logo')->store('organizations', 'public');
-            if ($logoPath) Storage::disk('public')->delete($logoPath);
+            if ($logoPath) {
+                Storage::disk('public')->delete($logoPath);
+            }
             $logoPath = $newPath;
         }
 
@@ -217,7 +251,7 @@ class OrganizationConfigurationController extends Controller
             'logo_path' => $logoPath,
             'phone' => $data['phone'] ?? null,
             'email' => $data['email'] ?? null,
-            'default_language' => $data['default_language'],
+            'default_language' => $organization?->default_language ?? 'fr',
             'description' => $data['description'] ?? null,
             'is_active' => $data['status'] === 'active',
         ];

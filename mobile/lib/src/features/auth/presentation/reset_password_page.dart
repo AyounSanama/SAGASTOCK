@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/security/password_policy.dart';
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_password_field.dart';
-import 'package:go_router/go_router.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../data/auth_service.dart';
+import 'auth_page_shell.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
@@ -11,6 +16,7 @@ class ResetPasswordPage extends StatefulWidget {
 }
 
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
+  final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController(),
       _token = TextEditingController(),
       _password = TextEditingController(),
@@ -27,16 +33,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   }
 
   Future<void> _submit() async {
-    if (!_email.text.contains('@') ||
-        _token.text.isEmpty ||
-        _password.text.length < 12 ||
-        _password.text != _confirmation.text) {
-      setState(
-        () => _error =
-            'Vérifiez les champs : le mot de passe doit contenir au moins 12 caractères et les confirmations doivent correspondre.',
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -49,77 +46,93 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Mot de passe réinitialisé.')),
+          const SnackBar(content: Text('Mot de passe modifié avec succès.')),
         );
         context.go('/login');
       }
     } catch (_) {
-      if (mounted) setState(() => _error = 'Code invalide ou expiré.');
+      if (mounted) {
+        setState(
+          () => _error =
+              'Le code est invalide ou a expiré. Demandez un nouveau lien.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Nouveau mot de passe')),
-    body: ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: _email,
-                  decoration: const InputDecoration(
-                    labelText: 'Adresse e-mail',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _token,
-                  decoration: const InputDecoration(
-                    labelText: 'Code de réinitialisation',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                AppPasswordField(
-                  controller: _password,
-                  label: 'Nouveau mot de passe',
-                ),
-                const SizedBox(height: 14),
-                AppPasswordField(
-                  controller: _confirmation,
-                  label: 'Confirmer le mot de passe',
-                ),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Text(
-                      _error!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 18),
-                AppButton.validate(
-                  label: 'Réinitialiser le mot de passe',
-                  icon: Icons.restart_alt_rounded,
-                  loading: _loading,
-                  expanded: true,
-                  onPressed: _submit,
-                ),
-              ],
-            ),
+  Widget build(BuildContext context) => AuthPageShell(
+    title: 'Nouveau mot de passe',
+    description: 'Choisissez un nouveau mot de passe sécurisé.',
+    child: Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppTextField(
+            label: 'Adresse e-mail',
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            prefixIcon: Icons.mail_outline,
+            validator: (value) => value != null && value.contains('@')
+                ? null
+                : 'Adresse e-mail invalide.',
           ),
-        ),
-      ],
+          const SizedBox(height: AppSpacing.md),
+          AppTextField(
+            label: 'Code de réinitialisation',
+            controller: _token,
+            prefixIcon: Icons.password_outlined,
+            validator: (value) =>
+                value == null || value.trim().isEmpty ? 'Code requis.' : null,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppPasswordField(
+            label: 'Nouveau mot de passe',
+            controller: _password,
+            validator: PasswordPolicy.validate,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppPasswordField(
+            label: 'Confirmer le mot de passe',
+            controller: _confirmation,
+            validator: (value) => value != _password.text
+                ? 'Les mots de passe ne correspondent pas.'
+                : null,
+          ),
+          if (_error != null)
+            Container(
+              margin: const EdgeInsets.only(top: AppSpacing.md),
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Text(
+                _error!,
+                style: AppTypography.secondary.copyWith(
+                  color: AppColors.danger,
+                ),
+              ),
+            ),
+          const SizedBox(height: AppSpacing.md),
+          AppButton.validate(
+            label: 'Réinitialiser le mot de passe',
+            icon: Icons.restart_alt_rounded,
+            loading: _loading,
+            expanded: true,
+            onPressed: _submit,
+          ),
+          AppButton.text(
+            expanded: true,
+            icon: Icons.arrow_back,
+            label: 'Retour à la connexion',
+            onPressed: () => context.go('/login'),
+          ),
+        ],
+      ),
     ),
   );
 }

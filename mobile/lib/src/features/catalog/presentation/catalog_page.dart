@@ -26,6 +26,7 @@ class _CatalogPageState extends State<CatalogPage>
   List<Map<String, dynamic>> _items = [];
   List<Map<String, dynamic>> _references = [];
   List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _projects = [];
   Map<String, dynamic>? _user;
   String? _organizationId;
   String _status = 'active';
@@ -134,12 +135,14 @@ class _CatalogPageState extends State<CatalogPage>
           status: _status,
         );
       } else {
-        _items = await _service.lists(
-          organizationId,
-          search: search,
-          status: _status,
-        );
-        _products = await _service.products(organizationId, status: 'active');
+        final values = await Future.wait([
+          _service.lists(organizationId, search: search, status: _status),
+          _service.products(organizationId, status: 'active'),
+          _service.projects(organizationId),
+        ]);
+        _items = values[0];
+        _products = values[1];
+        _projects = values[2];
       }
     } on DioException catch (error) {
       _error = error.response?.statusCode == 403
@@ -192,8 +195,231 @@ class _CatalogPageState extends State<CatalogPage>
   Future<void> _openForm([Map<String, dynamic>? item]) async {
     if (_tabs.index == 0) return _productForm(item);
     if (_tabs.index == 1) return _referenceForm(item);
-    return _listForm(item);
+    return _projectListForm(item);
   }
+
+  Future<void> _projectListForm(Map<String, dynamic>? item) async {
+    if (_projects.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Aucun projet accessible.')),
+        );
+      }
+      return;
+    }
+    final key = GlobalKey<FormState>();
+    final code = TextEditingController(text: item?['code']?.toString());
+    final name = TextEditingController(text: item?['name']?.toString());
+    var projectId = item?['scope_id']?.toString() ?? '${_projects.first['id']}';
+    var detail = await _service.projectStandardList(projectId);
+    if (!mounted) return;
+    var careLevel = '';
+    var facilityCategory = '';
+    final populations = <String>{};
+    final pathologies = <String>{};
+    final exams = <String>{};
+    final selectedProducts = <String>{};
+    var generating = false;
+    var saving = false;
+    List<Map<String, dynamic>> refs(String type) =>
+        ((detail['options']?[type] as List?) ?? const [])
+            .cast<Map<String, dynamic>>();
+    final saved = await showAppFormSheet<bool>(
+      context: context,
+      title: 'Liste standard du projet',
+      description:
+          'Configurez le contexte puis générez les produits recommandés.',
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: key,
+            child: Column(
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: projectId,
+                  decoration: const InputDecoration(labelText: 'Projet *'),
+                  items: _projects
+                      .map(
+                        (p) => DropdownMenuItem(
+                          value: '${p['id']}',
+                          child: Text('${p['name']}'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) async {
+                    if (value == null) return;
+                    final loaded = await _service.projectStandardList(value);
+                    setSheetState(() {
+                      projectId = value;
+                      detail = loaded;
+                      careLevel = '';
+                      facilityCategory = '';
+                      populations.clear();
+                      pathologies.clear();
+                      exams.clear();
+                      selectedProducts.clear();
+                    });
+                  },
+                ),
+                const SizedBox(height: 14),
+                _requiredField(code, 'Code de la liste'),
+                const SizedBox(height: 14),
+                _requiredField(name, 'Nom de la liste'),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  initialValue: careLevel.isEmpty ? null : careLevel,
+                  decoration: const InputDecoration(
+                    labelText: 'Niveau de soins / Programme *',
+                  ),
+                  items: refs('care_level')
+                      .map(
+                        (r) => DropdownMenuItem(
+                          value: '${r['id']}',
+                          child: Text('${r['name']}'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setSheetState(() => careLevel = v ?? ''),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  initialValue: facilityCategory.isEmpty
+                      ? null
+                      : facilityCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'Catégorie sanitaire *',
+                  ),
+                  items: refs('facility_category')
+                      .map(
+                        (r) => DropdownMenuItem(
+                          value: '${r['id']}',
+                          child: Text('${r['name']}'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) =>
+                      setSheetState(() => facilityCategory = v ?? ''),
+                ),
+                _referenceChecks(
+                  'Populations cibles',
+                  refs('target_population'),
+                  populations,
+                  setSheetState,
+                ),
+                _referenceChecks(
+                  'Pathologies',
+                  refs('pathology'),
+                  pathologies,
+                  setSheetState,
+                ),
+                _referenceChecks(
+                  'Examens de laboratoire',
+                  refs('laboratory_exam'),
+                  exams,
+                  setSheetState,
+                ),
+                const SizedBox(height: 12),
+                AppButton.primary(
+                  label: 'Générer les produits',
+                  loading: generating,
+                  onPressed: generating
+                      ? null
+                      : () async {
+                          if (careLevel.isEmpty ||
+                              facilityCategory.isEmpty ||
+                              populations.isEmpty ||
+                              (pathologies.isEmpty && exams.isEmpty)) {
+                            return;
+                          }
+                          setSheetState(() => generating = true);
+                          final products = await _service
+                              .generateProjectStandardList(projectId, {
+                                'care_level_id': careLevel,
+                                'facility_category_id': facilityCategory,
+                                'target_population_ids': populations.toList(),
+                                'pathology_ids': pathologies.toList(),
+                                'laboratory_exam_ids': exams.toList(),
+                              });
+                          setSheetState(() {
+                            _products = products;
+                            selectedProducts
+                              ..clear()
+                              ..addAll(products.map((p) => '${p['id']}'));
+                            generating = false;
+                          });
+                        },
+                ),
+                ..._products.map(
+                  (p) => CheckboxListTile(
+                    value: selectedProducts.contains('${p['id']}'),
+                    title: Text('${p['name']}'),
+                    subtitle: Text('${p['strength'] ?? ''}'),
+                    onChanged: (v) => setSheetState(
+                      () => v == true
+                          ? selectedProducts.add('${p['id']}')
+                          : selectedProducts.remove('${p['id']}'),
+                    ),
+                  ),
+                ),
+                _formActions(sheetContext, saving, () async {
+                  if (!(key.currentState?.validate() ?? false) ||
+                      selectedProducts.isEmpty) {
+                    return;
+                  }
+                  setSheetState(() => saving = true);
+                  await _service.saveProjectStandardList(
+                    projectId: projectId,
+                    code: code.text.trim(),
+                    name: name.text.trim(),
+                    context: {
+                      'care_level_id': careLevel,
+                      'facility_category_id': facilityCategory,
+                      'target_population_ids': populations.toList(),
+                      'pathology_ids': pathologies.toList(),
+                      'laboratory_exam_ids': exams.toList(),
+                    },
+                    productIds: selectedProducts.toList(),
+                  );
+                  if (sheetContext.mounted) Navigator.pop(sheetContext, true);
+                }),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    code.dispose();
+    name.dispose();
+    if (saved == true) await _load();
+  }
+
+  Widget _referenceChecks(
+    String title,
+    List<Map<String, dynamic>> values,
+    Set<String> selected,
+    StateSetter setSheetState,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Text(title, style: Theme.of(context).textTheme.titleSmall),
+      ),
+      ...values.map(
+        (r) => CheckboxListTile(
+          dense: true,
+          value: selected.contains('${r['id']}'),
+          title: Text('${r['name']}'),
+          onChanged: (v) => setSheetState(
+            () => v == true
+                ? selected.add('${r['id']}')
+                : selected.remove('${r['id']}'),
+          ),
+        ),
+      ),
+    ],
+  );
 
   Future<void> _referenceForm(Map<String, dynamic>? item) async {
     final key = GlobalKey<FormState>();
@@ -475,6 +701,8 @@ class _CatalogPageState extends State<CatalogPage>
     if (saved == true) await _load();
   }
 
+  // Kept temporarily for backward compatibility with older deep links.
+  // ignore: unused_element
   Future<void> _listForm([Map<String, dynamic>? item]) async {
     final key = GlobalKey<FormState>();
     final code = TextEditingController(text: item?['code']?.toString());

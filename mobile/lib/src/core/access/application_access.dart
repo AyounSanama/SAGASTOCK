@@ -212,6 +212,31 @@ abstract final class ApplicationAccess {
   static bool allows(Map<String, dynamic>? user, String? permission) =>
       permission == null || permissions(user).contains(permission);
 
+  /// Availability gate for the staged V1. It complements RBAC: a permission
+  /// alone must not expose a module hidden for the current role.
+  static bool moduleAvailable(Map<String, dynamic>? user, String path) {
+    final role = '${user?['role'] ?? ''}'.toLowerCase();
+    final roots = switch (role) {
+      'coordination_admin' => const {
+        '/home',
+        '/missions',
+        '/projects',
+        '/funding',
+        '/standard-lists',
+        '/profile',
+      },
+      'project_admin' => const {
+        '/home',
+        '/projects',
+        '/standard-lists',
+        '/profile',
+      },
+      _ => null,
+    };
+    if (roots == null) return true;
+    return roots.any((root) => path == root || path.startsWith('$root/'));
+  }
+
   /// Route d'accueil unique, calculée depuis l'identité authentifiée.
   static String landingPath(Map<String, dynamic>? user) {
     if (user?['must_change_password'] == true) return '/change-password';
@@ -228,11 +253,28 @@ abstract final class ApplicationAccess {
         ? _fallbackManifest
         : remote.cast<Map<String, dynamic>>();
     final allowedKeys = switch (role) {
-      'sago_admin' => const {'dashboard', 'configuration', 'organizations', 'standards', 'assistance', 'history', 'profile'},
-      'coordination_admin' || 'project_admin' || 'site_admin' || 'site_user' => const {
-          'dashboard', 'standard-lists', 'receipts', 'dispensing',
-          'inventory-orders', 'reports', 'synchronization', 'profile',
-        },
+      'sago_admin' => const {
+        'dashboard',
+        'configuration',
+        'organizations',
+        'standards',
+        'assistance',
+        'history',
+        'profile',
+      },
+      'coordination_admin' => const {
+        'dashboard',
+        'missions',
+        'projects',
+        'standard-lists',
+        'profile',
+      },
+      'project_admin' => const {
+        'dashboard',
+        'projects',
+        'standard-lists',
+        'profile',
+      },
       _ => null,
     };
     final filteredSource = allowedKeys == null
@@ -244,7 +286,20 @@ abstract final class ApplicationAccess {
         .map(
           (raw) => ApplicationNavigationItem(
             key: raw['key']?.toString() ?? '',
-            label: raw['label']?.toString() ?? '',
+            label: role == 'coordination_admin'
+                ? switch (raw['key']) {
+                    'missions' => 'Ma Coordination',
+                    'projects' => 'Configuration des projets',
+                    'standard-lists' => 'Liste standard du projet',
+                    _ => raw['label']?.toString() ?? '',
+                  }
+                : role == 'project_admin'
+                ? switch (raw['key']) {
+                    'projects' => 'Mon projet',
+                    'standard-lists' => 'Liste standard',
+                    _ => raw['label']?.toString() ?? '',
+                  }
+                : raw['label']?.toString() ?? '',
             path: role == 'sago_admin' && raw['key'] == 'dashboard'
                 ? '/sago/dashboard'
                 : raw['path']?.toString() ?? '/home',

@@ -83,6 +83,28 @@ class LocalFirstRepository {
     return rows.map((row) => row.payload).toList(growable: false);
   }
 
+  Future<void> cacheList({
+    required String collection,
+    required String organizationId,
+    required List<Map<String, dynamic>> values,
+    Map<String, dynamic> query = const {},
+  }) async {
+    final identity = await _identity();
+    final entityType = _collectionKey(collection, query);
+    await database.replaceEntities(
+      entityType: entityType,
+      ownerUserId: identity.userId,
+      organizationId: organizationId,
+      payloads: values,
+      localIdFor: (payload) => _localId(
+        ownerUserId: identity.userId,
+        organizationId: organizationId,
+        entityType: entityType,
+        remoteId: '${payload['id']}',
+      ),
+    );
+  }
+
   Future<Map<String, dynamic>> document({
     required String collection,
     required String endpoint,

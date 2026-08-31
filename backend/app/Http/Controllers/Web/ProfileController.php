@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use App\Support\PasswordPolicy;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
@@ -21,6 +22,8 @@ class ProfileController extends Controller
     {
         return view('profile.show', [
             'user' => $request->user()->load('roles'),
+            'supportedLanguages' => collect(config('pharmacare_languages.translated_locales', ['fr']))
+                ->mapWithKeys(fn (string $locale) => [$locale => config("pharmacare_languages.catalog.$locale", $locale)]),
             'devices' => $request->user()->devices()->latest('last_seen_at')->get(),
             'sessions' => DB::table('sessions')->where('user_id', $request->user()->id)->orderByDesc('last_activity')->get(),
             'currentSessionId' => $request->session()->getId(),
@@ -36,8 +39,9 @@ class ProfileController extends Controller
             'username' => ['required', 'alpha_dash', 'max:80', Rule::unique('users')->ignore($user->id)],
             'email' => ['required', 'email', 'max:190', Rule::unique('users')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:40'],
+            'preferred_locale' => ['sometimes', 'required', Rule::in(config('pharmacare_languages.translated_locales', ['fr']))],
         ]);
-        $old = $user->only(['first_name', 'last_name', 'username', 'email', 'phone']);
+        $old = $user->only(['first_name', 'last_name', 'username', 'email', 'phone', 'preferred_locale']);
         $user->update([...$data, 'username' => strtolower($data['username']), 'name' => trim($data['first_name'].' '.$data['last_name'])]);
         $this->audit->record($request, 'profile.updated', $user, $old, $user->only(array_keys($old)));
         return back()->with('status', 'Profil mis à jour.');
@@ -47,7 +51,7 @@ class ProfileController extends Controller
     {
         $data = $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+            'password' => ['required', 'confirmed', PasswordPolicy::rule()],
         ]);
         $request->user()->update(['password' => Hash::make($data['password']), 'must_change_password' => false, 'password_changed_at' => now()]);
         $request->user()->tokens()->delete();

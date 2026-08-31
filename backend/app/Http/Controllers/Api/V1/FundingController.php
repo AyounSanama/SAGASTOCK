@@ -165,6 +165,7 @@ class FundingController extends Controller
     private function projectIn(Organization $organization, Project $project): void
     {
         abort_unless($project->organization_id === $organization->id, 404);
+        abort_unless($this->scopes->projects(request()->user())->whereKey($project->id)->exists(), 404);
     }
 
     private function donorIn(Organization $organization, Donor $donor): void

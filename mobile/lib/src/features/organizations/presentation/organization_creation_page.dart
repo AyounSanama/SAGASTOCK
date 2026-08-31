@@ -5,7 +5,37 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/widgets/app_button.dart';
+import '../../../core/security/password_policy.dart';
 import '../data/organization_service.dart';
+
+final RegExp _adminUsernamePattern = RegExp(r'^[A-Za-z0-9_-]+$');
+
+String? validateOrganizationAdminUsername(String? value) {
+  final username = value?.trim() ?? '';
+  if (username.isEmpty) return 'Champ obligatoire.';
+  if (!_adminUsernamePattern.hasMatch(username)) {
+    return 'Utilisez uniquement des lettres, chiffres, tirets (-) et underscores (_).';
+  }
+  return null;
+}
+
+String organizationCreationErrorMessage(DioException exception) {
+  final responseData = exception.response?.data;
+  final errors = responseData is Map ? responseData['errors'] as Map? : null;
+  if (errors != null) {
+    if (errors.containsKey('country_ids') ||
+        errors.keys.any((key) => '$key'.startsWith('country_ids.'))) {
+      return 'Veuillez sélectionner un pays valide.';
+    }
+    if (errors.containsKey('admin_username')) {
+      return 'Veuillez vérifier l’identifiant de l’administrateur. Utilisez uniquement des lettres, chiffres, tirets (-) et underscores (_).';
+    }
+    return errors.values
+        .expand((value) => value is List ? value : [value])
+        .join('\n');
+  }
+  return 'Création impossible. Vérifiez les informations saisies.';
+}
 
 class OrganizationCreationPage extends StatefulWidget {
   const OrganizationCreationPage({super.key});
@@ -27,13 +57,13 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
   final countrySearch = TextEditingController();
   final _picker = ImagePicker();
   XFile? logo;
-  final Set<String> additionalLanguages = {};
   List<Map<String, dynamic>> countries = [];
   final Set<String> selectedCountries = {};
   int step = 0;
   bool loadingCountries = true, saving = false, multiCountry = false;
-  String language = 'fr', status = 'active', adminStatus = 'active';
+  String status = 'active', adminStatus = 'active';
   String activationMode = 'temporary_password';
+  String adminCountryId = '';
   String? error;
 
   @override
@@ -43,9 +73,21 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
   }
 
   Future<void> _loadCountries() async {
+    setState(() {
+      loadingCountries = true;
+      error = null;
+    });
     try {
       final values = await _service.countries();
-      if (mounted) setState(() => countries = values);
+      if (mounted) {
+        setState(() {
+          countries = values;
+          if (values.isEmpty) {
+            error =
+                'Aucun pays n\u2019est disponible. Synchronisez les r\u00e9f\u00e9rentiels puis r\u00e9essayez.';
+          }
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(
@@ -91,6 +133,15 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
       setState(() => error = 'Sélectionnez au moins un pays autorisé.');
       return;
     }
+    if (step == 1 &&
+        multiCountry &&
+        !selectedCountries.contains(adminCountryId)) {
+      setState(
+        () =>
+            error = 'Sélectionnez la coordination pays principale de l’Admin.',
+      );
+      return;
+    }
     setState(() {
       error = null;
       step++;
@@ -98,6 +149,7 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
   }
 
   Future<void> _submit() async {
+    if (saving) return;
     setState(() {
       saving = true;
       error = null;
@@ -108,13 +160,12 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
         'code': code.text.trim().toUpperCase(),
         'email': email.text.trim().isEmpty ? null : email.text.trim(),
         'phone': phone.text.trim().isEmpty ? null : phone.text.trim(),
-        'default_language': language,
-        'additional_languages': additionalLanguages.toList(),
         'status': status,
         'geographic_access_type': multiCountry
             ? 'multi_country'
             : 'single_country',
         'country_ids': selectedCountries.toList(),
+        if (multiCountry) 'admin_country_id': adminCountryId,
         'admin_first_name': firstName.text.trim(),
         'admin_last_name': lastName.text.trim(),
         'admin_email': adminEmail.text.trim(),
@@ -130,16 +181,7 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
       if (!mounted) return;
       Navigator.pop(context, response);
     } on DioException catch (exception) {
-      final errors = exception.response?.data is Map
-          ? (exception.response?.data as Map)['errors'] as Map?
-          : null;
-      setState(
-        () => error =
-            errors?.values
-                .expand((value) => value is List ? value : [value])
-                .join('\n') ??
-            'Création impossible. Vérifiez les informations saisies.',
-      );
+      setState(() => error = organizationCreationErrorMessage(exception));
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -307,21 +349,6 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
           keyboard: TextInputType.phone,
         ),
         DropdownButtonFormField(
-          initialValue: language,
-          decoration: const InputDecoration(
-            labelText: 'Langue principale *',
-            prefixIcon: Icon(Icons.language_rounded),
-          ),
-          items: const [
-            DropdownMenuItem(value: 'fr', child: Text('Français')),
-            DropdownMenuItem(value: 'en', child: Text('English')),
-          ],
-          onChanged: (value) => setState(() {
-            language = value!;
-            additionalLanguages.remove(language);
-          }),
-        ),
-        DropdownButtonFormField(
           initialValue: status,
           decoration: const InputDecoration(
             labelText: 'Statut *',
@@ -332,23 +359,6 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
             DropdownMenuItem(value: 'inactive', child: Text('Inactif')),
           ],
           onChanged: (value) => setState(() => status = value!),
-        ),
-        Text(
-          'Langues supplémentaires',
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        CheckboxListTile(
-          contentPadding: EdgeInsets.zero,
-          value: additionalLanguages.contains(language == 'fr' ? 'en' : 'fr'),
-          title: Text(language == 'fr' ? 'English' : 'Français'),
-          onChanged: (checked) => setState(() {
-            final code = language == 'fr' ? 'en' : 'fr';
-            if (checked == true) {
-              additionalLanguages.add(code);
-            } else {
-              additionalLanguages.remove(code);
-            }
-          }),
         ),
         OutlinedButton.icon(
           icon: const Icon(Icons.image_outlined),
@@ -410,11 +420,32 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
                 ..clear()
                 ..add(first);
             }
+            if (!multiCountry) adminCountryId = '';
           }),
         ),
         const SizedBox(height: 16),
         if (loadingCountries)
-          const Center(child: CircularProgressIndicator())
+          const Column(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 10),
+              Text('Chargement des pays\u2026'),
+            ],
+          )
+        else if (countries.isEmpty)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Le r\u00e9f\u00e9rentiel des pays est indisponible. V\u00e9rifiez la synchronisation ou la connexion au serveur.',
+              ),
+              const SizedBox(height: 10),
+              AppButton.text(
+                label: 'R\u00e9essayer',
+                onPressed: _loadCountries,
+              ),
+            ],
+          )
         else ...[
           OutlinedButton.icon(
             icon: const Icon(Icons.flag_outlined),
@@ -444,6 +475,30 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
                     ),
                   )
                   .toList(),
+            ),
+          if (multiCountry && selectedCountries.isNotEmpty)
+            DropdownButtonFormField<String>(
+              key: ValueKey('admin-country-${selectedCountries.join('-')}'),
+              initialValue: selectedCountries.contains(adminCountryId)
+                  ? adminCountryId
+                  : null,
+              decoration: const InputDecoration(
+                labelText: 'Coordination principale de l’Admin *',
+                prefixIcon: Icon(Icons.admin_panel_settings_outlined),
+              ),
+              items: countries
+                  .where(
+                    (country) => selectedCountries.contains('${country['id']}'),
+                  )
+                  .map(
+                    (country) => DropdownMenuItem<String>(
+                      value: '${country['id']}',
+                      child: Text('${country['name']}'),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) =>
+                  setState(() => adminCountryId = value ?? ''),
             ),
         ],
       ],
@@ -552,6 +607,7 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
         selectedCountries
           ..clear()
           ..addAll(result);
+        if (!selectedCountries.contains(adminCountryId)) adminCountryId = '';
       });
     }
   }
@@ -581,7 +637,17 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
           Icons.phone_outlined,
           keyboard: TextInputType.phone,
         ),
-        _field(username, 'Identifiant *', Icons.badge_outlined, required: true),
+        TextFormField(
+          controller: username,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(
+            labelText: 'Identifiant *',
+            prefixIcon: Icon(Icons.badge_outlined),
+            helperText:
+                'Lettres, chiffres, tirets (-) et underscores (_) uniquement.',
+          ),
+          validator: validateOrganizationAdminUsername,
+        ),
         DropdownButtonFormField(
           initialValue: activationMode,
           decoration: const InputDecoration(
@@ -604,7 +670,7 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
             Icons.lock_outline,
             required: true,
             obscure: true,
-            minimum: 10,
+            minimum: PasswordPolicy.minimumLength,
           ),
         DropdownButtonFormField(
           initialValue: adminStatus,
@@ -630,19 +696,26 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
         _summaryRow('Code', code.text.toUpperCase()),
         _summaryRow('Type d’accès', multiCountry ? 'Multipays' : 'Unipays'),
         _summaryRow('Pays autorisés', selected),
-        _summaryRow(
-          'Langue principale',
-          language == 'fr' ? 'Français' : 'English',
-        ),
-        _summaryRow(
-          'Langues supplémentaires',
-          additionalLanguages
-              .map((code) => code == 'fr' ? 'Français' : 'English')
-              .join(', '),
-        ),
+        if (multiCountry)
+          _summaryRow(
+            'Coordination principale',
+            countries
+                    .where((country) => '${country['id']}' == adminCountryId)
+                    .map((country) => '${country['name']}')
+                    .join()
+                    .trim()
+                    .isEmpty
+                ? 'À sélectionner'
+                : countries
+                      .where((country) => '${country['id']}' == adminCountryId)
+                      .map((country) => '${country['name']}')
+                      .join(),
+          ),
         _summaryRow('Logo', logo?.name ?? 'Non renseigné'),
         _summaryRow('Admin Coordination', '${firstName.text} ${lastName.text}'),
         _summaryRow('Email Admin', adminEmail.text),
+        _summaryRow('Téléphone Admin', adminPhone.text),
+        _summaryRow('Identifiant Admin', username.text),
         _summaryRow(
           'Activation',
           activationMode == 'invitation'

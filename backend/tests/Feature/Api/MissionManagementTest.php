@@ -19,7 +19,7 @@ class MissionManagementTest extends TestCase
     {
         $view = Permission::create(['code' => 'missions.view', 'name' => 'Consulter les missions']);
         $manage = Permission::create(['code' => 'missions.manage', 'name' => 'Gérer les missions']);
-        $role = Role::create(['code' => 'coordination_admin', 'name' => 'Administrateur coordination']);
+        $role = Role::create(['code' => 'mission_manager_test', 'name' => 'Gestionnaire de missions']);
         $role->permissions()->attach([$view->id, $manage->id]);
         $user = User::factory()->create([
             'is_active' => true,
@@ -29,6 +29,7 @@ class MissionManagementTest extends TestCase
             'scope_type' => 'organization',
             'scope_id' => $organization->id,
         ]);
+
         return $user;
     }
 
@@ -108,7 +109,7 @@ class MissionManagementTest extends TestCase
         $this->getJson("/api/v1/organizations/{$organization->id}/missions")->assertForbidden();
     }
 
-    public function test_coordination_can_only_use_countries_authorized_for_its_organization(): void
+    public function test_mission_manager_can_only_use_countries_authorized_for_its_organization(): void
     {
         $organization = Organization::create(['code' => 'MULTI', 'name' => 'ONG Multipays']);
         Sanctum::actingAs($this->administrator($organization));

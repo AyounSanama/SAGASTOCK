@@ -21,6 +21,7 @@ class AuthService {
       _userKey = 'cached_user',
       _authenticatedAtKey = 'authenticated_at',
       _offlineVerifierKey = 'offline_password_verifier';
+  static const _pendingLocaleKey = 'pending_preferred_locale';
   static const _maximumOfflineSession = Duration(days: 30);
 
   Future<bool> hasSession() async {
@@ -32,6 +33,25 @@ class AuthService {
   Future<Map<String, dynamic>?> cachedUser() async {
     final value = await _storage.read(key: _userKey);
     return value == null ? null : jsonDecode(value) as Map<String, dynamic>;
+  }
+
+  /// Refreshes the authorization context when the API is reachable while
+  /// preserving the last valid identity for offline-first operation.
+  Future<Map<String, dynamic>?> refreshedUser() async {
+    try {
+      final response = await _client.dio.get<Map<String, dynamic>>(
+        '/auth/me',
+        options: await _authorized(),
+      );
+      final user = response.data?['user'] as Map<String, dynamic>?;
+      if (user != null) {
+        await _storage.write(key: _userKey, value: jsonEncode(user));
+        return user;
+      }
+    } catch (_) {
+      // The cached authorization context remains the source of truth offline.
+    }
+    return cachedUser();
   }
 
   Future<Options> _authorized() async {
@@ -97,6 +117,10 @@ class AuthService {
     );
     user['session_mode'] = 'online';
     await _storage.write(key: _userKey, value: jsonEncode(user));
+    final pendingLocale = await _storage.read(key: _pendingLocaleKey);
+    if (pendingLocale != null) {
+      await updatePreferredLocale(pendingLocale);
+    }
     try {
       await EffectiveConfigurationService(
         client: _client,
@@ -210,6 +234,28 @@ class AuthService {
     if (user != null) {
       user['must_change_password'] = false;
       await _storage.write(key: _userKey, value: jsonEncode(user));
+    }
+  }
+
+  Future<void> updatePreferredLocale(String locale) async {
+    if (!const ['fr'].contains(locale)) {
+      throw ArgumentError.value(locale, 'locale', 'Langue non prise en charge');
+    }
+    final user = await cachedUser();
+    if (user == null) throw StateError('Session locale absente.');
+    user['preferred_locale'] = locale;
+    await _storage.write(key: _userKey, value: jsonEncode(user));
+    await _storage.write(key: _pendingLocaleKey, value: locale);
+    try {
+      await _client.dio.put<void>(
+        '/auth/locale',
+        data: {'preferred_locale': locale},
+        options: await _authorized(),
+      );
+      await _storage.delete(key: _pendingLocaleKey);
+    } catch (_) {
+      // La préférence locale reste active hors connexion. Elle sera
+      // renvoyée au serveur lors d'une prochaine modification en ligne.
     }
   }
 

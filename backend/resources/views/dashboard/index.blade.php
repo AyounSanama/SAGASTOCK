@@ -242,11 +242,6 @@
         @if (session('success'))
             <p class="success">{{ session('success') }}</p>
         @endif
-        @if (session('temporary_password'))
-            <p class="secret">Mot de passe temporaire à transmettre une seule fois :
-                <strong>{{ session('temporary_password') }}</strong>
-            </p>
-        @endif
         @if ($errors->any())
             <p class="success">{{ $errors->first() }}</p>
         @endif
@@ -528,19 +523,20 @@
                     const officialRole = ['coordination_admin', 'project_admin', 'site_admin'].includes(roleCode);
                     const projectRole = roleCode === 'project_admin';
                     const siteRole = roleCode === 'site_admin';
+                    const coordinationRole = roleCode === 'coordination_admin';
                     const needsProject = projectRole || siteRole;
                     document.getElementById('create-organization-field').hidden = !officialRole;
-                    document.getElementById('create-mission-field').hidden = !needsProject;
+                    document.getElementById('create-mission-field').hidden = !(coordinationRole || needsProject);
                     document.getElementById('create-project-field').hidden = !needsProject;
                     document.getElementById('create-facility-field').hidden = !siteRole;
                     document.getElementById('create-site-field').hidden = !siteRole;
                     organization.required = officialRole;
-                    mission.required = needsProject;
+                    mission.required = coordinationRole || needsProject;
                     project.required = needsProject;
                     facility.required = siteRole;
                     site.required = siteRole;
-                    document.getElementById('create-scope').value = roleCode === 'coordination_admin'
-                        ? `organization:${organization.value}`
+                    document.getElementById('create-scope').value = coordinationRole
+                        ? `mission:${mission.value}`
                         : roleCode === 'project_admin'
                         ? `project:${project.value}`
                         : siteRole ? `site:${site.value}` : '';

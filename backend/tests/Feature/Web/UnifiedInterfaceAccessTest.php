@@ -37,7 +37,7 @@ class UnifiedInterfaceAccessTest extends TestCase
         $this->assertNotContains('configuration', $coordinationKeys);
         $this->assertNotContains('organizations', $coordinationKeys);
         $this->assertNotContains('configuration', $projectKeys);
-        $this->assertContains('stocks', $projectKeys);
+        $this->assertNotContains('stocks', $projectKeys);
         $this->assertNotContains('configuration', $siteKeys);
         $this->assertContains('stocks', $siteKeys);
         $this->assertContains('receipts', $siteKeys);

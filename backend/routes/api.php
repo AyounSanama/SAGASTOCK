@@ -8,21 +8,22 @@ use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\DispensationController;
+use App\Http\Controllers\Api\V1\EffectiveConfigurationController;
 use App\Http\Controllers\Api\V1\FundingController;
 use App\Http\Controllers\Api\V1\InventoryController;
-use App\Http\Controllers\Api\V1\SupplyOrderController;
 use App\Http\Controllers\Api\V1\MissionController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\PasswordController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
+use App\Http\Controllers\Api\V1\PlatformConfigurationController;
 use App\Http\Controllers\Api\V1\ProjectController;
+use App\Http\Controllers\Api\V1\ProjectStandardListController;
 use App\Http\Controllers\Api\V1\ReceiptController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\StockController;
 use App\Http\Controllers\Api\V1\StructureController;
+use App\Http\Controllers\Api\V1\SupplyOrderController;
 use App\Http\Controllers\Api\V1\UserController;
-use App\Http\Controllers\Api\V1\EffectiveConfigurationController;
-use App\Http\Controllers\Api\V1\PlatformConfigurationController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Route;
 
@@ -112,6 +113,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/organizations/{organization}/dispensations/{dispensation}/return', [DispensationController::class, 'returnDispensation']);
         });
         Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::put('/auth/locale', [AuthController::class, 'updateLocale']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::put('/auth/password', [PasswordController::class, 'update']);
         Route::get('/auth/devices', [DeviceController::class, 'index']);
@@ -139,7 +141,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/organizations', [OrganizationController::class, 'store'])->middleware('permission:organizations.manage');
         Route::put('/organizations/{organization}', [OrganizationController::class, 'update'])->middleware('permission:organizations.manage');
         Route::delete('/organizations/{organization}', [OrganizationController::class, 'destroy'])->middleware('permission:organizations.manage');
-        Route::get('/countries', [CountryController::class, 'index'])->middleware('permission:missions.view');
+        Route::get('/countries', [CountryController::class, 'index'])
+            ->middleware('permission:organizations.manage|missions.view');
         Route::get('/organizations/{organization}/missions', [MissionController::class, 'index'])->middleware('permission:missions.view');
         Route::get('/organizations/{organization}/missions-archived', [MissionController::class, 'archived'])->middleware('permission:missions.view');
         Route::post('/organizations/{organization}/missions', [MissionController::class, 'store'])->middleware('permission:missions.manage');
@@ -147,6 +150,8 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/organizations/{organization}/missions/{mission}', [MissionController::class, 'destroy'])->middleware('permission:missions.manage');
         Route::post('/organizations/{organization}/missions/archived/{mission}/restore', [MissionController::class, 'restore'])->middleware('permission:missions.manage');
         Route::get('/organizations/{organization}/projects', [ProjectController::class, 'index'])->middleware('permission:projects.view');
+        Route::get('/organizations/{organization}/projects-setup', [ProjectController::class, 'setup'])->middleware('permission:projects.view');
+        Route::get('/organizations/{organization}/projects/archived', [ProjectController::class, 'archived'])->middleware('permission:projects.view');
         Route::post('/organizations/{organization}/projects', [ProjectController::class, 'store'])->middleware('permission:projects.manage');
         Route::put('/organizations/{organization}/projects/{project}', [ProjectController::class, 'update'])->middleware('permission:projects.manage');
         Route::delete('/organizations/{organization}/projects/{project}', [ProjectController::class, 'destroy'])->middleware('permission:projects.manage');
@@ -213,5 +218,10 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/organizations/{organization}/catalog/lists/archived/{standardList}/restore', [CatalogController::class, 'restoreList'])->middleware('permission:standard_lists.manage|catalog.manage');
         Route::post('/organizations/{organization}/catalog/lists/{standardList}/versions', [CatalogController::class, 'newListVersion'])->middleware('permission:standard_lists.manage|catalog.manage');
         Route::post('/organizations/{organization}/catalog/lists/{standardList}/versions/{version}/publish', [CatalogController::class, 'publishListVersion'])->middleware('permission:catalog.publish');
+        Route::get('/projects/{project}/standard-list', [ProjectStandardListController::class, 'show'])->middleware('permission:standard_lists.view');
+        Route::post('/projects/{project}/standard-list/generate', [ProjectStandardListController::class, 'generate'])->middleware('permission:standard_lists.manage');
+        Route::post('/projects/{project}/standard-list', [ProjectStandardListController::class, 'save'])->middleware('permission:standard_lists.manage');
+        Route::post('/projects/{project}/standard-list/{list}/publish', [ProjectStandardListController::class, 'publish'])->middleware('permission:standard_lists.manage');
+        Route::put('/projects/{project}/standard-list/products/{product}/mappings', [ProjectStandardListController::class, 'mapProduct'])->middleware('permission:standard_lists.manage');
     });
 });

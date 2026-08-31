@@ -8,6 +8,7 @@ use App\Models\Country;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\CoordinationProvisioningService;
 use App\Services\UserScopeService;
 use App\Services\GovernanceService;
 use Illuminate\Http\RedirectResponse;
@@ -20,7 +21,11 @@ use Illuminate\View\View;
 
 class OrganizationController extends Controller
 {
-    public function __construct(private AuditService $audit, private UserScopeService $scopes) {}
+    public function __construct(
+        private AuditService $audit,
+        private UserScopeService $scopes,
+        private CoordinationProvisioningService $coordinations,
+    ) {}
 
     public function index(Request $request): View|RedirectResponse
     {
@@ -44,6 +49,10 @@ class OrganizationController extends Controller
         $temporaryPassword = DB::transaction(function () use ($request, $organizationData, $countryIds, $adminData): string {
             $organization = Organization::create($organizationData);
             $organization->countries()->sync($countryIds);
+            $missions = $this->coordinations->provision($organization, $countryIds);
+            $primaryCountryId = $organization->geographic_access_type === 'single_country'
+                ? $countryIds[0]
+                : $adminData['admin_country_id'];
             $temporaryPassword = Str::password(16, symbols: true);
             $user = User::create([
                 'organization_id' => $organization->id,
@@ -54,13 +63,15 @@ class OrganizationController extends Controller
                 'is_active' => true, 'must_change_password' => true,
             ]);
             $role = Role::where('code', GovernanceService::COORDINATION_ADMIN)->where('is_active', true)->firstOrFail();
-            $user->roles()->attach($role, ['scope_type' => 'organization', 'scope_id' => $organization->id]);
+            $user->roles()->attach($role, [
+                'scope_type' => 'mission',
+                'scope_id' => $missions->get($primaryCountryId)->id,
+            ]);
             $this->audit->record($request, 'organization.created', $organization, [], $organization->only(['code', 'name', 'is_active']));
             $this->audit->record($request, 'user.created', $user, [], ['role' => GovernanceService::COORDINATION_ADMIN, 'organization_id' => $organization->id]);
             return $temporaryPassword;
         });
-        return back()->with('status', 'Organisation et Admin Coordination créés avec succès.')
-            ->with('temporary_password', $temporaryPassword);
+        return back()->with('status', 'Organisation et compte Admin Coordination créés avec succès. L’utilisateur devra modifier son mot de passe lors de sa première connexion.');
         /*
         return back()->with('status', 'Organisation créée.');
         */
@@ -110,9 +121,17 @@ class OrganizationController extends Controller
             'admin_email' => ['required', 'email', 'max:190', 'unique:users,email'],
             'admin_phone' => ['nullable', 'string', 'max:40'],
             'admin_username' => ['required', 'alpha_dash', 'max:80', 'unique:users,username'],
+            'admin_country_id' => [
+                Rule::requiredIf($request->input('geographic_access_type') === 'multi_country'),
+                'nullable', 'uuid', 'exists:countries,id',
+            ],
         ]);
         if ($data['geographic_access_type'] === 'single_country' && count($data['country_ids']) !== 1) {
             abort(422, 'Une organisation unipays doit avoir exactement un pays.');
+        }
+        if ($data['geographic_access_type'] === 'multi_country'
+            && ! in_array($data['admin_country_id'] ?? null, $data['country_ids'], true)) {
+            abort(422, 'La coordination principale doit correspondre à un pays autorisé.');
         }
         $firstCountry = Country::findOrFail($data['country_ids'][0]);
         $organizationData = collect($data)->only(['code','name','organization_type','email','phone','address','geographic_access_type'])->all();

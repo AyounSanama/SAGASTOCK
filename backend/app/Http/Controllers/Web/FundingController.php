@@ -119,13 +119,20 @@ class FundingController extends Controller
     public function detachDonor(Request $request,Organization $organization,Project $project,Donor $donor):RedirectResponse{$this->allow('funding.manage');$this->accessible($request,$organization);$this->projectIn($organization,$project);abort_unless($donor->organization_id===$organization->id,404);$project->donors()->detach($donor->id);$this->audit->record($request,'project.donor_detached',$project,[],['donor_id'=>$donor->id]);return back()->with('status','Bailleur dissocié.');}
     public function detachProgram(Request $request,Organization $organization,Project $project,Program $program):RedirectResponse{$this->allow('funding.manage');$this->accessible($request,$organization);$this->projectIn($organization,$project);abort_unless($program->organization_id===$organization->id,404);$project->programs()->detach($program->id);$this->audit->record($request,'project.program_detached',$project,[],['program_id'=>$program->id]);return back()->with('status','Programme dissocié.');}
 
-    private function projectIn(Organization $organization, Project $project): void { abort_unless($project->organization_id === $organization->id, 404); }
+    private function projectIn(Organization $organization, Project $project): void
+    {
+        abort_unless($project->organization_id === $organization->id, 404);
+        abort_unless($this->scopes->projects(request()->user())->whereKey($project->id)->exists(), 404);
+    }
     private function allow(string $permission): void { abort_unless(Auth::user()?->hasPermission($permission), 403); }
     private function accessible(Request $request, Organization $organization): void { abort_unless($this->scopes->organizations($request->user())->whereKey($organization->id)->exists(), 404); }
 
     private function viewData(Request $request, ?Organization $organization, ?Project $project, $organizations, $projects): array
     {
         $canManage = $request->user()->hasPermission('funding.manage');
+        $activeSection = in_array($request->string('section')->toString(), ['donors', 'programs'], true)
+            ? $request->string('section')->toString()
+            : 'donors';
 
         return [
             'organization' => $organization,
@@ -133,6 +140,7 @@ class FundingController extends Controller
             'organizations' => $organizations,
             'projects' => $projects,
             'canManage' => $canManage,
+            'activeSection' => $activeSection,
             'donors' => $organization?->donors()->withCount(['projects', 'programs'])->orderBy('name')->get() ?? collect(),
             'programs' => $organization?->programs()->with(['donor:id,code,name'])->withCount('projects')->orderBy('name')->get() ?? collect(),
             'assignedDonors' => $project?->donors()->orderBy('name')->get() ?? collect(),

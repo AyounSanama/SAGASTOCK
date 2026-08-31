@@ -254,6 +254,11 @@ class CatalogController extends Controller
             ? StandardList::onlyTrashed()->where('organization_id', $organization->id)
             : $organization->standardLists();
 
+        $projectIds = $this->scopes->projects($request->user())->pluck('projects.id');
+        $query->where(function ($scope) use ($projectIds) {
+            $scope->where(fn ($project) => $project->where('scope_type', 'project')->whereIn('scope_id', $projectIds));
+        });
+
         return response()->json($query->with(['versions.products:id,code,name', 'latestVersion'])
             ->when($request->string('search')->toString(), fn ($q, $search) => $q->where(fn ($nested) => $nested
                 ->where('name', 'like', "%{$search}%")

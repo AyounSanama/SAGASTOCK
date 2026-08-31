@@ -109,6 +109,94 @@ void main() {
     expect(ApplicationAccess.landingPath(user), '/home');
   });
 
+  test('Admin Coordination conserve les modules autorisés par le backend', () {
+    final user = <String, dynamic>{
+      'role': 'coordination_admin',
+      'permissions': <String>['dashboard.view', 'missions.view'],
+      'navigation': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'key': 'dashboard',
+          'label': 'Tableau de bord',
+          'path': '/home',
+          'icon': 'dashboard',
+          'permission': 'dashboard.view',
+        },
+        <String, dynamic>{
+          'key': 'missions',
+          'label': 'Missions',
+          'path': '/missions',
+          'icon': 'missions',
+          'permission': 'missions.view',
+        },
+        <String, dynamic>{
+          'key': 'users',
+          'label': 'Utilisateurs',
+          'path': '/users',
+          'icon': 'users',
+          'permission': 'users.view',
+        },
+      ],
+    };
+
+    final navigation = ApplicationAccess.navigation(user);
+    final keys = navigation.map((item) => item.key).toList(growable: false);
+
+    expect(keys, <String>['dashboard', 'missions']);
+    expect(navigation.last.label, 'Ma Coordination');
+  });
+
+  test('la V1 filtre aussi un ancien manifeste conservé hors connexion', () {
+    final coordination = <String, dynamic>{
+      'role': 'coordination_admin',
+      'permissions': <String>[
+        'dashboard.view',
+        'missions.view',
+        'projects.view',
+        'standard_lists.view',
+        'stocks.view',
+      ],
+      'navigation': <Map<String, dynamic>>[
+        for (final item in <(String, String, String, String)>[
+          ('dashboard', 'Tableau de bord', '/home', 'dashboard.view'),
+          ('missions', 'Missions', '/missions', 'missions.view'),
+          ('projects', 'Projets', '/projects', 'projects.view'),
+          (
+            'standard-lists',
+            'Listes',
+            '/standard-lists',
+            'standard_lists.view',
+          ),
+          ('stocks', 'Stocks', '/stocks', 'stocks.view'),
+        ])
+          <String, dynamic>{
+            'key': item.$1,
+            'label': item.$2,
+            'path': item.$3,
+            'icon': item.$1,
+            'permission': item.$4,
+          },
+      ],
+    };
+
+    final items = ApplicationAccess.navigation(coordination);
+    expect(items.map((item) => item.label), <String>[
+      'Tableau de bord',
+      'Ma Coordination',
+      'Configuration des projets',
+      'Liste standard du projet',
+    ]);
+    expect(items[2].path, '/projects');
+    expect(ApplicationAccess.moduleAvailable(coordination, '/stocks'), isFalse);
+    expect(
+      ApplicationAccess.moduleAvailable(coordination, '/projects/42'),
+      isTrue,
+    );
+
+    final project = <String, dynamic>{...coordination, 'role': 'project_admin'};
+    expect(ApplicationAccess.moduleAvailable(project, '/missions'), isFalse);
+    expect(ApplicationAccess.moduleAvailable(project, '/projects/42'), isTrue);
+  });
+
   test('les autres rôles entrent sur le tableau de bord', () {
     for (final role in <String>[
       'owner',

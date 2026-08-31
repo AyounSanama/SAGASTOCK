@@ -16,7 +16,6 @@
             <div><label>Statut *</label><select name="status" required><option value="active" @selected($status==='active')>Actif</option><option value="inactive" @selected($status==='inactive')>Inactif</option></select></div>
             <div><label>Email institutionnel</label><input name="email" type="email" value="{{ $value('email') }}" maxlength="190"></div>
             <div><label>Téléphone</label><input name="phone" type="tel" value="{{ $value('phone') }}" maxlength="40"></div>
-            <div><label>Langue principale *</label><select name="default_language" required>@foreach($languages as $code=>$label)<option value="{{ $code }}" @selected($value('default_language','fr')===$code)>{{ $label }}</option>@endforeach</select><small class="field-hint">Cette liste est extensible ; la disponibilité d’une langue ne garantit pas encore la traduction complète de l’interface.</small></div>
             <div><label>Logo</label><input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp"></div>
         </div>
     </section>
@@ -39,12 +38,27 @@
             @error('country_ids')<small class="field-error">{{ $message }}</small>@enderror
             @error('country_ids.*')<small class="field-error">{{ $message }}</small>@enderror
         </div>
+        @if($creating)
+            <div class="organization-form-grid" data-admin-country-field @if($accessType !== 'multi_country') hidden @endif>
+                <div>
+                    <label>Coordination principale de l’Admin *</label>
+                    <select name="admin_country_id" data-admin-country-select>
+                        <option value="">Sélectionner le pays de coordination</option>
+                        @foreach($countries as $country)
+                            <option value="{{ $country->id }}" @selected(old('admin_country_id')===(string)$country->id)>{{ $country->name }}</option>
+                        @endforeach
+                    </select>
+                    <small class="field-hint">L’Admin Coordination sera affecté uniquement à la mission de ce pays.</small>
+                    @error('admin_country_id')<small class="field-error">{{ $message }}</small>@enderror
+                </div>
+            </div>
+        @endif
     </section>
 
     @if($creating)
     <section class="organization-form-section">
         <header><span>C</span><div><h3>Administrateur principal</h3><p>Premier compte rattaché à l’organisation.</p></div></header>
-        <div class="locked-role"><span class="material-symbols-outlined">lock</span><div><small>Rôle attribué automatiquement</small><strong>Admin Coordination</strong></div></div>
+        <div class="locked-role"><span class="material-symbols-outlined" aria-hidden="true">lock</span><div><small>Rôle attribué automatiquement :</small><strong>Admin Coordination</strong></div></div>
         <div class="organization-form-grid">
             <div><label>Prénom *</label><input name="admin_first_name" value="{{ old('admin_first_name') }}" maxlength="80" required></div>
             <div><label>Nom *</label><input name="admin_last_name" value="{{ old('admin_last_name') }}" maxlength="80" required></div>
@@ -65,7 +79,6 @@
             <div><small>Organisation</small><strong data-summary-name>À renseigner</strong></div>
             <div><small>Type d’accès</small><strong data-summary-access>Unipays</strong></div>
             <div><small>Pays</small><strong data-summary-countries>À sélectionner</strong></div>
-            <div><small>Langue</small><strong data-summary-language>Français</strong></div>
             @if($creating)<div><small>Administrateur principal</small><strong data-summary-admin>À renseigner</strong></div>@endif
         </div>
     </section>

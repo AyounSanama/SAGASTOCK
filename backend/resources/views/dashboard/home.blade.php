@@ -112,6 +112,8 @@
 @section('content')
 @php
     $dashboardLabel = 'Tableau de bord';
+    $dashboardRole = app(\App\Services\GovernanceService::class)->roleCode(auth()->user());
+    $isV1CoordinationOrProject = in_array($dashboardRole, [\App\Services\GovernanceService::COORDINATION_ADMIN, \App\Services\GovernanceService::PROJECT_ADMIN], true);
 @endphp
 <main class="dashboard-main">
     <section class="dashboard-hero">
@@ -160,6 +162,7 @@
                 @endforelse
             </div>
         </article>
+        @unless($isV1CoordinationOrProject)
         <article class="analytics-card">
             <header class="analytics-head"><div><h2>État du catalogue</h2><span>Produits actifs visibles</span></div></header>
             <div class="donut-wrap"><div class="donut"><div class="donut-label"><strong>{{ number_format($stats['products']) }}</strong><small>Produits</small></div></div></div>
@@ -168,6 +171,7 @@
             <header class="analytics-head"><div><h2>Alertes de stock</h2><span>Points nécessitant une attention</span></div></header>
             <div class="alert-summary"><div class="alert-row danger"><span><i class="material-symbols-outlined">warning</i>Ruptures</span><strong>{{ number_format($stats['stockouts']) }}</strong></div><div class="alert-row"><span><i class="material-symbols-outlined">event_busy</i>Péremptions proches</span><strong>{{ number_format($stats['expiring_batches']) }}</strong></div><div class="alert-row"><span><i class="material-symbols-outlined">inventory_2</i>Lignes de stock</span><strong>{{ number_format($stats['stock_lines']) }}</strong></div></div>
         </article>
+        @endunless
     </section>
 
     <section class="dashboard-metrics legacy-dashboard-metrics" aria-hidden="true">
@@ -210,16 +214,18 @@
                 </header>
                 <div class="dashboard-card-body">
                     <div class="dashboard-shortcuts">
-                        @if(auth()->user()->hasPermission('users.manage'))
+                        @if($dashboardRole === \App\Services\GovernanceService::COORDINATION_ADMIN && auth()->user()->hasPermission('projects.manage'))
+                        <a class="dashboard-shortcut" href="{{ route('modules.projects',['create'=>1]) }}"><span class="dashboard-shortcut-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14M4 4h16v16H4z"/></svg></span><span><b>Créer un projet</b><small>Projet, bailleurs et premier Admin Projet</small></span></a>
+                        @elseif(auth()->user()->hasPermission('users.manage') && !$isV1CoordinationOrProject)
                         <a class="dashboard-shortcut" href="{{ route('users.index',['create'=>1]) }}"><span class="dashboard-shortcut-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19a6 6 0 0 0-12 0M9 11a4 4 0 1 0 0-8M19 8v6M16 11h6"/></svg></span><span><b>Créer un utilisateur</b><small>Nouveau compte, rôle et périmètre</small></span></a>
                         @endif
-                        @if(auth()->user()->hasPermission('users.view'))
+                        @if(auth()->user()->hasPermission('users.view') && !$isV1CoordinationOrProject)
                         <a class="dashboard-shortcut" href="{{ route('users.index') }}"><span class="dashboard-shortcut-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8M20 8v6M17 11h6"/></svg></span><span><b>Utilisateurs et sécurité</b><small>Consulter, modifier et archiver</small></span></a>
                         @endif
-                        @if(auth()->user()->hasPermission('organizations.view'))
+                        @if(auth()->user()->hasPermission('organizations.view') && !$isV1CoordinationOrProject)
                         <a class="dashboard-shortcut" href="{{ route('organizations.index') }}"><span class="dashboard-shortcut-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h2M13 10h2M9 14h2M13 14h2"/></svg></span><span><b>Organisations</b><small>ONG, missions et projets</small></span></a>
                         @endif
-                        @if($organizations->first() && auth()->user()->hasPermission('stocks.view'))
+                        @if($organizations->first() && auth()->user()->hasPermission('stocks.view') && !$isV1CoordinationOrProject)
                         <a class="dashboard-shortcut" href="{{ route('organizations.stocks.index',$organizations->first()) }}"><span class="dashboard-shortcut-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4zM8 9h8M8 13h5"/></svg></span><span><b>Gérer le stock de médicaments</b><small>Soldes par lot et mouvements</small></span></a>
                         @endif
                         <a class="dashboard-shortcut" href="{{ route('profile.show') }}"><span class="dashboard-shortcut-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span><b>Mon profil</b><small>Informations personnelles et mot de passe</small></span></a>
@@ -227,6 +233,7 @@
                 </div>
             </article>
 
+            @unless($isV1CoordinationOrProject)
             <article class="dashboard-card">
                 <header class="dashboard-card-head">
                     <div class="dashboard-card-title">
@@ -246,9 +253,11 @@
                     @endif
                 </div>
             </article>
+            @endunless
         </div>
 
         <aside class="dashboard-column">
+            @unless($isV1CoordinationOrProject)
             <article class="dashboard-card">
                 <header class="dashboard-card-head">
                     <div class="dashboard-card-title">
@@ -262,6 +271,7 @@
                     <div class="summary-item"><strong>{{ number_format($stats['users_archived']) }}</strong><span>Comptes archivés</span></div>
                 </div>
             </article>
+            @endunless
 
             <article class="dashboard-card">
                 <header class="dashboard-card-head">

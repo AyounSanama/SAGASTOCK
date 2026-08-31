@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\HealthFacility;
+use App\Models\Mission;
 use App\Models\Organization;
 use App\Models\Project;
-use App\Models\User;
 use App\Models\Role;
-use App\Models\HealthFacility;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -16,15 +17,18 @@ class UserScopeService
     public function isPlatform(User $user): bool
     {
         $officialRole = app(GovernanceService::class)->roleCode($user);
+
         return in_array($officialRole, [GovernanceService::SAGO_ADMIN, null], true)
             && $user->roles()
-            ->wherePivot('scope_type', 'platform')
-            ->exists();
+                ->wherePivot('scope_type', 'platform')
+                ->exists();
     }
 
     public function organizationIds(User $user): Collection
     {
-        if ($this->isPlatform($user)) return Organization::pluck('id');
+        if ($this->isPlatform($user)) {
+            return Organization::pluck('id');
+        }
         $direct = $user->roles()
             ->wherePivot('scope_type', 'organization')
             ->pluck('role_user.scope_id');
@@ -33,12 +37,14 @@ class UserScopeService
         }
         $projectOrganizations = Project::whereIn('id', $this->directProjectIds($user))
             ->pluck('organization_id');
+        $coordinationOrganizations = Mission::whereIn('id', $this->coordinationMissionIds($user))
+            ->pluck('organization_id');
         $siteOrganizations = HealthFacility::whereHas(
             'sites',
             fn (Builder $query) => $query->whereIn('sites.id', $this->directSiteIds($user)),
         )->pluck('organization_id');
 
-        return $direct->merge($projectOrganizations)->merge($siteOrganizations)
+        return $direct->merge($coordinationOrganizations)->merge($projectOrganizations)->merge($siteOrganizations)
             ->filter()->unique()->values();
     }
 
@@ -49,12 +55,29 @@ class UserScopeService
             ->pluck('role_user.scope_id')->filter()->values();
     }
 
+    public function coordinationMissionIds(User $user): Collection
+    {
+        if (app(GovernanceService::class)->roleCode($user) !== GovernanceService::COORDINATION_ADMIN) {
+            return collect();
+        }
+
+        return $user->roles()
+            ->whereIn('roles.code', ['coordination_admin', 'organization_admin'])
+            ->wherePivot('scope_type', 'mission')
+            ->pluck('role_user.scope_id')
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
     public function projectIds(User $user): Collection
     {
-        if ($this->isPlatform($user)) return Project::pluck('id');
+        if ($this->isPlatform($user)) {
+            return Project::pluck('id');
+        }
         $role = app(GovernanceService::class)->roleCode($user);
         if ($role === GovernanceService::COORDINATION_ADMIN) {
-            return Project::whereIn('organization_id', $this->coordinationOrganizationIds($user))
+            return Project::whereIn('mission_id', $this->coordinationMissionIds($user))
                 ->pluck('id')->unique()->values();
         }
         if ($role === GovernanceService::PROJECT_ADMIN) {
@@ -65,26 +88,30 @@ class UserScopeService
                 Project::whereIn('organization_id', $this->organizationIds($user))->pluck('id'),
             )->unique()->values();
         }
+
         return collect();
     }
 
     public function facilityIds(User $user): Collection
     {
-        if ($this->isPlatform($user)) return HealthFacility::pluck('id');
+        if ($this->isPlatform($user)) {
+            return HealthFacility::pluck('id');
+        }
         $role = app(GovernanceService::class)->roleCode($user);
         if ($role === GovernanceService::COORDINATION_ADMIN) {
-            return HealthFacility::whereIn('organization_id', $this->coordinationOrganizationIds($user))
+            return HealthFacility::whereIn('mission_id', $this->coordinationMissionIds($user))
+                ->orWhereHas('projects', fn (Builder $q) => $q->whereIn('projects.id', $this->projectIds($user)))
                 ->pluck('id')->unique()->values();
         }
         if ($role === GovernanceService::PROJECT_ADMIN) {
-            return HealthFacility::whereHas('projects', fn (Builder $q) =>
-                $q->whereIn('projects.id', $this->directProjectIds($user)))
+            return HealthFacility::whereHas('projects', fn (Builder $q) => $q->whereIn('projects.id', $this->directProjectIds($user)))
                 ->pluck('id')->unique()->values();
         }
         if (in_array($role, [GovernanceService::SITE_ADMIN, GovernanceService::SITE_USER], true)) {
             return Site::whereIn('id', $this->directSiteIds($user))
                 ->pluck('health_facility_id')->filter()->unique()->values();
         }
+
         return HealthFacility::whereIn('organization_id', $this->organizationIds($user))
             ->orWhereHas('projects', fn (Builder $q) => $q->whereIn('projects.id', $this->directProjectIds($user)))
             ->orWhereHas('sites', fn (Builder $q) => $q->whereIn('sites.id', $this->directSiteIds($user)))
@@ -108,10 +135,12 @@ class UserScopeService
 
     public function siteIds(User $user): Collection
     {
-        if ($this->isPlatform($user)) return Site::pluck('id');
+        if ($this->isPlatform($user)) {
+            return Site::pluck('id');
+        }
         $role = app(GovernanceService::class)->roleCode($user);
         if ($role === GovernanceService::COORDINATION_ADMIN) {
-            return Site::whereIn('organization_id', $this->coordinationOrganizationIds($user))
+            return Site::whereIn('health_facility_id', $this->facilityIds($user))
                 ->pluck('id')->unique()->values();
         }
         if ($role === GovernanceService::PROJECT_ADMIN) {
@@ -121,6 +150,7 @@ class UserScopeService
         if (in_array($role, [GovernanceService::SITE_ADMIN, GovernanceService::SITE_USER], true)) {
             return $this->directSiteIds($user)->unique()->values();
         }
+
         return $this->directSiteIds($user)->merge(
             Site::whereIn('organization_id', $this->organizationIds($user))
                 ->orWhereIn('health_facility_id', $this->facilityIds($user))->pluck('id'),
@@ -130,16 +160,20 @@ class UserScopeService
     public function users(User $actor, ?Builder $query = null): Builder
     {
         $query ??= User::query();
-        if ($this->isPlatform($actor)) return $query;
+        if ($this->isPlatform($actor)) {
+            return $query;
+        }
         $role = app(GovernanceService::class)->roleCode($actor);
-        if ($role === GovernanceService::SITE_USER || $role === null) {
+        if ($role === GovernanceService::SITE_USER) {
             return $query->whereKey($actor->id);
         }
-        $organizations = $role === GovernanceService::COORDINATION_ADMIN
-            ? $this->coordinationOrganizationIds($actor) : collect();
+        $organizations = in_array($role, [GovernanceService::COORDINATION_ADMIN, GovernanceService::PROJECT_ADMIN], true)
+            ? collect()
+            : $this->organizationIds($actor);
         $projects = in_array($role, [GovernanceService::COORDINATION_ADMIN, GovernanceService::PROJECT_ADMIN], true)
             ? $this->projectIds($actor) : collect();
         $sites = $this->siteIds($actor);
+
         return $query->where(function (Builder $users) use ($actor, $organizations, $projects, $sites) {
             $users->whereKey($actor->id);
             if ($organizations->isNotEmpty()) {
@@ -147,17 +181,17 @@ class UserScopeService
             }
             if ($organizations->isNotEmpty() || $projects->isNotEmpty() || $sites->isNotEmpty()) {
                 $users->orWhereHas('roles', function (Builder $roles) use ($organizations, $projects, $sites) {
-                $roles->where(function (Builder $scopes) use ($organizations, $projects, $sites) {
-                    if ($organizations->isNotEmpty()) {
-                        $scopes->orWhere(fn (Builder $q) => $q->where('role_user.scope_type', 'organization')->whereIn('role_user.scope_id', $organizations));
-                    }
-                    if ($projects->isNotEmpty()) {
-                        $scopes->orWhere(fn (Builder $q) => $q->where('role_user.scope_type', 'project')->whereIn('role_user.scope_id', $projects));
-                    }
-                    if ($sites->isNotEmpty()) {
-                        $scopes->orWhere(fn (Builder $q) => $q->where('role_user.scope_type', 'site')->whereIn('role_user.scope_id', $sites));
-                    }
-                });
+                    $roles->where(function (Builder $scopes) use ($organizations, $projects, $sites) {
+                        if ($organizations->isNotEmpty()) {
+                            $scopes->orWhere(fn (Builder $q) => $q->where('role_user.scope_type', 'organization')->whereIn('role_user.scope_id', $organizations));
+                        }
+                        if ($projects->isNotEmpty()) {
+                            $scopes->orWhere(fn (Builder $q) => $q->where('role_user.scope_type', 'project')->whereIn('role_user.scope_id', $projects));
+                        }
+                        if ($sites->isNotEmpty()) {
+                            $scopes->orWhere(fn (Builder $q) => $q->where('role_user.scope_type', 'site')->whereIn('role_user.scope_id', $sites));
+                        }
+                    });
                 });
             }
         });
@@ -201,10 +235,16 @@ class UserScopeService
 
     public function allowsScope(User $actor, string $type, ?string $id): bool
     {
-        if ($this->isPlatform($actor)) return true;
-        if ($type === 'platform') return false;
+        if ($this->isPlatform($actor)) {
+            return true;
+        }
+        if ($type === 'platform') {
+            return false;
+        }
+
         return match ($type) {
             'organization' => $this->organizationIds($actor)->contains($id),
+            'mission' => $this->coordinationMissionIds($actor)->contains($id),
             'project' => $this->projectIds($actor)->contains($id),
             'facility' => $this->facilityIds($actor)->contains($id),
             'site' => $this->siteIds($actor)->contains($id),
@@ -214,11 +254,14 @@ class UserScopeService
 
     public function roles(User $actor): Builder
     {
-        if ($this->isPlatform($actor)) return Role::query();
+        if ($this->isPlatform($actor)) {
+            return Role::query();
+        }
         $organizations = $this->organizationIds($actor);
         $projects = $this->projectIds($actor);
         $facilities = $this->facilityIds($actor);
         $sites = $this->siteIds($actor);
+
         return Role::where('is_system', true)->orWhere(function (Builder $query) use ($organizations, $projects, $facilities, $sites) {
             $query->where(fn (Builder $q) => $q->where('scope_type', 'organization')->whereIn('scope_id', $organizations))
                 ->orWhere(fn (Builder $q) => $q->where('scope_type', 'project')->whereIn('scope_id', $projects))
@@ -303,7 +346,10 @@ class UserScopeService
 
     public function canManageRole(User $actor, Role $role): bool
     {
-        if ($role->is_system) return false;
+        if ($role->is_system) {
+            return false;
+        }
+
         return $this->isPlatform($actor) || $this->allowsScope($actor, $role->scope_type, $role->scope_id);
     }
 }

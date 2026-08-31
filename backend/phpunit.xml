@@ -11,6 +11,18 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <testsuite name="V1 Acceptance">
+            <file>tests/Feature/AuthSessionTest.php</file>
+            <file>tests/Feature/CoordinationCountryScopeTest.php</file>
+            <file>tests/Feature/ProjectCreationEntryPointsTest.php</file>
+            <file>tests/Feature/V1ModuleAvailabilityTest.php</file>
+            <file>tests/Feature/PasswordPolicyConsistencyTest.php</file>
+            <file>tests/Feature/LanguagePreferenceTest.php</file>
+            <file>tests/Feature/Api/SagoAdministrationTest.php</file>
+            <file>tests/Feature/Api/ProjectProvisioningTest.php</file>
+            <file>tests/Feature/Api/ProjectStandardListTest.php</file>
+            <file>tests/Feature/Web/TransactionalOrganizationCreationTest.php</file>
+        </testsuite>
     </testsuites>
     <source>
         <include>

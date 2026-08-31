@@ -21,8 +21,9 @@ class FundingManagementTest extends TestCase
     {
         $view = Permission::create(['code' => 'funding.view', 'name' => 'Consulter les financements']);
         $manage = Permission::create(['code' => 'funding.manage', 'name' => 'Gérer les financements']);
+        $projects = Permission::firstOrCreate(['code' => 'projects.view'], ['name' => 'Consulter les projets']);
         $role = Role::create(['code' => 'funding_admin', 'name' => 'Administrateur financements']);
-        $role->permissions()->attach([$view->id, $manage->id]);
+        $role->permissions()->attach([$view->id, $manage->id, $projects->id]);
         $user = User::factory()->create();
         $user->roles()->attach($role->id, ['scope_type' => 'platform']);
         return $user;
@@ -31,7 +32,7 @@ class FundingManagementTest extends TestCase
     private function context(): array
     {
         $organization = Organization::create(['code' => 'ONG', 'name' => 'ONG']);
-        $country = Country::create(['iso2' => 'CM', 'name' => 'Cameroun']);
+        $country = Country::firstOrCreate(['iso2' => 'CM'], ['name' => 'Cameroun']);
         $mission = Mission::create(['organization_id' => $organization->id, 'country_id' => $country->id, 'code' => 'MISSION', 'name' => 'Mission']);
         $project = Project::create(['organization_id' => $organization->id, 'mission_id' => $mission->id, 'code' => 'PROJECT', 'name' => 'Projet']);
         return [$organization, $project];
@@ -70,8 +71,14 @@ class FundingManagementTest extends TestCase
         $this->deleteJson("/api/v1/organizations/{$organization->id}/projects/{$project->id}/donors/{$donor['id']}")->assertNoContent();
         $this->deleteJson("/api/v1/organizations/{$organization->id}/projects/{$project->id}/programs/{$program['id']}")->assertNoContent();
         $this->deleteJson("/api/v1/organizations/{$organization->id}/donors/{$donor['id']}")->assertNoContent();
+        $this->getJson("/api/v1/organizations/{$organization->id}/projects-setup")
+            ->assertOk()
+            ->assertJsonPath('archived_donors.0.id', $donor['id']);
         $this->postJson("/api/v1/organizations/{$organization->id}/donors/archived/{$donor['id']}/restore")->assertOk();
         $this->deleteJson("/api/v1/organizations/{$organization->id}/programs/{$program['id']}")->assertNoContent();
+        $this->getJson("/api/v1/organizations/{$organization->id}/projects-setup")
+            ->assertOk()
+            ->assertJsonPath('archived_programs.0.id', $program['id']);
         $this->postJson("/api/v1/organizations/{$organization->id}/programs/archived/{$program['id']}/restore")->assertOk();
     }
 
@@ -94,11 +101,19 @@ class FundingManagementTest extends TestCase
 
         $this->actingAs($admin)->get('/funding')
             ->assertOk()
-            ->assertSee('Bailleurs et programmes')
+            ->assertSee('Configuration des projets')
+            ->assertSee('Projets')
+            ->assertSee('Bailleurs')
+            ->assertSee('Programmes')
             ->assertSee('donor-create-sheet')
             ->assertSee('overflow-x:clip', false)
             ->assertSee('grid-template-columns:minmax(0,1fr) minmax(0,1fr)', false)
             ->assertSee($project->name);
+
+        $this->actingAs($admin)->get('/funding?section=programs')
+            ->assertOk()
+            ->assertSee('section-programs', false)
+            ->assertSee('Ajouter un programme');
 
         $this->actingAs($admin)->from('/funding')->post("/organizations/{$organization->id}/donors", [
             'code' => 'GAVI', 'name' => 'Alliance Gavi', 'email' => 'contact@gavi.test',

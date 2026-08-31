@@ -3,6 +3,8 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Country;
+use App\Models\Mission;
+use App\Models\Organization;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -49,11 +51,17 @@ class SagoAdministrationTest extends TestCase
         $this->assertDatabaseCount('country_organization', 1);
 
         $coordination = User::where('email', 'ada@example.test')->firstOrFail();
+        $mission = Mission::where('organization_id', $coordination->organization_id)->firstOrFail();
+        $this->assertDatabaseHas('role_user', [
+            'user_id' => $coordination->id,
+            'scope_type' => 'mission',
+            'scope_id' => $mission->id,
+        ]);
         Sanctum::actingAs($coordination);
         $this->postJson('/api/v1/organizations', [])->assertForbidden();
     }
 
-    public function test_mobile_contract_persists_logo_and_languages(): void
+    public function test_mobile_contract_persists_logo_without_assigning_user_language_to_organization(): void
     {
         Storage::fake('public');
         $country = Country::firstOrCreate(['iso2' => 'CM'], ['name' => 'Cameroun', 'is_active' => true]);
@@ -73,10 +81,70 @@ class SagoAdministrationTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('organization.default_language', 'fr')
-            ->assertJsonPath('organization.additional_languages.0', 'en');
-        $organization = \App\Models\Organization::where('code', 'MOBILE_ORG')->firstOrFail();
+            ->assertJsonPath('organization.additional_languages', null);
+        $organization = Organization::where('code', 'MOBILE_ORG')->firstOrFail();
         Storage::disk('public')->assertExists($organization->logo_path);
-        $this->assertSame(['en'], $organization->additional_languages);
+        $this->assertNull($organization->additional_languages);
+    }
+
+    public function test_android_unipays_regression_contract_creates_the_complete_scope(): void
+    {
+        $country = Country::firstOrCreate(['iso2' => 'CM'], ['name' => 'Cameroun', 'is_active' => true]);
+        Sanctum::actingAs($this->sago());
+
+        $this->postJson('/api/v1/organizations', [
+            'name' => 'ONG SANTE TEST CAMEROUN',
+            'code' => 'OSTC01',
+            'geographic_access_type' => 'single_country',
+            'country_ids' => [$country->id],
+            'admin_first_name' => 'Jean',
+            'admin_last_name' => 'COORDINATION',
+            'admin_email' => 'jean.coordination.test@gmail.com',
+            'admin_username' => 'jean_coordination',
+            'activation_mode' => 'temporary_password',
+            'admin_password' => 'Test@123',
+        ])->assertCreated()
+            ->assertJsonPath('organization.code', 'OSTC01')
+            ->assertJsonPath('coordination_admin.username', 'jean_coordination');
+
+        $organization = Organization::where('code', 'OSTC01')->firstOrFail();
+        $admin = User::where('username', 'jean_coordination')->firstOrFail();
+        $mission = Mission::where('organization_id', $organization->id)
+            ->where('country_id', $country->id)->firstOrFail();
+        $this->assertTrue($organization->countries()->whereKey($country->id)->exists());
+        $this->assertDatabaseHas('role_user', [
+            'user_id' => $admin->id,
+            'scope_type' => 'mission',
+            'scope_id' => $mission->id,
+        ]);
+    }
+
+    public function test_api_rejects_an_admin_username_containing_spaces(): void
+    {
+        $country = Country::firstOrCreate(['iso2' => 'CM'], ['name' => 'Cameroun', 'is_active' => true]);
+        Sanctum::actingAs($this->sago());
+
+        $this->postJson('/api/v1/organizations', [
+            'name' => 'Organisation invalide', 'code' => 'INVALID_USERNAME',
+            'geographic_access_type' => 'single_country', 'country_ids' => [$country->id],
+            'admin_first_name' => 'Jean', 'admin_last_name' => 'Coordination',
+            'admin_email' => 'invalid.username@example.test',
+            'admin_username' => 'jean coordination',
+        ])->assertUnprocessable()->assertJsonValidationErrors('admin_username');
+
+        $this->assertDatabaseMissing('organizations', ['code' => 'INVALID_USERNAME']);
+    }
+
+    public function test_sago_mobile_can_load_the_shared_country_reference(): void
+    {
+        Country::firstOrCreate(['iso2' => 'CM'], ['name' => 'Cameroun', 'is_active' => true]);
+        Country::firstOrCreate(['iso2' => 'TD'], ['name' => 'Tchad', 'is_active' => true]);
+        Sanctum::actingAs($this->sago());
+
+        $this->getJson('/api/v1/countries')
+            ->assertOk()
+            ->assertJsonFragment(['iso2' => 'CM', 'name' => 'Cameroun'])
+            ->assertJsonFragment(['iso2' => 'TD', 'name' => 'Tchad']);
     }
 
     private function sago(): User
@@ -89,6 +157,7 @@ class SagoAdministrationTest extends TestCase
         Role::firstOrCreate(['code' => 'coordination_admin'], ['name' => 'Admin Coordination', 'is_active' => true, 'is_system' => true]);
         $user = User::factory()->create(['password' => 'Secret@123', 'is_active' => true, 'must_change_password' => false]);
         $user->roles()->attach($sago, ['scope_type' => 'platform']);
+
         return $user;
     }
 }

@@ -8,6 +8,7 @@ import 'src/core/routing/app_router.dart';
 import 'src/core/access/application_access.dart';
 import 'src/features/auth/data/auth_service.dart';
 import 'src/core/sync/sync_bootstrap.dart';
+import 'src/core/localization/app_locale.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,7 @@ Future<String> _resolveInitialLocation() async {
     final hasSession = await service.hasSession();
     if (!hasSession) return '/login';
     final user = await service.cachedUser();
+    AppLocale.apply('${user?['preferred_locale'] ?? 'fr'}');
     return ApplicationAccess.landingPath(user);
   } catch (_) {
     return '/login';

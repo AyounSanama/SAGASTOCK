@@ -25,6 +25,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use App\Support\PasswordPolicy;
 use Illuminate\View\View;
 
 class ConfigurationWizardController extends Controller
@@ -208,7 +209,7 @@ class ConfigurationWizardController extends Controller
             'username'=>['required','alpha_dash','max:80','unique:users,username'],
             'email'=>['required','email','unique:users,email'], 'phone'=>['nullable','string','max:40'],
             'role_id'=>['required','integer','exists:roles,id'],
-            'password'=>['required','confirmed',Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+            'password'=>['required','confirmed',PasswordPolicy::rule()],
         ]);
         $role = $this->scopes->assignableRoles($request->user())->findOrFail($data['role_id']);
         [$scopeType,$scopeId] = $this->scopeForRole($role, $organization);
@@ -445,7 +446,7 @@ class ConfigurationWizardController extends Controller
         abort_unless($this->governance->canAssign($r->user(), $role, $scope[0], $scope[1]), 403);
         $d = $r->validate([
             'name' => ['required', 'string', 'max:160'], 'email' => ['required', 'email', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:40'], 'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'phone' => ['nullable', 'string', 'max:40'], 'password' => ['required', 'confirmed', PasswordPolicy::rule()],
             'role_id' => ['required', 'integer', 'exists:roles,id'],
         ]);
         unset($d['role_id']); $d += ['organization_id' => $o->id, 'is_active' => true, 'must_change_password' => true];

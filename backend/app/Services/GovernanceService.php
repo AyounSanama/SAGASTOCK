@@ -14,12 +14,18 @@ class GovernanceService
         'dispensations.view', 'dispensations.manage', 'inventories.manage',
         'orders.manage', 'reports.view', 'synchronization.manage',
     ];
+
     public const SAGO_ADMIN = 'sago_admin';
+
     /** @deprecated Utiliser SAGO_ADMIN. */
     public const OWNER = self::SAGO_ADMIN;
+
     public const COORDINATION_ADMIN = 'coordination_admin';
+
     public const PROJECT_ADMIN = 'project_admin';
+
     public const SITE_ADMIN = 'site_admin';
+
     public const SITE_USER = 'site_user';
 
     public const OFFICIAL_ROLES = [
@@ -52,7 +58,9 @@ class GovernanceService
             ->map(fn (string $code) => $this->canonicalCode($code));
 
         foreach (self::OFFICIAL_ROLES as $code) {
-            if ($codes->contains($code)) return $code;
+            if ($codes->contains($code)) {
+                return $code;
+            }
         }
 
         return null;
@@ -106,15 +114,19 @@ class GovernanceService
         }
 
         $targetCode = $this->canonicalCode($role->code);
-        if (! in_array($targetCode, $this->assignableCodes($actor), true)) return false;
+        if (! in_array($targetCode, $this->assignableCodes($actor), true)) {
+            return false;
+        }
 
         $expectedScope = match ($targetCode) {
-            self::COORDINATION_ADMIN => 'organization',
+            self::COORDINATION_ADMIN => 'mission',
             self::PROJECT_ADMIN => 'project',
             self::SITE_ADMIN, self::SITE_USER => 'site',
             default => null,
         };
-        if ($scopeType !== $expectedScope || !$scopeId) return false;
+        if ($scopeType !== $expectedScope || ! $scopeId) {
+            return false;
+        }
 
         return app(UserScopeService::class)->allowsScope($actor, $scopeType, $scopeId);
     }

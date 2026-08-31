@@ -18,12 +18,13 @@ class ProjectManagementTest extends TestCase
 
     private function administrator(): User
     {
-        $view = Permission::create(['code' => 'projects.view', 'name' => 'Consulter les projets']);
-        $manage = Permission::create(['code' => 'projects.manage', 'name' => 'Gérer les projets']);
-        $role = Role::create(['code' => 'custom_project_manager', 'name' => 'Administrateur projets']);
-        $role->permissions()->attach([$view->id, $manage->id]);
+        $view = Permission::firstOrCreate(['code' => 'projects.view'], ['name' => 'Consulter les projets']);
+        $manage = Permission::firstOrCreate(['code' => 'projects.manage'], ['name' => 'Gérer les projets']);
+        $role = Role::firstOrCreate(['code' => 'custom_project_manager'], ['name' => 'Administrateur projets']);
+        $role->permissions()->syncWithoutDetaching([$view->id, $manage->id]);
         $user = User::factory()->create(['is_active' => true]);
         $user->roles()->attach($role->id, ['scope_type' => 'platform']);
+
         return $user;
     }
 
@@ -41,12 +42,16 @@ class ProjectManagementTest extends TestCase
         $id = $created->json('project.id');
 
         $this->getJson("/api/v1/organizations/{$organization->id}/projects")->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson("/api/v1/organizations/{$organization->id}/projects?search=PROJET_1&status=active")
+            ->assertOk()->assertJsonCount(1, 'data');
         $this->getJson("/api/v1/organizations/{$other->id}/projects")->assertOk()->assertJsonCount(0, 'data');
         $this->putJson("/api/v1/organizations/{$other->id}/projects/{$id}", [
             'mission_id' => $mission->id, 'code' => 'PROJET_1', 'name' => 'Intrusion',
         ])->assertNotFound();
         $this->assertDatabaseHas('audit_logs', ['event' => 'project.created', 'auditable_id' => $id]);
         $this->deleteJson("/api/v1/organizations/{$organization->id}/projects/{$id}")->assertNoContent();
+        $this->getJson("/api/v1/organizations/{$organization->id}/projects/archived")
+            ->assertOk()->assertJsonPath('data.0.id', $id);
         $this->postJson("/api/v1/organizations/{$organization->id}/projects/archived/{$id}/restore")
             ->assertOk()->assertJsonPath('project.is_active', true);
     }

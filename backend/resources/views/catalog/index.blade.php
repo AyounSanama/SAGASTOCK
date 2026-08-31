@@ -10,7 +10,7 @@
         'suppliers' => ['Fournisseurs et partenaires', 'Gérez les fournisseurs, fabricants et partenaires.', 'local_shipping'],
         'batches' => ['Lots produits', 'Suivez les lots et les dates de péremption.', 'inventory_2'],
         'kits' => ['Kits', 'Composez et gérez les kits de produits médicaux.', 'deployed_code'],
-        'lists' => ['Listes standards de médicaments', 'Consultez et gérez les listes autorisées pour votre périmètre.', 'format_list_bulleted'],
+        'lists' => ['Liste standard du projet', 'Configurez et consultez les listes standards rattachées à vos projets.', 'format_list_bulleted'],
     ];
     [$sectionTitle, $sectionSubtitle, $sectionIcon] = $sectionTitles[$activeSection] ?? $sectionTitles['products'];
 @endphp
@@ -21,7 +21,7 @@
 @else
 <x-app-page-header :title="$sectionTitle" :subtitle="$organization->name.' · '.$sectionSubtitle" :icon="$sectionIcon" />
 @endif
-<nav class="catalog-tabs" aria-label="Sections du catalogue"><a class="{{ $activeSection==='products'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'products']) }}">Produits</a><a class="{{ $activeSection==='references'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'references']) }}">Référentiels</a><a class="{{ $activeSection==='suppliers'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'suppliers']) }}">Fournisseurs</a><a class="{{ $activeSection==='batches'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'batches']) }}">Lots</a><a class="{{ $activeSection==='kits'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'kits']) }}">Kits</a><a class="{{ $activeSection==='lists'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'lists']) }}">Listes standards</a></nav>
+<nav class="catalog-tabs" aria-label="Sections du catalogue"><a class="{{ $activeSection==='products'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'products']) }}">Produits</a><a class="{{ $activeSection==='references'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'references']) }}">Référentiels</a><a class="{{ $activeSection==='suppliers'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'suppliers']) }}">Fournisseurs</a><a class="{{ $activeSection==='batches'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'batches']) }}">Lots</a><a class="{{ $activeSection==='kits'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'kits']) }}">Kits</a><a class="{{ $activeSection==='lists'?'active':'' }}" href="{{ route('organizations.catalog.index',[$organization,'section'=>'lists']) }}">Liste standard du projet</a></nav>
 @if($activeSection === 'products')
 <x-app-filter-bar action="{{ route('organizations.catalog.index', $organization) }}"><input type="hidden" name="section" value="products"><x-app-search-input name="search" :value="request('search')" placeholder="Rechercher par nom, DCI, code ou référence…" /><x-app-button variant="secondary" icon="search" type="submit">Rechercher</x-app-button></x-app-filter-bar>
 @endif
