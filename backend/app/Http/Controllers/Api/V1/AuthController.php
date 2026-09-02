@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\HealthFacility;
 use App\Models\Mission;
+use App\Models\Project;
 use App\Models\User;
 use App\Services\ApplicationNavigationService;
 use App\Services\GovernanceService;
@@ -116,6 +117,12 @@ class AuthController extends Controller
             ->withCount('projects')
             ->whereIn('id', app(UserScopeService::class)->coordinationMissionIds($user))
             ->first();
+        $project = Project::with([
+            'organization:id,code,name',
+            'mission.country:id,iso2,name',
+            'donors:id,code,name',
+            'programs:id,code,name',
+        ])->whereIn('id', app(UserScopeService::class)->directProjectIds($user))->first();
 
         return [
             'id' => $user->uuid, 'name' => $user->name,
@@ -155,6 +162,8 @@ class AuthController extends Controller
                 'projects_count' => $mission->projects_count,
                 'health_facilities_count' => HealthFacility::where('mission_id', $mission->id)->count(),
             ] : null,
+            'project_id' => $project?->id,
+            'project' => $project,
             'roles' => $user->roles()->pluck('code')->all(),
             'role' => $governance->roleCode($user),
             'dashboard' => $governance->dashboard($user),

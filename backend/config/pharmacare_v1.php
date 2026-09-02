@@ -3,11 +3,11 @@
 return [
     'navigation' => [
         'coordination_admin' => ['dashboard', 'missions', 'projects', 'standard-lists', 'profile'],
-        'project_admin' => ['dashboard', 'projects', 'standard-lists', 'profile'],
+        'project_admin' => ['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'profile'],
     ],
     'web_paths' => [
         'coordination_admin' => ['dashboard', 'missions', 'projects', 'funding', 'standard-lists', 'profile'],
-        'project_admin' => ['dashboard', 'projects', 'standard-lists', 'profile'],
+        'project_admin' => ['dashboard', 'projects', 'health-facilities', 'users', 'standard-lists', 'profile'],
     ],
     'api_patterns' => [
         'coordination_admin' => [
@@ -30,6 +30,9 @@ return [
             '#^api/v1/projects(?:/|$)#',
             '#^api/v1/organizations/[^/]+/projects(?:/|$)#',
             '#^api/v1/organizations/[^/]+/catalog/(?:lists|references|products)(?:/|$)#',
+            '#^api/v1/organizations/[^/]+/structures(?:/|$)#',
+            '#^api/v1/organizations/[^/]+/facilities(?:/|$)#',
+            '#^api/v1/(?:users|users-archived|assignable-roles|roles)(?:/|$)#',
         ],
     ],
 ];

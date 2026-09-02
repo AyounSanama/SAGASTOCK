@@ -33,7 +33,7 @@ class OrganizationController extends Controller
         if (app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::SAGO_ADMIN) {
             return redirect()->route('configuration.organization', $request->boolean('create') ? ['create' => 1] : []);
         }
-        $organizations = $this->scopes->organizations($request->user())
+        $organizations = $this->scopes->organizations($request->user())->with('countries:id,iso2,name')
             ->when($request->string('search')->toString(), fn ($query, $search) => $query
                 ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
             ->orderBy('name')->paginate(20);
@@ -151,7 +151,9 @@ class OrganizationController extends Controller
             'country_code' => ['nullable', 'string', 'size:2'],
             'address' => ['nullable', 'string', 'max:1000'],
         ]);
-        $data['country_code'] = isset($data['country_code']) ? strtoupper($data['country_code']) : null;
+        if (array_key_exists('country_code', $data)) {
+            $data['country_code'] = isset($data['country_code']) ? strtoupper($data['country_code']) : null;
+        }
         $data['is_active'] = $request->boolean('is_active', true);
         return $data;
     }

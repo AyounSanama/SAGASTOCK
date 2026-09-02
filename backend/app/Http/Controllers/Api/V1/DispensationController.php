@@ -11,12 +11,16 @@ use App\Models\Prescription;
 use App\Models\PrescriptionItem;
 use App\Models\Product;
 use App\Models\Site;
+use App\Models\StandardList;
+use App\Models\StandardListVersion;
 use App\Services\AuditService;
 use App\Services\StockLedgerService;
 use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -27,7 +31,7 @@ class DispensationController extends Controller
     public function patients(Request $request, Organization $organization): JsonResponse
     {
         $this->access($request, $organization, 'patients.view');
-        return response()->json(Patient::where('organization_id', $organization->id)
+        return response()->json($this->patientQuery($request, $organization)
             ->when($request->string('search')->toString(), fn ($q, $s) => $q->where(fn ($n) => $n->where('code', 'like', "%$s%")->orWhere('first_name', 'like', "%$s%")->orWhere('last_name', 'like', "%$s%")->orWhere('phone', 'like', "%$s%")))
             ->orderBy('last_name')->orderBy('first_name')->paginate(30));
     }
@@ -35,7 +39,7 @@ class DispensationController extends Controller
     public function patientHistory(Request $request, Organization $organization, Patient $patient): JsonResponse
     {
         $this->access($request, $organization, 'patients.view');
-        abort_unless($patient->organization_id === $organization->id, 404);
+        abort_unless($this->patientQuery($request, $organization)->whereKey($patient->id)->exists(), 404);
         return response()->json(['patient' => $patient, 'prescriptions' => $patient->prescriptions()
             ->with(['site', 'items.product', 'dispensations.items.batch'])->latest('prescribed_on')->get(),
             'dispensations' => $patient->dispensations()->with(['site', 'prescription', 'items.product', 'items.batch'])->latest('dispensed_at')->get()]);
@@ -45,10 +49,17 @@ class DispensationController extends Controller
     {
         $this->access($request, $organization, 'patients.manage');
         if ($request->filled('client_reference') && ($existing = Patient::where('client_reference', $request->input('client_reference'))->first())) {
-            abort_unless($existing->organization_id === $organization->id, 404);
+            abort_unless($this->patientQuery($request, $organization)->whereKey($existing->id)->exists(), 404);
             return response()->json(['patient' => $existing]);
         }
-        $patient = Patient::create([...$this->patientData($request, $organization), 'organization_id' => $organization->id]);
+        $data = $this->patientData($request, $organization);
+        $site = $this->patientSite($request, $organization, $data['site_id'] ?? null);
+        $patient = Patient::create([
+            ...$data,
+            'organization_id' => $organization->id,
+            'site_id' => $site->id,
+            'health_facility_id' => $site->health_facility_id,
+        ]);
         $this->audit->record($request, 'patient.created', $patient);
         return response()->json(['patient' => $patient], 201);
     }
@@ -56,9 +67,14 @@ class DispensationController extends Controller
     public function updatePatient(Request $request, Organization $organization, Patient $patient): JsonResponse
     {
         $this->access($request, $organization, 'patients.manage');
-        abort_unless($patient->organization_id === $organization->id, 404);
+        abort_unless($this->patientQuery($request, $organization)->whereKey($patient->id)->exists(), 404);
         $old = $patient->toArray();
-        $patient->update($this->patientData($request, $organization, $patient));
+        $data = $this->patientData($request, $organization, $patient);
+        if (array_key_exists('site_id', $data)) {
+            $site = $this->patientSite($request, $organization, $data['site_id']);
+            $data['health_facility_id'] = $site->health_facility_id;
+        }
+        $patient->update($data);
         $this->audit->record($request, 'patient.updated', $patient, $old, $patient->fresh()->toArray());
         return response()->json(['patient' => $patient]);
     }
@@ -66,7 +82,7 @@ class DispensationController extends Controller
     public function archivePatient(Request $request, Organization $organization, Patient $patient): JsonResponse
     {
         $this->access($request, $organization, 'patients.manage');
-        abort_unless($patient->organization_id === $organization->id, 404);
+        abort_unless($this->patientQuery($request, $organization)->whereKey($patient->id)->exists(), 404);
         $patient->update(['is_active' => false]); $patient->delete();
         $this->audit->record($request, 'patient.archived', $patient);
         return response()->json(status: 204);
@@ -75,7 +91,8 @@ class DispensationController extends Controller
     public function restorePatient(Request $request, Organization $organization, string $patient): JsonResponse
     {
         $this->access($request, $organization, 'patients.manage');
-        $model = Patient::onlyTrashed()->where('organization_id', $organization->id)->findOrFail($patient);
+        $model = Patient::onlyTrashed()->where('organization_id', $organization->id)
+            ->whereIn('site_id', $this->siteIds($request, $organization))->findOrFail($patient);
         $model->restore(); $model->update(['is_active' => true]);
         $this->audit->record($request, 'patient.restored', $model);
         return response()->json(['patient' => $model]);
@@ -108,13 +125,21 @@ class DispensationController extends Controller
             'items.*.frequency' => ['required', 'string', 'max:120'], 'items.*.duration' => ['required', 'string', 'max:120'],
             'items.*.instructions' => ['nullable', 'string', 'max:1000'], 'items.*.substitution_authorized' => ['nullable', 'boolean'],
         ]);
-        $patient = Patient::where('organization_id', $organization->id)->where('is_active', true)->findOrFail($data['patient_id']);
         $site = $this->site($request, $organization, $data['site_id']);
+        $patient = $this->patientQuery($request, $organization)->where('is_active', true)->findOrFail($data['patient_id']);
+        abort_unless($patient->site_id === null || $patient->site_id === $site->id, 422, 'Le patient appartient à une autre formation sanitaire.');
         $productIds = collect($data['items'])->pluck('product_id')->unique();
-        abort_unless(Product::where('organization_id', $organization->id)->whereIn('id', $productIds)->count() === $productIds->count(), 422, 'Un produit ne fait pas partie de cette organisation.');
-        $attachment = $request->file('attachment')?->store('private/prescriptions');
-        $prescription = DB::transaction(function () use ($data, $organization, $patient, $site, $request, $attachment) {
-            $model = Prescription::create([...collect($data)->except(['items', 'attachment'])->all(), 'attachment_path' => $attachment, 'organization_id' => $organization->id, 'patient_id' => $patient->id, 'site_id' => $site->id, 'created_by' => $request->user()->id]);
+        abort_unless($this->allowedProducts($request, $organization)->whereIn('id', $productIds)->count() === $productIds->count(), 422, 'Un produit ne fait pas partie de la liste standard autorisée pour ce projet.');
+        $attachmentFile = $request->file('attachment');
+        $attachment = $attachmentFile?->storeAs('private/prescriptions', Str::uuid().'.'.$attachmentFile->extension());
+        $prescription = DB::transaction(function () use ($data, $organization, $patient, $site, $request, $attachment, $attachmentFile) {
+            if ($patient->site_id === null) {
+                $patient->update(['site_id' => $site->id, 'health_facility_id' => $site->health_facility_id]);
+            }
+            $model = Prescription::create([...collect($data)->except(['items', 'attachment'])->all(), 'attachment_path' => $attachment,
+                'attachment_original_name' => $attachmentFile?->getClientOriginalName(), 'attachment_mime_type' => $attachmentFile?->getMimeType(),
+                'attachment_size' => $attachmentFile?->getSize(), 'attachment_captured_at' => $attachmentFile ? now() : null,
+                'organization_id' => $organization->id, 'patient_id' => $patient->id, 'site_id' => $site->id, 'created_by' => $request->user()->id]);
             foreach ($data['items'] as $row) $model->items()->create([...$row, 'substitution_authorized' => (bool) ($row['substitution_authorized'] ?? false)]);
             return $model;
         });
@@ -156,9 +181,9 @@ class DispensationController extends Controller
     {
         $this->access($request, $organization, 'dispensations.manage');
         $sites = Site::with('healthFacility:id,name')->whereIn('id', $this->siteIds($request, $organization))->orderBy('name')->get();
-        return response()->json(['sites' => $sites, 'patients' => Patient::where('organization_id', $organization->id)->where('is_active', true)->orderBy('last_name')->get(),
+        return response()->json(['sites' => $sites, 'patients' => $this->patientQuery($request, $organization)->where('is_active', true)->orderBy('last_name')->get(),
             'prescriptions' => Prescription::with(['patient', 'items.product'])->where('organization_id', $organization->id)->whereIn('site_id', $sites->pluck('id'))->whereIn('status', ['validated', 'partially_dispensed', 'waiting_stock'])->latest('prescribed_on')->get(),
-            'products' => Product::where('organization_id', $organization->id)->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name'])]);
+            'products' => $this->allowedProducts($request, $organization)->with('codes:id,product_id,code_type,value,is_primary')->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name'])]);
     }
 
     public function fefoSuggestion(Request $request, Organization $organization): JsonResponse
@@ -166,7 +191,7 @@ class DispensationController extends Controller
         $this->access($request, $organization, 'dispensations.manage');
         $data = $request->validate(['site_id' => ['required', 'uuid'], 'product_id' => ['required', 'uuid'], 'quantity' => ['required', 'numeric', 'gt:0']]);
         $site = $this->site($request, $organization, $data['site_id']);
-        $product = Product::where('organization_id', $organization->id)->findOrFail($data['product_id']);
+        $product = $this->allowedProducts($request, $organization)->findOrFail($data['product_id']);
         $allocations = $this->ledger->fefo($organization, $site, $product->id, (float) $data['quantity']);
         return response()->json(['requested_quantity' => (float) $data['quantity'], 'available_quantity' => $allocations->sum('suggested_quantity'), 'allocations' => $allocations]);
     }
@@ -181,20 +206,28 @@ class DispensationController extends Controller
         $data = $request->validate([
             'offline_uuid' => ['nullable', 'uuid'], 'reference' => ['required', 'max:80', Rule::unique('dispensations')->where('organization_id', $organization->id)],
             'patient_id' => ['required', 'uuid'], 'prescription_id' => ['nullable', 'uuid'], 'site_id' => ['required', 'uuid'],
+            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'destination_type' => ['nullable', Rule::in(['patient', 'hospital_service', 'community', 'other'])], 'destination_name' => ['nullable', 'string', 'max:190'],
             'allow_partial' => ['nullable', 'boolean'], 'dispensed_at' => ['required', 'date', 'before_or_equal:now'], 'notes' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'], 'items.*.prescription_item_id' => ['nullable', 'uuid'],
             'items.*.product_id' => ['required', 'uuid'], 'items.*.quantity' => ['required', 'numeric', 'gt:0'],
         ]);
-        $patient = Patient::where('organization_id', $organization->id)->where('is_active', true)->findOrFail($data['patient_id']);
+        $patient = $this->patientQuery($request, $organization)->where('is_active', true)->findOrFail($data['patient_id']);
         $site = $this->site($request, $organization, $data['site_id']);
+        abort_unless($patient->site_id === null || $patient->site_id === $site->id, 422, 'Le patient appartient à une autre formation sanitaire.');
         $prescription = empty($data['prescription_id']) ? null : Prescription::where('organization_id', $organization->id)->where('patient_id', $patient->id)->whereIn('status', ['validated', 'partially_dispensed', 'waiting_stock'])->findOrFail($data['prescription_id']);
         $allowPartial = (bool) ($data['allow_partial'] ?? false);
-        $dispensation = DB::transaction(function () use ($data, $organization, $patient, $site, $prescription, $request, $allowPartial) {
-            $model = Dispensation::create([...collect($data)->except(['items', 'allow_partial'])->all(), 'destination_type' => $data['destination_type'] ?? 'patient', 'organization_id' => $organization->id, 'patient_id' => $patient->id, 'site_id' => $site->id, 'prescription_id' => $prescription?->id, 'status' => 'validated', 'dispensed_by' => $request->user()->id]);
+        $attachmentFile = $request->file('attachment');
+        $attachmentPath = $attachmentFile?->storeAs('private/dispensations', Str::uuid().'.'.$attachmentFile->extension());
+        $dispensation = DB::transaction(function () use ($data, $organization, $patient, $site, $prescription, $request, $allowPartial, $attachmentFile, $attachmentPath) {
+            $model = Dispensation::create([...collect($data)->except(['items', 'allow_partial', 'attachment'])->all(), 'destination_type' => $data['destination_type'] ?? 'patient',
+                'prescription_attachment_path' => $attachmentPath, 'prescription_attachment_original_name' => $attachmentFile?->getClientOriginalName(),
+                'prescription_attachment_mime_type' => $attachmentFile?->getMimeType(), 'prescription_attachment_size' => $attachmentFile?->getSize(),
+                'prescription_attachment_captured_at' => $attachmentFile ? now() : null,
+                'organization_id' => $organization->id, 'patient_id' => $patient->id, 'site_id' => $site->id, 'prescription_id' => $prescription?->id, 'status' => 'validated', 'dispensed_by' => $request->user()->id]);
             $totalRequested = 0.0; $totalDispensed = 0.0;
             foreach ($data['items'] as $row) {
-                $product = Product::where('organization_id', $organization->id)->findOrFail($row['product_id']);
+                $product = $this->allowedProducts($request, $organization)->findOrFail($row['product_id']);
                 $requested = (float) $row['quantity']; $totalRequested += $requested;
                 $prescriptionItem = empty($row['prescription_item_id']) ? null : PrescriptionItem::where('prescription_id', $prescription?->id)->where('product_id', $product->id)->findOrFail($row['prescription_item_id']);
                 if ($prescriptionItem && (float) $prescriptionItem->quantity_dispensed + $requested > (float) $prescriptionItem->quantity_prescribed) throw ValidationException::withMessages(['items' => 'La quantité dépasse le reliquat prescrit.']);
@@ -247,12 +280,49 @@ class DispensationController extends Controller
 
     private function patientData(Request $request, Organization $organization, ?Patient $patient = null): array
     {
-        return $request->validate(['client_reference' => ['nullable', 'uuid', Rule::unique('patients')->ignore($patient?->id)], 'code' => ['required', 'alpha_dash', 'max:60', Rule::unique('patients')->where('organization_id', $organization->id)->ignore($patient?->id)],
+        return $request->validate(['id' => ['nullable', 'uuid', Rule::unique('patients')->ignore($patient?->id)], 'client_reference' => ['nullable', 'uuid', Rule::unique('patients')->ignore($patient?->id)], 'site_id' => ['nullable', 'uuid'], 'code' => ['required', 'alpha_dash', 'max:60', Rule::unique('patients')->where('organization_id', $organization->id)->ignore($patient?->id)],
             'first_name' => ['required', 'string', 'max:120'], 'last_name' => ['required', 'string', 'max:120'], 'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
             'sex' => ['nullable', Rule::in(['female', 'male', 'other', 'unknown'])], 'phone' => ['nullable', 'string', 'max:40'], 'external_identifier' => ['nullable', 'string', 'max:120'],
             'address' => ['nullable', 'string', 'max:1000'], 'allergies' => ['nullable', 'string', 'max:2000'], 'clinical_notes' => ['nullable', 'string', 'max:3000'], 'is_active' => ['sometimes', 'boolean']]);
     }
     private function access(Request $request, Organization $organization, string $permission): void { abort_unless($request->user()->hasPermission($permission), 403); abort_unless($this->scopes->organizations($request->user())->whereKey($organization->id)->exists(), 404); }
+    private function patientQuery(Request $request, Organization $organization): Builder
+    {
+        $siteIds = $this->siteIds($request, $organization);
+        return Patient::where('organization_id', $organization->id)->where(function (Builder $query) use ($siteIds): void {
+            $query->whereIn('site_id', $siteIds)
+                ->orWhereHas('prescriptions', fn (Builder $q) => $q->whereIn('site_id', $siteIds))
+                ->orWhereHas('dispensations', fn (Builder $q) => $q->whereIn('site_id', $siteIds));
+        });
+    }
+    private function patientSite(Request $request, Organization $organization, ?string $siteId): Site
+    {
+        if ($siteId) return $this->site($request, $organization, $siteId);
+        $ids = $this->siteIds($request, $organization);
+        if ($ids->count() !== 1) {
+            throw ValidationException::withMessages(['site_id' => 'Veuillez sélectionner la formation sanitaire du patient.']);
+        }
+        return Site::findOrFail($ids->first());
+    }
+    private function allowedProducts(Request $request, Organization $organization): Builder
+    {
+        $siteIds = $this->siteIds($request, $organization);
+        $projectIds = DB::table('health_facility_project')
+            ->join('sites', 'sites.health_facility_id', '=', 'health_facility_project.health_facility_id')
+            ->whereIn('sites.id', $siteIds)
+            ->pluck('health_facility_project.project_id')->unique();
+        $lists = StandardList::where('organization_id', $organization->id)
+            ->where('scope_type', 'project')->whereIn('scope_id', $projectIds)
+            ->where('is_active', true)->get(['id', 'allow_outside_list']);
+        $query = Product::where('organization_id', $organization->id);
+        if ($lists->isEmpty() || $lists->contains('allow_outside_list', true)) return $query;
+
+        $versionIds = StandardListVersion::whereIn('standard_list_id', $lists->pluck('id'))
+            ->where('status', 'published')->pluck('id');
+        $productIds = DB::table('standard_list_items')
+            ->whereIn('standard_list_version_id', $versionIds)->pluck('product_id');
+        return $query->whereIn('id', $productIds);
+    }
     private function siteIds(Request $request, Organization $organization) { return $this->scopes->sites($request->user())->whereHas('healthFacility', fn ($q) => $q->where('organization_id', $organization->id))->pluck('id'); }
     private function site(Request $request, Organization $organization, string $id): Site { return $this->scopes->sites($request->user())->whereKey($id)->whereHas('healthFacility', fn ($q) => $q->where('organization_id', $organization->id))->firstOrFail(); }
 }

@@ -195,6 +195,11 @@ void main() {
     final project = <String, dynamic>{...coordination, 'role': 'project_admin'};
     expect(ApplicationAccess.moduleAvailable(project, '/missions'), isFalse);
     expect(ApplicationAccess.moduleAvailable(project, '/projects/42'), isTrue);
+    expect(
+      ApplicationAccess.moduleAvailable(project, '/health-facilities'),
+      isTrue,
+    );
+    expect(ApplicationAccess.moduleAvailable(project, '/users'), isTrue);
   });
 
   test('les autres rôles entrent sur le tableau de bord', () {

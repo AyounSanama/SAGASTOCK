@@ -1,10 +1,16 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'dart:typed_data';
+import '../../../core/files/private_attachment_store.dart';
+import '../../../core/access/session_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
 import '../data/clinical_supply_service.dart';
+import '../../auth/data/auth_service.dart';
 
 class ClinicalSupplyPage extends StatefulWidget {
   const ClinicalSupplyPage({super.key, this.initialTab = 0});
@@ -17,8 +23,7 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
     with SingleTickerProviderStateMixin {
   final service = ClinicalSupplyService();
   late final TabController tabs;
-  List<Map<String, dynamic>> organizations = [],
-      patients = [],
+  List<Map<String, dynamic>> patients = [],
       prescriptions = [],
       dispensations = [];
   String? organizationId;
@@ -44,10 +49,12 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
 
   Future<void> _init() async {
     try {
-      organizations = await service.organizations();
-      organizationId = organizations.isEmpty
-          ? null
-          : '${organizations.first['id']}';
+      organizationId = SessionScope.organizationId(
+        await AuthService().cachedUser(),
+      );
+      if (organizationId!.isEmpty) {
+        throw StateError('missing organization scope');
+      }
       await _load();
     } catch (_) {
       error = 'Chargement impossible.';
@@ -97,12 +104,17 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
         : 'Opération impossible.';
   }
 
-  Future<void> execute(Future<Object?> Function() action, String success) async {
+  Future<void> execute(
+    Future<Object?> Function() action,
+    String success,
+  ) async {
     try {
       final result = await action();
-      message(result == false
-          ? 'Action conservée hors connexion et à synchroniser.'
-          : success);
+      message(
+        result == false
+            ? 'Action conservée hors connexion et à synchroniser.'
+            : success,
+      );
       await _load();
     } on DioException catch (e) {
       message(apiError(e));
@@ -192,6 +204,19 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
     }
   }
 
+  Future<void> addDispensationFlow() async {
+    if (organizationId == null) return;
+    final completed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => NewDispensationFlowPage(
+          organizationId: organizationId!,
+          service: service,
+        ),
+      ),
+    );
+    if (completed == true) await _load();
+  }
+
   @override
   Widget build(BuildContext c) => Scaffold(
     drawer: const AppNavigationDrawer(),
@@ -213,33 +238,11 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
           : () => switch (tabs.index) {
               0 => addPatient(),
               1 => addPrescription(),
-              _ => addDispensation(),
+              _ => addDispensationFlow(),
             },
     ),
     body: Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: DropdownButtonFormField<String>(
-            initialValue: organizationId,
-            decoration: const InputDecoration(
-              labelText: 'Organisation',
-              prefixIcon: Icon(Icons.apartment_outlined),
-            ),
-            items: organizations
-                .map(
-                  (o) => DropdownMenuItem(
-                    value: '${o['id']}',
-                    child: Text('${o['name']}'),
-                  ),
-                )
-                .toList(),
-            onChanged: (v) {
-              organizationId = v;
-              _load();
-            },
-          ),
-        ),
         if (pending > 0)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -392,6 +395,646 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
             },
           ),
         );
+}
+
+class NewDispensationFlowPage extends StatefulWidget {
+  const NewDispensationFlowPage({
+    super.key,
+    required this.organizationId,
+    required this.service,
+  });
+
+  final String organizationId;
+  final ClinicalSupplyService service;
+
+  @override
+  State<NewDispensationFlowPage> createState() =>
+      _NewDispensationFlowPageState();
+}
+
+class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
+  final _pages = PageController();
+  final _picker = ImagePicker();
+  final _quantity = TextEditingController();
+  Map<String, List<Map<String, dynamic>>> _options = const {};
+  final List<Map<String, dynamic>> _items = [];
+  int _step = 0;
+  bool _loading = true;
+  bool _submitting = false;
+  String? _patientId;
+  String? _siteId;
+  String? _productId;
+  String? _attachmentPath;
+  String? _attachmentName;
+  Uint8List? _attachmentPreview;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    _quantity.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final options = await widget.service.options(widget.organizationId);
+      if (!mounted) return;
+      setState(() {
+        _options = options;
+        if (options['sites']?.length == 1) {
+          _siteId = '${options['sites']!.first['id']}';
+        }
+      });
+    } catch (_) {
+      _notice('Impossible de charger les données de la formation sanitaire.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _notice(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  bool _stepComplete(int step) => switch (step) {
+    0 => _patientId != null && _siteId != null,
+    1 => _attachmentPath != null,
+    2 => _items.isNotEmpty,
+    _ => true,
+  };
+
+  Future<void> _go(int target) async {
+    final firstIncomplete = target > _step
+        ? [
+            for (var step = _step; step < target; step++) step,
+          ].where((step) => !_stepComplete(step)).firstOrNull
+        : null;
+    if (firstIncomplete != null) {
+      _notice(switch (firstIncomplete) {
+        0 => 'Sélectionnez un patient et une formation sanitaire.',
+        1 => 'Photographiez ou sélectionnez l’ordonnance.',
+        _ => 'Ajoutez au moins un produit à dispenser.',
+      });
+      await _pages.animateToPage(
+        firstIncomplete,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+      if (mounted) setState(() => _step = firstIncomplete);
+      return;
+    }
+    setState(() => _step = target);
+    await _pages.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Future<void> _capture(ImageSource source) async {
+    final selected = await _picker.pickImage(
+      source: source,
+      imageQuality: 88,
+      maxWidth: 2200,
+    );
+    if (selected == null) return;
+    final path = await persistPrivateAttachment(selected);
+    final preview = await selected.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _attachmentPath = path;
+      _attachmentName = selected.name;
+      _attachmentPreview = preview;
+    });
+  }
+
+  Future<void> _createPatient() async {
+    final data = await showAppFormSheet<Map<String, dynamic>>(
+      context: context,
+      title: 'Nouveau patient',
+      description: 'Créez le dossier dans votre formation sanitaire.',
+      builder: (_) => const PatientForm(),
+    );
+    if (data == null) return;
+    data['site_id'] = _siteId;
+    final saved = await widget.service.createPatient(
+      widget.organizationId,
+      data,
+    );
+    if (!saved) {
+      final localPatient = Map<String, dynamic>.from(data)
+        ..['is_active'] = true
+        ..['offline_pending'] = true;
+      setState(() {
+        _options = {
+          ..._options,
+          'patients': [...?_options['patients'], localPatient],
+        };
+        _patientId = '${data['id']}';
+      });
+      _notice(
+        'Patient conservé hors connexion. Vous pouvez poursuivre la dispensation.',
+      );
+      return;
+    }
+    await _load();
+    final match = _options['patients']?.where(
+      (patient) => patient['client_reference'] == data['client_reference'],
+    );
+    if (match != null && match.isNotEmpty && mounted) {
+      setState(() => _patientId = '${match.first['id']}');
+    }
+  }
+
+  void _addProduct() {
+    final quantity = double.tryParse(_quantity.text.replaceAll(',', '.'));
+    if (_productId == null || quantity == null || quantity <= 0) {
+      _notice('Sélectionnez un produit et une quantité valide.');
+      return;
+    }
+    final product = _options['products']!.firstWhere(
+      (value) => '${value['id']}' == _productId,
+    );
+    setState(() {
+      _items.add({
+        'product_id': _productId,
+        'quantity': quantity,
+        'name': product['name'],
+      });
+      _productId = null;
+      _quantity.clear();
+    });
+  }
+
+  Future<void> _scanProduct() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const _ProductBarcodeScannerPage()),
+    );
+    if (code == null || !mounted) return;
+
+    final products = _options['products'] ?? const [];
+    Map<String, dynamic>? matched;
+    for (final product in products) {
+      final primaryCode = '${product['code'] ?? ''}'.trim();
+      final codes = (product['codes'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((value) => '${value['value'] ?? ''}'.trim());
+      if (primaryCode == code || codes.contains(code)) {
+        matched = product;
+        break;
+      }
+    }
+
+    if (matched == null) {
+      _notice(
+        'Ce code-barres ne correspond à aucun produit autorisé pour ce projet.',
+      );
+      return;
+    }
+    setState(() => _productId = '${matched!['id']}');
+    _notice('${matched['name']} sélectionné.');
+  }
+
+  Future<void> _submit() async {
+    if (!_stepComplete(2) || _submitting) return;
+    setState(() => _submitting = true);
+    try {
+      final online = await widget.service.dispense(widget.organizationId, {
+        'reference': 'DIS-${DateTime.now().millisecondsSinceEpoch}',
+        'patient_id': _patientId,
+        'site_id': _siteId,
+        'dispensed_at': DateTime.now().toUtc().toIso8601String(),
+        'allow_partial': false,
+        '_attachment_path': _attachmentPath,
+        '_attachment_name': _attachmentName ?? 'ordonnance.jpg',
+        'items': _items
+            .map(
+              (item) => {
+                'product_id': item['product_id'],
+                'quantity': item['quantity'],
+              },
+            )
+            .toList(),
+      });
+      if (!mounted) return;
+      _notice(
+        online
+            ? 'Dispensation enregistrée avec succès.'
+            : 'Dispensation sécurisée hors connexion, en attente de synchronisation.',
+      );
+      Navigator.pop(context, true);
+    } on DioException catch (error) {
+      final response = error.response?.data;
+      _notice(
+        response is Map && response['message'] != null
+            ? '${response['message']}'
+            : 'La dispensation n’a pas pu être enregistrée.',
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Nouvelle dispensation')),
+    body: _loading
+        ? const Center(child: CircularProgressIndicator())
+        : Column(
+            children: [
+              _WorkflowSteps(step: _step, onTap: _go),
+              Expanded(
+                child: PageView(
+                  controller: _pages,
+                  onPageChanged: (target) {
+                    if (target > _step && !_stepComplete(_step)) {
+                      _go(_step);
+                    } else {
+                      setState(() => _step = target);
+                    }
+                  },
+                  children: [
+                    _patientStep(),
+                    _prescriptionStep(),
+                    _productsStep(),
+                    _summaryStep(),
+                  ],
+                ),
+              ),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      if (_step > 0)
+                        Expanded(
+                          child: AppButton.secondary(
+                            label: 'Précédent',
+                            icon: Icons.arrow_back_rounded,
+                            onPressed: () => _go(_step - 1),
+                          ),
+                        ),
+                      if (_step > 0) const SizedBox(width: 12),
+                      Expanded(
+                        child: _step == 3
+                            ? AppButton.validate(
+                                label: 'Valider la dispensation',
+                                loading: _submitting,
+                                onPressed: _submit,
+                              )
+                            : AppButton.primary(
+                                label: 'Continuer',
+                                trailingIcon: true,
+                                icon: Icons.arrow_forward_rounded,
+                                onPressed: () => _go(_step + 1),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+  );
+
+  Widget _patientStep() => _stepBody(
+    'Patient',
+    'Recherchez un patient existant ou créez un nouveau dossier.',
+    [
+      DropdownButtonFormField<String>(
+        initialValue: _siteId,
+        decoration: const InputDecoration(labelText: 'Formation sanitaire'),
+        items: (_options['sites'] ?? const [])
+            .map(
+              (site) => DropdownMenuItem(
+                value: '${site['id']}',
+                child: Text(
+                  '${site['health_facility']?['name'] ?? site['name']}',
+                ),
+              ),
+            )
+            .toList(),
+        onChanged: (value) => setState(() => _siteId = value),
+      ),
+      const SizedBox(height: 14),
+      DropdownButtonFormField<String>(
+        initialValue: _patientId,
+        decoration: const InputDecoration(labelText: 'Patient'),
+        items: (_options['patients'] ?? const [])
+            .map(
+              (patient) => DropdownMenuItem(
+                value: '${patient['id']}',
+                child: Text(
+                  '${patient['code']} · ${patient['last_name']} ${patient['first_name']}',
+                ),
+              ),
+            )
+            .toList(),
+        onChanged: (value) => setState(() => _patientId = value),
+      ),
+      const SizedBox(height: 14),
+      AppButton.add(
+        label: 'Nouveau patient',
+        expanded: true,
+        onPressed: _siteId == null ? null : _createPatient,
+      ),
+    ],
+  );
+
+  Widget _prescriptionStep() => _stepBody(
+    'Scanner / Photographier l’ordonnance',
+    'La photo est conservée dans l’espace privé de PharmaCare.',
+    [
+      Container(
+        height: 280,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: _attachmentPreview == null
+            ? const Center(
+                child: Icon(
+                  Icons.document_scanner_outlined,
+                  size: 72,
+                  color: AppTheme.muted,
+                ),
+              )
+            : Image.memory(_attachmentPreview!, fit: BoxFit.contain),
+      ),
+      const SizedBox(height: 14),
+      Row(
+        children: [
+          Expanded(
+            child: AppButton.primary(
+              label: 'Caméra',
+              icon: Icons.camera_alt_outlined,
+              onPressed: () => _capture(ImageSource.camera),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: AppButton.secondary(
+              label: 'Galerie',
+              icon: Icons.image_outlined,
+              onPressed: () => _capture(ImageSource.gallery),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+
+  Widget _productsStep() => _stepBody(
+    'Produits à dispenser',
+    'Les lots seront attribués automatiquement selon FEFO.',
+    [
+      AppButton.secondary(
+        label: 'Scanner un code-barres',
+        icon: Icons.qr_code_scanner_rounded,
+        expanded: true,
+        onPressed: _scanProduct,
+      ),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(
+        initialValue: _productId,
+        decoration: const InputDecoration(labelText: 'Produit'),
+        items: (_options['products'] ?? const [])
+            .map(
+              (product) => DropdownMenuItem(
+                value: '${product['id']}',
+                child: Text('${product['code']} · ${product['name']}'),
+              ),
+            )
+            .toList(),
+        onChanged: (value) => setState(() => _productId = value),
+      ),
+      const SizedBox(height: 12),
+      TextField(
+        controller: _quantity,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(labelText: 'Quantité'),
+      ),
+      const SizedBox(height: 12),
+      AppButton.add(
+        label: 'Ajouter le produit',
+        expanded: true,
+        onPressed: _addProduct,
+      ),
+      const SizedBox(height: 16),
+      ..._items.asMap().entries.map(
+        (entry) => Card(
+          child: ListTile(
+            title: Text('${entry.value['name']}'),
+            subtitle: Text('Quantité : ${entry.value['quantity']}'),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppTheme.red),
+              onPressed: () => setState(() => _items.removeAt(entry.key)),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _summaryStep() {
+    final patient = (_options['patients'] ?? const []).where(
+      (value) => '${value['id']}' == _patientId,
+    );
+    return _stepBody('Résumé', 'Vérifiez les informations avant validation.', [
+      ListTile(
+        leading: const Icon(Icons.person_outline),
+        title: const Text('Patient'),
+        subtitle: Text(
+          patient.isEmpty
+              ? '—'
+              : '${patient.first['last_name']} ${patient.first['first_name']}',
+        ),
+      ),
+      ListTile(
+        leading: const Icon(Icons.description_outlined),
+        title: const Text('Ordonnance'),
+        subtitle: Text(_attachmentName ?? 'Photo enregistrée'),
+      ),
+      ListTile(
+        leading: const Icon(Icons.medication_outlined),
+        title: const Text('Produits'),
+        subtitle: Text(
+          '${_items.length} produit(s) · ${_items.fold<double>(0, (sum, item) => sum + (item['quantity'] as num).toDouble())} unité(s)',
+        ),
+      ),
+      const Card(
+        child: Padding(
+          padding: EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Icon(Icons.verified_user_outlined, color: AppTheme.blue),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Les lots sont contrôlés et sortis selon la règle FEFO.',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _stepBody(String title, String subtitle, List<Widget> children) =>
+      ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          Text(subtitle, style: const TextStyle(color: AppTheme.muted)),
+          const SizedBox(height: 20),
+          ...children,
+        ],
+      );
+}
+
+class _WorkflowSteps extends StatelessWidget {
+  const _WorkflowSteps({required this.step, required this.onTap});
+  final int step;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+    child: Row(
+      children: List.generate(4, (index) {
+        final active = index == step;
+        final done = index < step;
+        return Expanded(
+          child: InkWell(
+            onTap: () => onTap(index),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 15,
+                    backgroundColor: done
+                        ? AppTheme.green
+                        : active
+                        ? AppTheme.orange
+                        : AppTheme.border,
+                    child: done
+                        ? const Icon(Icons.check, color: Colors.white, size: 17)
+                        : Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              color: active ? Colors.white : AppTheme.muted,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    const [
+                      'Patient',
+                      'Ordonnance',
+                      'Dispensation',
+                      'Résumé',
+                    ][index],
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: active ? AppTheme.orange : AppTheme.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    ),
+  );
+}
+
+class _ProductBarcodeScannerPage extends StatefulWidget {
+  const _ProductBarcodeScannerPage();
+
+  @override
+  State<_ProductBarcodeScannerPage> createState() =>
+      _ProductBarcodeScannerPageState();
+}
+
+class _ProductBarcodeScannerPageState
+    extends State<_ProductBarcodeScannerPage> {
+  bool _handled = false;
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_handled) return;
+    final value = capture.barcodes
+        .map((barcode) => barcode.rawValue?.trim())
+        .whereType<String>()
+        .where((code) => code.isNotEmpty)
+        .firstOrNull;
+    if (value == null) return;
+    _handled = true;
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Scanner un produit')),
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        MobileScanner(onDetect: _onDetect),
+        Center(
+          child: Container(
+            width: 270,
+            height: 170,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppTheme.orange, width: 3),
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+        const SafeArea(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Card(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  child: Text(
+                    'Placez le code-barres du produit dans le cadre.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class Status extends StatelessWidget {
@@ -627,8 +1270,7 @@ class _DispensationFormState extends State<DispensationForm> {
 class ClinicalValidationForm extends StatefulWidget {
   const ClinicalValidationForm({super.key});
   @override
-  State<ClinicalValidationForm> createState() =>
-      _ClinicalValidationFormState();
+  State<ClinicalValidationForm> createState() => _ClinicalValidationFormState();
 }
 
 class _ClinicalValidationFormState extends State<ClinicalValidationForm> {
@@ -646,7 +1288,9 @@ class _ClinicalValidationFormState extends State<ClinicalValidationForm> {
       if (decision == 'approve' &&
           (!protocol || !dosage || !contraindications)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Confirmez les trois contrôles cliniques.')),
+          const SnackBar(
+            content: Text('Confirmez les trois contrôles cliniques.'),
+          ),
         );
         return;
       }

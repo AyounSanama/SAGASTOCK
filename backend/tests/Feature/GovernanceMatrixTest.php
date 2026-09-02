@@ -95,7 +95,10 @@ class GovernanceMatrixTest extends TestCase
         $this->getJson('/api/v1/assignable-roles')->assertForbidden();
 
         Sanctum::actingAs($this->actor('project_admin', 'project', $project->id));
-        $this->getJson('/api/v1/assignable-roles')->assertForbidden();
+        $this->getJson('/api/v1/assignable-roles')
+            ->assertOk()
+            ->assertJsonCount(1, 'roles')
+            ->assertJsonPath('roles.0.code', 'site_admin');
 
         Sanctum::actingAs($this->actor('site_admin', 'site', $site->id));
         $this->getJson('/api/v1/assignable-roles')
@@ -188,10 +191,10 @@ class GovernanceMatrixTest extends TestCase
         $projectMenu = collect($navigation->mobileItems(
             $this->actor('project_admin', 'project', $project->id)
         ))->pluck('key');
-        foreach (['dashboard', 'projects', 'standard-lists', 'profile'] as $key) {
+        foreach (['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'profile'] as $key) {
             $this->assertTrue($projectMenu->contains($key), "Project menu is missing {$key}");
         }
-        foreach (['products', 'stocks', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'synchronization', 'configuration', 'organizations', 'missions', 'funding', 'facilities', 'sites', 'users', 'inventories', 'orders', 'settings', 'project_settings', 'site_settings', 'activity_logs'] as $key) {
+        foreach (['products', 'stocks', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'synchronization', 'configuration', 'organizations', 'missions', 'funding', 'sites', 'inventories', 'orders', 'settings', 'project_settings', 'site_settings', 'activity_logs'] as $key) {
             $this->assertFalse($projectMenu->contains($key), "Project menu must not contain {$key}");
         }
 
@@ -324,7 +327,7 @@ class GovernanceMatrixTest extends TestCase
         $this->assertFalse($siteWidgets->contains('users_active'));
     }
 
-    public function test_hidden_user_api_is_unavailable_to_coordination_and_project_admin_in_v1(): void
+    public function test_fosa_account_api_is_available_only_to_project_admin_in_v1(): void
     {
         [$organization, $project, , $site] = $this->hierarchy('U');
         $projectRole = Role::where('code', 'project_admin')->firstOrFail();
@@ -346,7 +349,7 @@ class GovernanceMatrixTest extends TestCase
         $this->postJson('/api/v1/users', [
             'name' => 'Admin Site Projet', 'email' => 'site.by.project@example.org',
             'role_id' => $siteRole->id, 'scope_type' => 'site', 'scope_id' => $site->id,
-        ])->assertForbidden();
+        ])->assertCreated()->assertJsonPath('user.roles.0.code', 'site_admin');
         $this->postJson('/api/v1/users', [
             'name' => 'Projet Interdit', 'email' => 'project.forbidden@example.org',
             'role_id' => $projectRole->id, 'scope_type' => 'project', 'scope_id' => $project->id,
@@ -360,12 +363,12 @@ class GovernanceMatrixTest extends TestCase
         ])->assertForbidden();
     }
 
-    public function test_project_admin_cannot_open_hidden_user_form_in_v1(): void
+    public function test_project_admin_can_open_fosa_user_workspace_in_v1(): void
     {
         [, $project] = $this->hierarchy('F');
         $projectAdmin = $this->actor('project_admin', 'project', $project->id);
 
-        $this->actingAs($projectAdmin)->get('/users')->assertForbidden();
+        $this->actingAs($projectAdmin)->get('/users')->assertOk();
     }
 
     public function test_coordination_admin_cannot_use_hidden_user_sidebar_module_in_v1(): void
@@ -397,7 +400,7 @@ class GovernanceMatrixTest extends TestCase
         $this->assertDatabaseMissing('users', ['email' => 'brice.site@example.org']);
     }
 
-    public function test_project_admin_cannot_create_site_account_through_hidden_user_module_in_v1(): void
+    public function test_project_admin_can_create_site_account_through_fosa_user_module_in_v1(): void
     {
         [$organization, $project, $facility, $site] = $this->hierarchy('WEB-PROJECT');
         $projectAdmin = $this->actor('project_admin', 'project', $project->id);
@@ -409,12 +412,12 @@ class GovernanceMatrixTest extends TestCase
             'organization_id' => $organization->id, 'mission_id' => $project->mission_id,
             'project_id' => $project->id, 'health_facility_id' => $facility->id,
             'dispensing_site_id' => $site->id,
-        ])->assertForbidden();
+        ])->assertRedirect();
 
-        $this->assertDatabaseMissing('users', ['email' => 'claire.site@example.org']);
+        $this->assertDatabaseHas('users', ['email' => 'claire.site@example.org']);
     }
 
-    public function test_hidden_user_module_refuses_out_of_scope_site_account_creation_in_v1(): void
+    public function test_fosa_user_module_hides_out_of_scope_site_account_creation_in_v1(): void
     {
         [$organizationA, $projectA] = $this->hierarchy('WEB-CHAIN-A');
         [$organizationB, $projectB, $facilityB, $siteB] = $this->hierarchy('WEB-CHAIN-B');
@@ -427,7 +430,7 @@ class GovernanceMatrixTest extends TestCase
             'organization_id' => $organizationB->id, 'mission_id' => $projectB->mission_id,
             'project_id' => $projectB->id, 'health_facility_id' => $facilityB->id,
             'dispensing_site_id' => $siteB->id,
-        ])->assertForbidden();
+        ])->assertNotFound();
 
         $this->assertDatabaseMissing('users', ['email' => 'outside.chain@example.org']);
         $this->assertNotSame($organizationA->id, $organizationB->id);

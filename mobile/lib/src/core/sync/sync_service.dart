@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../connectivity/connectivity_service.dart';
 import '../database/app_database.dart';
 import '../network/api_client.dart';
+import 'offline_request_data.dart';
 
 typedef OperationSender = Future<void> Function(OfflineOperation operation);
 
@@ -124,7 +125,9 @@ class SyncService {
     }
     await _client.dio.request<void>(
       operation.endpoint,
-      data: jsonDecode(operation.payloadJson),
+      data: await prepareOfflineRequestData(
+        (jsonDecode(operation.payloadJson) as Map).cast<String, dynamic>(),
+      ),
       options: Options(
         method: operation.method.toUpperCase(),
         headers: {

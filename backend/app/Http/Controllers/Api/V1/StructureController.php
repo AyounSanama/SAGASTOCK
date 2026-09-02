@@ -25,14 +25,15 @@ class StructureController extends Controller
     public function index(Request $request, Organization $organization): JsonResponse
     {
         $this->organization($request, $organization);
+        $facilityIds = $this->scopes->facilityIds($request->user());
         return response()->json([
-            'facilities' => $organization->healthFacilities()->with([
+            'facilities' => $organization->healthFacilities()->whereIn('id', $facilityIds)->with([
                 'mission.country', 'projects:id,name', 'departments', 'archivedDepartments',
                 'pharmacies', 'archivedPharmacies', 'sites.department', 'sites.pharmacy', 'archivedSites',
             ])->when($request->string('search')->toString(), fn ($query, $search) => $query
                 ->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
                 ->orderBy('name')->paginate(20),
-            'archived_facilities' => $organization->healthFacilities()->onlyTrashed()->latest('deleted_at')->get(),
+            'archived_facilities' => $organization->healthFacilities()->onlyTrashed()->whereIn('id', $facilityIds)->latest('deleted_at')->get(),
             'module_activations' => ModuleActivation::where(function ($query) use ($organization) {
                 $query->where(fn ($q) => $q->where('target_type', 'organization')->where('target_id', $organization->id))
                     ->orWhere(fn ($q) => $q->where('target_type', 'project')->whereIn('target_id', $organization->projects()->pluck('id')))
@@ -180,7 +181,11 @@ class StructureController extends Controller
     private function facility(Request $request, Organization $organization, HealthFacility $facility): void
     {
         $this->organization($request, $organization);
-        abort_unless($facility->organization_id === $organization->id, 404);
+        abort_unless(
+            $facility->organization_id === $organization->id
+                && $this->scopes->facilityIds($request->user())->contains($facility->id),
+            404,
+        );
     }
 
     private function child(Request $request, Organization $organization, HealthFacility $facility, Model $child): void
@@ -202,7 +207,15 @@ class StructureController extends Controller
             'is_active' => ['sometimes', 'boolean'],
         ]);
         if (!empty($data['mission_id'])) abort_unless(Mission::whereKey($data['mission_id'])->where('organization_id', $organization->id)->exists(), 422);
-        if (!empty($data['project_ids'])) abort_unless(Project::whereIn('id', $data['project_ids'])->where('organization_id', $organization->id)->count() === count(array_unique($data['project_ids'])), 422);
+        if (!empty($data['project_ids'])) {
+            $projectIds = collect($data['project_ids'])->unique();
+            abort_unless(
+                Project::whereIn('id', $projectIds)->where('organization_id', $organization->id)->count() === $projectIds->count()
+                    && $projectIds->every(fn (string $id) => $this->scopes->projectIds($request->user())->contains($id)),
+                422,
+                'Un projet sélectionné ne fait pas partie de votre périmètre.',
+            );
+        }
         return $data;
     }
 

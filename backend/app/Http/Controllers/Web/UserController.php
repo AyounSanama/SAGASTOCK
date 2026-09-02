@@ -170,6 +170,9 @@ class UserController extends Controller
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
+            'first_name' => ['nullable', 'string', 'max:80'],
+            'last_name' => ['nullable', 'string', 'max:80'],
+            'username' => ['nullable', 'alpha_dash', 'max:80', Rule::unique('users')->ignore($user->id)],
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:40'],
             'is_active' => ['nullable', 'boolean'],
@@ -188,6 +191,9 @@ class UserController extends Controller
         $old = $user->only(['name', 'email', 'phone', 'is_active']);
         $user->update([
             'name' => $data['name'],
+            'first_name' => $data['first_name'] ?? null,
+            'last_name' => $data['last_name'] ?? null,
+            'username' => $data['username'] ?? null,
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'is_active' => $request->boolean('is_active'),

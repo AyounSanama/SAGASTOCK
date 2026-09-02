@@ -228,6 +228,8 @@ abstract final class ApplicationAccess {
       'project_admin' => const {
         '/home',
         '/projects',
+        '/health-facilities',
+        '/users',
         '/standard-lists',
         '/profile',
       },
@@ -272,6 +274,8 @@ abstract final class ApplicationAccess {
       'project_admin' => const {
         'dashboard',
         'projects',
+        'facilities',
+        'users',
         'standard-lists',
         'profile',
       },
@@ -297,6 +301,7 @@ abstract final class ApplicationAccess {
                 ? switch (raw['key']) {
                     'projects' => 'Mon projet',
                     'standard-lists' => 'Liste standard',
+                    'users' => 'Équipe FOSA',
                     _ => raw['label']?.toString() ?? '',
                   }
                 : raw['label']?.toString() ?? '',

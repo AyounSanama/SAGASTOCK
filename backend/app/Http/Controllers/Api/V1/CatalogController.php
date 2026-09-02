@@ -347,14 +347,33 @@ return $d;
 
     private function productData(Request $r, Organization $o, ?Product $m = null): array
     {
-        $d = $r->validate(['category_id' => ['nullable', 'uuid', 'exists:catalog_references,id'], 'therapeutic_family_id' => ['nullable', 'uuid', 'exists:catalog_references,id'], 'base_unit_id' => ['nullable', 'uuid', 'exists:catalog_references,id'], 'dosage_form_id' => ['nullable', 'uuid', 'exists:catalog_references,id'], 'administration_route_id' => ['nullable', 'uuid', 'exists:catalog_references,id'], 'code' => ['required', 'alpha_dash', 'max:60', Rule::unique('products')->where('organization_id', $o->id)->ignore($m?->id)], 'name' => ['required', 'string', 'max:190'], 'generic_name' => ['nullable', 'string', 'max:190'], 'product_type' => ['required', Rule::in(['medicine', 'consumable', 'device', 'reagent', 'program_input', 'other'])], 'strength' => ['nullable', 'string', 'max:100'], 'description' => ['nullable', 'string', 'max:3000'], 'is_controlled' => ['sometimes', 'boolean'], 'is_active' => ['sometimes', 'boolean'], 'codes' => ['nullable', 'array'], 'codes.*.code_type' => ['required', Rule::in(['internal', 'barcode', 'qr', 'gs1'])], 'codes.*.value' => ['required', 'string', 'max:190', 'distinct'], 'codes.*.is_primary' => ['sometimes', 'boolean']]);
+        $d = $r->validate([
+            'category_id' => ['nullable', 'uuid', 'exists:catalog_references,id'],
+            'therapeutic_family_id' => ['nullable', 'uuid', 'exists:catalog_references,id'],
+            'base_unit_id' => ['nullable', 'uuid', 'exists:catalog_references,id'],
+            'dosage_form_id' => ['nullable', 'uuid', 'exists:catalog_references,id'],
+            'administration_route_id' => ['nullable', 'uuid', 'exists:catalog_references,id'],
+            'code' => ['required', 'alpha_dash', 'max:60', Rule::unique('products')->where('organization_id', $o->id)->ignore($m?->id)],
+            'name' => ['required', 'string', 'max:190'],
+            'generic_name' => ['nullable', 'string', 'max:190'],
+            'product_type' => ['required', Rule::in(['medicine', 'consumable', 'device', 'reagent', 'program_input', 'other'])],
+            'strength' => ['nullable', 'string', 'max:100'],
+            'packaging' => ['nullable', 'string', 'max:190'],
+            'description' => ['nullable', 'string', 'max:3000'],
+            'is_controlled' => ['sometimes', 'boolean'],
+            'is_active' => ['sometimes', 'boolean'],
+            'codes' => ['nullable', 'array'],
+            'codes.*.code_type' => ['required', Rule::in(['internal', 'barcode', 'qr', 'gs1'])],
+            'codes.*.value' => ['required', 'string', 'max:190', 'distinct'],
+            'codes.*.is_primary' => ['sometimes', 'boolean'],
+        ]);
         foreach (['category_id' => 'category', 'therapeutic_family_id' => 'therapeutic_family', 'base_unit_id' => 'unit', 'dosage_form_id' => 'dosage_form', 'administration_route_id' => 'administration_route'] as $field => $type) {
             if (! empty($d[$field])) {
                 abort_unless(CatalogReference::whereKey($d[$field])->where('reference_type', $type)->where(fn ($q) => $q->whereNull('organization_id')->orWhere('organization_id', $o->id))->exists(), 422, "Référence $field invalide.");
             }
         }
 
-return $d;
+        return $d;
     }
 
     private function batchData(Request $r, Organization $o, ?Batch $m = null): array

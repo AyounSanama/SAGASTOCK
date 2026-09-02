@@ -73,10 +73,14 @@ class DashboardService
                 GovernanceService::PROJECT_ADMIN => $widget['key'] === 'projects',
                 default => true,
             })
-            ->map(function (array $widget) use ($stats, $isCoordination) {
+            ->map(function (array $widget) use ($stats, $isCoordination, $roleCode) {
                 if ($isCoordination && $widget['key'] === 'missions') {
                     $widget['label'] = 'Ma Coordination';
                     $widget['caption'] = 'Coordination pays affectée';
+                }
+                if ($roleCode === GovernanceService::PROJECT_ADMIN && $widget['key'] === 'projects') {
+                    $widget['label'] = 'Mon projet';
+                    $widget['caption'] = 'Projet affecté';
                 }
 
                 return [...$widget, 'value' => $stats[$widget['key']] ?? 0];

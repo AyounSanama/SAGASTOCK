@@ -9,7 +9,8 @@
         <div class="field"><label>Périmètre géographique</label><select name="geographic_access_type" id="geographic-access-type" required><option value="single_country" @selected(old('geographic_access_type')==='single_country')>Unipays</option><option value="multi_country" @selected(old('geographic_access_type')==='multi_country')>Multipays</option></select></div>
         <div class="field full"><label>Pays autorisé(s)</label><select name="country_ids[]" id="organization-countries" required>@foreach($countries as $country)<option value="{{ $country->id }}" @selected(in_array($country->id, old('country_ids', [])))>{{ $country->name }} ({{ $country->iso2 }})</option>@endforeach</select><small class="meta">Sélectionnez le pays autorisé pour cette organisation.</small></div>
     @else
-        <div class="field"><label>Code pays</label><input name="country_code" maxlength="2" value="{{ old('country_code', $organization?->country_code) }}" placeholder="CM"></div>
+        <div class="field"><label>Périmètre géographique</label><input value="{{ $organization?->geographic_access_type === 'multi_country' ? 'Multipays' : 'Unipays' }}" readonly><small class="meta">Le périmètre est défini lors de la création afin de préserver les coordinations existantes.</small></div>
+        <div class="field full"><label>Pays autorisé(s)</label><input value="{{ $organization?->countries?->pluck('name')->join(', ') ?: ($organization?->country_code ?: 'Non renseigné') }}" readonly></div>
     @endif
     <div class="field full"><label>Adresse</label><textarea name="address" placeholder="Adresse complète">{{ old('address', $organization?->address) }}</textarea></div>
     <label class="switch-field full"><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $organization?->is_active ?? true))><span><strong>Organisation active</strong><br><small class="meta">Autorise son utilisation dans les opérations courantes.</small></span></label>

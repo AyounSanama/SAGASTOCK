@@ -1,0 +1,5 @@
+# ninja log v5
+48	653	8099760341727281	CMakeFiles/jni.dir/include/dart_api_dl.c.o	88d8e17ac9e87fb6
+1	877	8099760345516594	CMakeFiles/jni.dir/dartjni.c.o	a498bcfc10ccce77
+129	1567	8099760352326170	CMakeFiles/jni.dir/third_party/global_jni_env.c.o	104fe41e2f16d1c7
+1568	2439	8099760360526164	D:/Mes projets/Application SAGO M/SAGASTOCK/mobile/build/jni/intermediates/cxx/Debug/6s2e4w5s/obj/x86_64/libdartjni.so	5a08fbc0ca119367

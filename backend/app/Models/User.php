@@ -68,6 +68,8 @@ class User extends Authenticatable
             'products.view' => ['products.view', 'catalog.view'],
             'sites.view' => ['sites.view', 'structures.view'],
             'sites.manage' => ['sites.manage', 'structures.manage'],
+            'structures.view' => ['structures.view', 'health_facilities.view', 'dispensing_sites.view'],
+            'structures.manage' => ['structures.manage', 'health_facilities.manage', 'dispensing_sites.manage'],
             default => [$permission],
         };
     }

@@ -521,6 +521,9 @@ class _CatalogPageState extends State<CatalogPage>
       text: item?['generic_name']?.toString(),
     );
     final strength = TextEditingController(text: item?['strength']?.toString());
+    final packaging = TextEditingController(
+      text: item?['packaging']?.toString(),
+    );
     final barcode = TextEditingController(text: _barcode(item));
     final description = TextEditingController(
       text: item?['description']?.toString(),
@@ -550,6 +553,8 @@ class _CatalogPageState extends State<CatalogPage>
                 _requiredField(code, 'Code interne'),
                 const SizedBox(height: 14),
                 _requiredField(name, 'Désignation'),
+                const SizedBox(height: 14),
+                _requiredField(packaging, 'Conditionnement'),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: generic,
@@ -618,7 +623,11 @@ class _CatalogPageState extends State<CatalogPage>
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: barcode,
-                  decoration: const InputDecoration(labelText: 'Code-barres'),
+                  decoration: const InputDecoration(
+                    labelText: 'Code-barres (optionnel)',
+                    helperText:
+                        'Utilisé par le scanner lors de la dispensation.',
+                  ),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -654,6 +663,7 @@ class _CatalogPageState extends State<CatalogPage>
                         'dosage_form_id': form,
                         'administration_route_id': route,
                         'strength': strength.text.trim(),
+                        'packaging': packaging.text.trim(),
                         'description': description.text.trim(),
                         'is_controlled': controlled,
                         'is_active': active,
@@ -693,6 +703,7 @@ class _CatalogPageState extends State<CatalogPage>
       name,
       generic,
       strength,
+      packaging,
       barcode,
       description,
     ]) {

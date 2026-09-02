@@ -78,21 +78,22 @@ class StructureController extends Controller
     {
         $this->allow($request, 'structures.view');
         $this->organization($request, $organization);
-        $facilityBase = $organization->healthFacilities();
+        $facilityIds = $this->scopes->facilityIds($request->user());
+        $facilityBase = $organization->healthFacilities()->whereIn('id', $facilityIds);
         $facilityStats = [
             'total' => (clone $facilityBase)->count(),
             'active' => (clone $facilityBase)->where('is_active', true)->count(),
             'sites' => Site::whereIn('health_facility_id', (clone $facilityBase)->pluck('id'))->count(),
             'missions' => (clone $facilityBase)->whereNotNull('mission_id')->distinct()->count('mission_id'),
         ];
-        $facilities = $organization->healthFacilities()->with(['mission.country', 'projects:id,name', 'departments', 'archivedDepartments', 'pharmacies.department', 'archivedPharmacies', 'sites.department', 'sites.pharmacy', 'archivedSites'])->withCount('sites')
+        $facilities = $organization->healthFacilities()->whereIn('id', $facilityIds)->with(['mission.country', 'projects:id,name', 'departments', 'archivedDepartments', 'pharmacies.department', 'archivedPharmacies', 'sites.department', 'sites.pharmacy', 'archivedSites'])->withCount('sites')
             ->when($request->string('search')->toString(), fn ($query, $search) => $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
             ->when($request->filled('mission_id'), fn ($query) => $query->where('mission_id', $request->string('mission_id')->toString()))
             ->when($request->filled('facility_type'), fn ($query) => $query->where('facility_type', $request->string('facility_type')->toString()))
             ->when($request->get('status') === 'active', fn ($query) => $query->where('is_active', true))
             ->when($request->get('status') === 'inactive', fn ($query) => $query->where('is_active', false))
             ->orderBy('name')->paginate(10)->withQueryString();
-        $archivedFacilities = $organization->healthFacilities()->onlyTrashed()->latest('deleted_at')->get();
+        $archivedFacilities = $organization->healthFacilities()->onlyTrashed()->whereIn('id', $facilityIds)->latest('deleted_at')->get();
         $activations = ModuleActivation::where(function ($query) use ($organization) {
             $query->where(fn ($q) => $q->where('target_type', 'organization')->where('target_id', $organization->id))
                 ->orWhere(fn ($q) => $q->where('target_type', 'project')->whereIn('target_id', $organization->projects()->pluck('id')))
@@ -104,7 +105,7 @@ class StructureController extends Controller
             'facilityStats' => $facilityStats,
             'archivedFacilities' => $archivedFacilities, 'activations' => $activations,
             'missions' => $organization->missions()->with('country')->orderBy('name')->get(),
-            'projects' => $organization->projects()->orderBy('name')->get(),
+            'projects' => $organization->projects()->whereIn('id', $this->scopes->projectIds($request->user()))->orderBy('name')->get(),
             'moduleCodes' => [
                 'references' => ['name' => 'Gestion des médicaments', 'icon' => '💊', 'description' => 'Catalogue, référentiels et produits médicaux.'],
                 'stocks' => ['name' => 'Stock de médicaments', 'icon' => '▤', 'description' => 'Lots, mouvements, niveaux et traçabilité.'],
@@ -125,7 +126,7 @@ class StructureController extends Controller
         return view('structures.create', [
             'organization' => $organization,
             'missions' => $organization->missions()->with('country')->orderBy('name')->get(),
-            'projects' => $organization->projects()->orderBy('name')->get(),
+            'projects' => $organization->projects()->whereIn('id', $this->scopes->projectIds($request->user()))->orderBy('name')->get(),
         ]);
     }
 
@@ -269,7 +270,7 @@ class StructureController extends Controller
             'care_level'=>['nullable','string','max:50'],'email'=>['nullable','email','max:190'],'phone'=>['nullable','string','max:40'],'address'=>['nullable','string','max:1000'],'is_active'=>['nullable','boolean'],
         ]);
         if(!empty($data['mission_id']))abort_unless(Mission::whereKey($data['mission_id'])->where('organization_id',$organization->id)->exists(),422);
-        if(!empty($data['project_ids']))abort_unless(Project::whereIn('id',$data['project_ids'])->where('organization_id',$organization->id)->count()===count(array_unique($data['project_ids'])),422);
+        if(!empty($data['project_ids'])){$projectIds=collect($data['project_ids'])->unique();abort_unless(Project::whereIn('id',$projectIds)->where('organization_id',$organization->id)->count()===$projectIds->count()&&$projectIds->every(fn(string $id)=>$this->scopes->projectIds($request->user())->contains($id)),422,'Un projet sélectionné ne fait pas partie de votre périmètre.');}
         $data['is_active']=$request->boolean('is_active',true); return $data;
     }
     private function departmentData(Request $request, HealthFacility $facility, ?Department $model=null):array{$data=$request->validate(['code'=>['required','alpha_dash','max:50',Rule::unique('departments')->where('health_facility_id',$facility->id)->ignore($model?->id)],'name'=>['required','string','max:160'],'department_type'=>['required',Rule::in(['clinical','pharmacy','laboratory','logistics','administration','other'])],'is_active'=>['nullable','boolean']]);$data['is_active']=$request->boolean('is_active',true);return $data;}
@@ -277,7 +278,7 @@ class StructureController extends Controller
     private function siteData(Request $request, HealthFacility $facility, ?Site $model=null):array{$data=$request->validate(['department_id'=>['nullable','uuid','exists:departments,id'],'pharmacy_id'=>['nullable','uuid','exists:pharmacies,id'],'code'=>['required','alpha_dash','max:50',Rule::unique('sites')->where('health_facility_id',$facility->id)->ignore($model?->id)],'name'=>['required','string','max:160'],'site_type'=>['required',Rule::in(['stock','dispensing','stock_and_dispensing','quarantine','other'])],'location'=>['nullable','string','max:190'],'is_active'=>['nullable','boolean']]);if(!empty($data['department_id']))abort_unless($facility->departments()->whereKey($data['department_id'])->exists(),422);if(!empty($data['pharmacy_id']))abort_unless($facility->pharmacies()->whereKey($data['pharmacy_id'])->exists(),422);$data['is_active']=$request->boolean('is_active',true);return $data;}
     private function organization(Request $request,Organization $organization):void{abort_unless($this->scopes->organizations($request->user())->whereKey($organization->id)->exists(),404);}
     private function manage(Request $request,Organization $organization):void{$this->allow($request,'structures.manage');$this->organization($request,$organization);}
-    private function manageFacility(Request $request,Organization $organization,HealthFacility $facility):void{$this->manage($request,$organization);abort_unless($facility->organization_id===$organization->id,404);}
+    private function manageFacility(Request $request,Organization $organization,HealthFacility $facility):void{$this->manage($request,$organization);abort_unless($facility->organization_id===$organization->id&&$this->scopes->facilityIds($request->user())->contains($facility->id),404);}
     private function manageChild(Request $request,Organization $organization,HealthFacility $facility,Model $model):void{$this->manageFacility($request,$organization,$facility);abort_unless($model->health_facility_id===$facility->id,404);}
     private function saved(Request $request,Model $model,string $event,string $message):RedirectResponse{$this->audit->record($request,$event,$model,[],$model->toArray());return back()->with('status',$message);}
     private function archiveChild(Request $request,Organization $organization,HealthFacility $facility,Model $model,string $event,string $message):RedirectResponse{$this->manageChild($request,$organization,$facility,$model);$model->update(['is_active'=>false]);$model->delete();return $this->saved($request,$model,$event,$message);}

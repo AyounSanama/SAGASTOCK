@@ -90,6 +90,16 @@ class OrganizationService {
     );
   }
 
+  Future<Map<String, dynamic>> project({
+    required String projectId,
+    required String organizationId,
+  }) => _repository.document(
+    collection: 'project.current',
+    endpoint: '/projects/$projectId',
+    organizationId: organizationId,
+    query: {'project_id': projectId},
+  );
+
   Future<List<Map<String, dynamic>>> organizationCountries(
     String organizationId,
   ) async {
@@ -458,14 +468,11 @@ class OrganizationService {
     int? safetyStockMonths,
     List<String> donorIds = const [],
     List<String> programIds = const [],
+    List<Map<String, dynamic>> donorRecords = const [],
+    List<Map<String, dynamic>> programRecords = const [],
     bool isActive = true,
-  }) => _repository.mutate(
-    collection: 'projects',
-    organizationId: organizationId,
-    endpoint: '/organizations/$organizationId/projects/$projectId',
-    method: 'PUT',
-    remoteId: projectId,
-    payload: {
+  }) {
+    final payload = <String, dynamic>{
       'mission_id': missionId,
       'code': code,
       'name': name,
@@ -478,8 +485,21 @@ class OrganizationService {
       'donor_ids': donorIds,
       'program_ids': programIds,
       'is_active': isActive,
-    },
-  );
+    };
+    return _repository.mutate(
+      collection: 'projects',
+      organizationId: organizationId,
+      endpoint: '/organizations/$organizationId/projects/$projectId',
+      method: 'PUT',
+      remoteId: projectId,
+      payload: payload,
+      optimisticPayload: {
+        ...payload,
+        'donors': donorRecords,
+        'programs': programRecords,
+      },
+    );
+  }
 
   Future<bool> archiveProject({
     required String organizationId,

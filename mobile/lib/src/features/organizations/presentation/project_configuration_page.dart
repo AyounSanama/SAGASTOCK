@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../auth/data/auth_service.dart';
 import 'scoped_funding_page.dart';
 import 'scoped_projects_page.dart';
+import 'my_project_page.dart';
 
 /// Conteneur V1 de l'Admin Coordination : les trois sections sœurs utilisent
 /// les écrans, repositories et formulaires existants.
@@ -47,7 +48,7 @@ class _ProjectConfigurationPageState extends State<ProjectConfigurationPage>
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_role == 'project_admin') {
-      return const ScopedProjectsPage();
+      return const MyProjectPage();
     }
     return Scaffold(
       appBar: AppBar(

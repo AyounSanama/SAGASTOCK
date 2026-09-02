@@ -95,16 +95,16 @@ class UserScopeService
     public function facilityIds(User $user): Collection
     {
         if ($this->isPlatform($user)) {
-            return HealthFacility::pluck('id');
+            return HealthFacility::withTrashed()->pluck('id');
         }
         $role = app(GovernanceService::class)->roleCode($user);
         if ($role === GovernanceService::COORDINATION_ADMIN) {
-            return HealthFacility::whereIn('mission_id', $this->coordinationMissionIds($user))
+            return HealthFacility::withTrashed()->whereIn('mission_id', $this->coordinationMissionIds($user))
                 ->orWhereHas('projects', fn (Builder $q) => $q->whereIn('projects.id', $this->projectIds($user)))
                 ->pluck('id')->unique()->values();
         }
         if ($role === GovernanceService::PROJECT_ADMIN) {
-            return HealthFacility::whereHas('projects', fn (Builder $q) => $q->whereIn('projects.id', $this->directProjectIds($user)))
+            return HealthFacility::withTrashed()->whereHas('projects', fn (Builder $q) => $q->whereIn('projects.id', $this->directProjectIds($user)))
                 ->pluck('id')->unique()->values();
         }
         if (in_array($role, [GovernanceService::SITE_ADMIN, GovernanceService::SITE_USER], true)) {
@@ -112,7 +112,7 @@ class UserScopeService
                 ->pluck('health_facility_id')->filter()->unique()->values();
         }
 
-        return HealthFacility::whereIn('organization_id', $this->organizationIds($user))
+        return HealthFacility::withTrashed()->whereIn('organization_id', $this->organizationIds($user))
             ->orWhereHas('projects', fn (Builder $q) => $q->whereIn('projects.id', $this->directProjectIds($user)))
             ->orWhereHas('sites', fn (Builder $q) => $q->whereIn('sites.id', $this->directSiteIds($user)))
             ->pluck('id')->filter()->unique()->values();

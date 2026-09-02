@@ -32,8 +32,8 @@ class V1ModuleAvailabilityTest extends TestCase
         $this->assertSame('/projects', $coordinationItems->firstWhere('key', 'projects')['path']);
 
         $projectItems = collect($navigation->items($project));
-        $this->assertSame(['dashboard', 'projects', 'standard-lists', 'profile'], $projectItems->pluck('key')->all());
-        $this->assertSame(['Tableau de bord', 'Mon projet', 'Liste standard', 'Mon profil'], $projectItems->pluck('label')->all());
+        $this->assertSame(['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'profile'], $projectItems->pluck('key')->all());
+        $this->assertSame(['Tableau de bord', 'Mon projet', 'Formations sanitaires', 'Équipe FOSA', 'Liste standard', 'Mon profil'], $projectItems->pluck('label')->all());
     }
 
     public function test_hidden_v1_modules_are_refused_without_being_removed(): void
@@ -44,7 +44,7 @@ class V1ModuleAvailabilityTest extends TestCase
         }
 
         $project = $this->actor('project_admin', 'project');
-        foreach (['/missions', '/users', '/products', '/stocks', '/receipts', '/dispensations', '/inventories', '/orders', '/reports', '/synchronization'] as $path) {
+        foreach (['/missions', '/products', '/stocks', '/receipts', '/dispensations', '/inventories', '/orders', '/reports', '/synchronization'] as $path) {
             $this->actingAs($project)->get($path)->assertForbidden();
         }
 

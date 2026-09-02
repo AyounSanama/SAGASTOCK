@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
 import '../network/api_client.dart';
 import 'sync_bootstrap.dart';
+import 'offline_request_data.dart';
 
 class OfflineOperationService {
   OfflineOperationService({
@@ -34,7 +35,7 @@ class OfflineOperationService {
     try {
       await _client.dio.request<void>(
         endpoint,
-        data: payload,
+        data: await prepareOfflineRequestData(payload),
         options: Options(
           method: method.toUpperCase(),
           headers: {

@@ -153,7 +153,7 @@ class _NavigationItem extends StatelessWidget {
 
   String _compactLabel(ApplicationNavigationItem item) => switch (item.key) {
     'dashboard' => 'Accueil',
-    'projects' => 'Projets',
+    'projects' => item.label == 'Mon projet' ? 'Mon projet' : 'Projets',
     'standard-lists' => 'Liste standard',
     'profile' => 'Mon profil',
     _ => item.label,

@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>PharmaCare utilise la photothèque pour sélectionner le logo officiel de l'organisation.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>PharmaCare utilise la caméra pour photographier les ordonnances et scanner les produits.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

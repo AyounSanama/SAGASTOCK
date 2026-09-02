@@ -39,6 +39,8 @@ class HomePage extends StatelessWidget {
           final activities = _maps(data['activities']);
           final projects = _maps(data['recent_projects']);
           final offline = data['offline'] == true;
+          final isProjectAdmin =
+              '${user?['role'] ?? ''}'.toLowerCase() == 'project_admin';
 
           return RefreshIndicator(
             onRefresh: () => DashboardService().load(),
@@ -61,7 +63,7 @@ class HomePage extends StatelessWidget {
                       const _SectionTitle('Actions rapides'),
                       const SizedBox(height: AppSpacing.md),
                       _QuickActions(user: user, navigation: navigation),
-                      if (projects.isNotEmpty) ...[
+                      if (projects.isNotEmpty && !isProjectAdmin) ...[
                         const SizedBox(height: AppSpacing.xl),
                         _RecentProjects(projects: projects),
                       ],

@@ -511,6 +511,20 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                                       safetyStockMonths: safetyStockMonths,
                                       donorIds: selectedDonors.toList(),
                                       programIds: selectedPrograms.toList(),
+                                      donorRecords: donors
+                                          .where(
+                                            (item) => selectedDonors.contains(
+                                              '${item['id']}',
+                                            ),
+                                          )
+                                          .toList(),
+                                      programRecords: programs
+                                          .where(
+                                            (item) => selectedPrograms.contains(
+                                              '${item['id']}',
+                                            ),
+                                          )
+                                          .toList(),
                                       isActive: active,
                                     );
                                   } else {

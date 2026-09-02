@@ -76,6 +76,9 @@ class ApplicationNavigationService
                 if ($role === GovernanceService::PROJECT_ADMIN && $item['key'] === 'standard-lists') {
                     $item['label'] = 'Liste standard';
                 }
+                if ($role === GovernanceService::PROJECT_ADMIN && $item['key'] === 'users') {
+                    $item['label'] = 'Équipe FOSA';
+                }
                 $item['url'] = $this->buildUrl($item['route']);
 
                 return $item;

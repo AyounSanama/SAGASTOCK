@@ -32,6 +32,7 @@ import '../widgets/authorized_module_page.dart';
 import '../access/application_access.dart';
 import '../../features/auth/data/auth_service.dart';
 import '../../features/catalog/presentation/catalog_page.dart';
+import '../../features/catalog/presentation/standard_list_entry_page.dart';
 
 GoRouter createAppRouter({required String initialLocation}) => GoRouter(
   initialLocation: initialLocation,
@@ -174,7 +175,7 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
         ),
         GoRoute(
           path: '/standard-lists',
-          builder: (context, state) => const CatalogPage(initialTab: 2),
+          builder: (context, state) => const StandardListEntryPage(),
         ),
         for (final module in const <(String, String, IconData)>[
           ('/reports', 'Rapports', Icons.assessment_outlined),

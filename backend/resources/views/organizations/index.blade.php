@@ -3,6 +3,11 @@
 @section('title', 'Organisations · PharmaCare')
 @section('page-title', 'Organisations')
 
+@php
+    $isSagoAdmin = app(\App\Services\GovernanceService::class)->roleCode(auth()->user())
+        === \App\Services\GovernanceService::SAGO_ADMIN;
+@endphp
+
 @push('styles')
     <style>
         :root {
@@ -498,6 +503,7 @@
                         <div class="fact">
                             <small>E-mail</small><strong>{{ $organization->email ?: 'Non renseigné' }}</strong></div>
                     </div>
+                    @unless($isSagoAdmin ?? false)
                     <div class="module-links">
                         <a class="module-link" href="{{ route('organizations.missions.index', $organization) }}"><span
                                 class="mi">◎</span>
@@ -525,6 +531,7 @@
                                 class="arrow">›</span>
                         </a>
                     </div>
+                    @endunless
                     <div class="actions">
                         <button class="btn btn-secondary btn-sm" type="button"
                             data-sheet-open="edit-organization-{{ $organization->id }}">✎ Modifier</button>

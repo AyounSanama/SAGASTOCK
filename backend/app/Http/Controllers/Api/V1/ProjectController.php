@@ -39,6 +39,20 @@ class ProjectController extends Controller
         return response()->json($projects);
     }
 
+    public function show(Request $request, Project $project): JsonResponse
+    {
+        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
+
+        return response()->json([
+            'project' => $project->load([
+                'organization:id,code,name',
+                'mission.country:id,iso2,name',
+                'donors:id,code,name',
+                'programs:id,code,name',
+            ]),
+        ]);
+    }
+
     public function setup(Request $request, Organization $organization): JsonResponse
     {
         $this->accessible($request, $organization);

@@ -7,6 +7,7 @@ use App\Models\Donor;
 use App\Models\Mission;
 use App\Models\Organization;
 use App\Models\Program;
+use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -105,6 +106,43 @@ class ProjectProvisioningTest extends TestCase
 
         $this->assertDatabaseMissing('projects', ['code' => 'INVALID']);
         $this->assertDatabaseMissing('users', ['email' => 'invalid@example.org']);
+    }
+
+    public function test_project_update_replaces_funding_relations_and_returns_complete_project(): void
+    {
+        [$actor, $organization, $mission] = $this->coordination();
+        $unicef = Donor::create(['organization_id' => $organization->id, 'code' => 'UNICEF', 'name' => 'UNICEF']);
+        $gffo = Donor::create(['organization_id' => $organization->id, 'code' => 'GFFO', 'name' => 'GFFO']);
+        $nutrition = Program::create(['organization_id' => $organization->id, 'donor_id' => $gffo->id, 'code' => 'NUT', 'name' => 'Nutrition']);
+        $project = Project::create([
+            'organization_id' => $organization->id,
+            'mission_id' => $mission->id,
+            'code' => 'PROJECT_2026',
+            'name' => 'Projet initial',
+            'is_active' => true,
+        ]);
+        $project->donors()->attach($unicef);
+        Sanctum::actingAs($actor);
+
+        $this->putJson("/api/v1/organizations/{$organization->id}/projects/{$project->id}", [
+            'mission_id' => $mission->id,
+            'code' => 'PROJECT_2026',
+            'name' => 'Projet actualisé',
+            'donor_ids' => [$gffo->id],
+            'program_ids' => [$nutrition->id],
+            'order_period_months' => 3,
+            'delivery_lead_time_months' => 2,
+            'safety_stock_months' => 1,
+            'is_active' => true,
+        ])->assertOk()
+            ->assertJsonPath('project.name', 'Projet actualisé')
+            ->assertJsonPath('project.donors.0.id', $gffo->id)
+            ->assertJsonPath('project.programs.0.id', $nutrition->id)
+            ->assertJsonPath('project.order_period_months', 3);
+
+        $this->assertDatabaseMissing('project_donors', ['project_id' => $project->id, 'donor_id' => $unicef->id]);
+        $this->assertDatabaseHas('project_donors', ['project_id' => $project->id, 'donor_id' => $gffo->id]);
+        $this->assertDatabaseHas('program_project', ['project_id' => $project->id, 'program_id' => $nutrition->id]);
     }
 
     /** @return array{User, Organization, Mission} */

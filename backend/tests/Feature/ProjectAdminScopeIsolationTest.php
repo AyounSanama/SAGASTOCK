@@ -63,8 +63,21 @@ class ProjectAdminScopeIsolationTest extends TestCase
         $this->actingAs($admin)->get('/projects')->assertOk()
             ->assertSee('Projet Nutrition')->assertDontSee('Projet Santé Maternelle')->assertDontSee('Projet étranger');
         Sanctum::actingAs($admin);
+        $this->getJson('/api/v1/auth/me')
+            ->assertOk()
+            ->assertJsonPath('user.project_id', $nutrition->id)
+            ->assertJsonPath('user.project.id', $nutrition->id)
+            ->assertJsonPath('user.project.mission.country.id', $country->id);
+        $this->getJson("/api/v1/projects/{$nutrition->id}")
+            ->assertOk()
+            ->assertJsonPath('project.id', $nutrition->id);
+        $this->getJson("/api/v1/projects/{$maternal->id}")->assertNotFound();
         $this->getJson("/api/v1/organizations/{$organization->id}/projects")
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $nutrition->id);
+        $this->getJson("/api/v1/organizations/{$organization->id}/structures")
+            ->assertOk()
+            ->assertJsonCount(1, 'facilities.data')
+            ->assertJsonPath('facilities.data.0.id', $allowedFacility->id);
         $this->getJson("/api/v1/organizations/{$otherOrganization->id}/projects")->assertNotFound();
         $this->assertNotSame($maternal->id, $nutrition->id);
         $this->assertNotSame($foreign->id, $nutrition->id);

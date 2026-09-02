@@ -38,7 +38,8 @@ class ClinicalSupplyService {
   }
 
   Future<bool> createPatient(String id, Map<String, dynamic> data) {
-    data['client_reference'] ??= const Uuid().v4();
+    data['id'] ??= const Uuid().v4();
+    data['client_reference'] ??= data['id'];
     return _sendOrQueue('/organizations/$id/patients', data);
   }
 

@@ -76,12 +76,15 @@ class CatalogService {
         organizationId: organizationId,
       );
 
-  Future<Map<String, dynamic>> projectStandardList(String projectId) =>
-      _repository.document(
-        collection: 'project.standard-list',
-        endpoint: '/projects/$projectId/standard-list',
-        query: {'project_id': projectId},
-      );
+  Future<Map<String, dynamic>> projectStandardList(
+    String projectId, {
+    String? organizationId,
+  }) => _repository.document(
+    collection: 'project.standard-list',
+    endpoint: '/projects/$projectId/standard-list',
+    organizationId: organizationId,
+    query: {'project_id': projectId},
+  );
 
   Future<List<Map<String, dynamic>>> generateProjectStandardList(
     String projectId,

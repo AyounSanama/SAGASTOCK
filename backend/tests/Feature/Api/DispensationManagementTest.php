@@ -32,7 +32,7 @@ class DispensationManagementTest extends TestCase
         $role = Role::create(['code' => 'care_test', 'name' => 'Soins']); $role->permissions()->attach($permissions);
         $user = User::factory()->create(['is_active' => true, 'organization_id' => $organization->id]);
         $user->roles()->attach($role, ['scope_type' => 'organization', 'scope_id' => $organization->id]); Sanctum::actingAs($user);
-        return compact('organization', 'site', 'product', 'early', 'late', 'user');
+        return compact('organization', 'facility', 'site', 'product', 'early', 'late', 'user', 'role');
     }
 
     private function patient(array $c): array
@@ -89,5 +89,66 @@ class DispensationManagementTest extends TestCase
         $this->assertDatabaseHas('stock_movements', ['movement_type' => 'return_in', 'reference_type' => 'dispensation_return']);
         $this->getJson("/api/v1/organizations/{$c['organization']->id}/patients/{$patient['id']}/history")->assertOk()->assertJsonCount(1, 'prescriptions')->assertJsonCount(2, 'dispensations');
         $this->actingAs($c['user'])->get('/dispensations')->assertOk()->assertSee('Ordonnances et validation clinique')->assertSee('DIS-PART');
+    }
+
+    public function test_fosa_account_cannot_access_patients_from_another_site(): void
+    {
+        $c = $this->context();
+        $otherFacility = HealthFacility::create([
+            'organization_id' => $c['organization']->id,
+            'code' => 'FOSA-OTHER',
+            'name' => 'Centre hors périmètre',
+            'facility_type' => 'clinic',
+        ]);
+        $otherSite = Site::create([
+            'organization_id' => $c['organization']->id,
+            'health_facility_id' => $otherFacility->id,
+            'code' => 'PHARMA-OTHER',
+            'name' => 'Pharmacie hors périmètre',
+            'site_type' => 'stock_and_dispensing',
+        ]);
+        $fosaUser = User::factory()->create([
+            'is_active' => true,
+            'organization_id' => $c['organization']->id,
+        ]);
+        $siteRole = Role::create(['code' => 'site_admin', 'name' => 'Gérant FOSA']);
+        $siteRole->permissions()->attach($c['role']->permissions()->pluck('permissions.id'));
+        $fosaUser->roles()->attach($siteRole, [
+            'scope_type' => 'site',
+            'scope_id' => $c['site']->id,
+        ]);
+        Sanctum::actingAs($fosaUser);
+
+        $this->getJson("/api/v1/organizations/{$c['organization']->id}/dispensations/options")
+            ->assertOk()
+            ->assertJsonCount(1, 'sites')
+            ->assertJsonPath('sites.0.id', $c['site']->id);
+
+        $this->postJson("/api/v1/organizations/{$c['organization']->id}/patients", [
+            'code' => 'P-HORS-SCOPE',
+            'first_name' => 'Patient',
+            'last_name' => 'Interdit',
+            'site_id' => $otherSite->id,
+        ])->assertNotFound();
+    }
+
+    public function test_offline_patient_identifier_is_preserved_for_queued_dependencies(): void
+    {
+        $c = $this->context();
+        $offlineId = fake()->uuid();
+
+        $this->postJson("/api/v1/organizations/{$c['organization']->id}/patients", [
+            'id' => $offlineId,
+            'client_reference' => $offlineId,
+            'site_id' => $c['site']->id,
+            'code' => 'P-OFFLINE',
+            'first_name' => 'Patient',
+            'last_name' => 'Hors Ligne',
+        ])->assertCreated()->assertJsonPath('patient.id', $offlineId);
+
+        $this->assertDatabaseHas('patients', [
+            'id' => $offlineId,
+            'site_id' => $c['site']->id,
+        ]);
     }
 }
