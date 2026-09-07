@@ -223,6 +223,7 @@ abstract final class ApplicationAccess {
         '/projects',
         '/funding',
         '/standard-lists',
+        '/notifications',
         '/profile',
       },
       'project_admin' => const {
@@ -231,6 +232,7 @@ abstract final class ApplicationAccess {
         '/health-facilities',
         '/users',
         '/standard-lists',
+        '/notifications',
         '/profile',
       },
       _ => null,

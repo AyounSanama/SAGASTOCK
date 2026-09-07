@@ -246,6 +246,94 @@ class AppDatabase extends _$AppDatabase {
     offlineOperations,
   )..where((row) => row.operationId.equals(operationId))).getSingleOrNull();
 
+  Future<String?> dependencyForLocalReference(
+    String ownerUserId,
+    String localReference,
+  ) async {
+    final entities = await (select(
+      localEntities,
+    )..where((row) => row.ownerUserId.equals(ownerUserId))).get();
+    for (final entity in entities) {
+      if ('${entity.payload['id']}' != localReference) continue;
+      final operation =
+          await (select(offlineOperations)..where(
+                (row) =>
+                    row.ownerUserId.equals(ownerUserId) &
+                    row.localEntityId.equals(entity.localId),
+              ))
+              .getSingleOrNull();
+      return operation?.operationId;
+    }
+    return null;
+  }
+
+  Future<Map<String, String>> localToRemoteIds(String ownerUserId) async {
+    final entities =
+        await (select(localEntities)..where(
+              (row) =>
+                  row.ownerUserId.equals(ownerUserId) &
+                  row.remoteId.isNotNull(),
+            ))
+            .get();
+    return {
+      for (final entity in entities)
+        if (entity.payload['_local_id'] is String)
+          entity.payload['_local_id'] as String: entity.remoteId!,
+    };
+  }
+
+  Future<void> completeOperationWithResponse(
+    OfflineOperation operation,
+    Map<String, dynamic>? response,
+  ) async {
+    await transaction(() async {
+      final reference = operation.localEntityId;
+      if (reference != null && response != null) {
+        final entity =
+            await (select(localEntities)..where(
+                  (row) =>
+                      row.ownerUserId.equals(operation.ownerUserId) &
+                      row.localId.equals(reference),
+                ))
+                .getSingleOrNull();
+        final serverPayload = _serverEntity(response);
+        final serverId = serverPayload?['id']?.toString();
+        if (entity != null && serverPayload != null && serverId != null) {
+          final previous = entity.payload;
+          final localId = '${previous['id']}';
+          final payload = <String, dynamic>{
+            ...previous,
+            ...serverPayload,
+            '_local_id': localId,
+            '_sync_status': 'synced',
+          }..remove('_operation_id');
+          await (update(
+            localEntities,
+          )..where((row) => row.localId.equals(entity.localId))).write(
+            LocalEntitiesCompanion(
+              remoteId: Value(serverId),
+              payloadJson: Value(jsonEncode(payload)),
+              syncState: const Value('synced'),
+              updatedAt: Value(DateTime.now().toUtc()),
+              lastSyncedAt: Value(DateTime.now().toUtc()),
+            ),
+          );
+        }
+      }
+      await completeOperation(operation.operationId);
+    });
+  }
+
+  Map<String, dynamic>? _serverEntity(Map<String, dynamic> response) {
+    if (response['id'] != null) return response;
+    for (final value in response.values) {
+      if (value is Map && value['id'] != null) {
+        return Map<String, dynamic>.from(value);
+      }
+    }
+    return null;
+  }
+
   Future<void> markOperationSyncing(String operationId) =>
       (update(
         offlineOperations,

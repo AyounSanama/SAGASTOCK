@@ -35,11 +35,17 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
       if (!mounted) return;
       setState(() {
         _organizations = organizations;
-        _organizationId = organizations.isEmpty ? null : '${organizations.first['id']}';
+        _organizationId = organizations.isEmpty
+            ? null
+            : '${organizations.first['id']}';
       });
-      if (_organizationId != null) await _loadReceipts();
+      if (_organizationId != null) {
+        await _loadReceipts();
+      }
     } on DioException {
-      if (mounted) setState(() => _error = 'Impossible de charger les organisations.');
+      if (mounted) {
+        setState(() => _error = 'Impossible de charger les organisations.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -130,8 +136,14 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
           'Les quantités acceptées seront ajoutées au stock. Cette opération ne peut pas être annulée directement.',
         ),
         actions: [
-          AppButton.cancel(onPressed: () => Navigator.pop(context, false), compact: true),
-          AppButton.validate(onPressed: () => Navigator.pop(context, true), compact: true),
+          AppButton.cancel(
+            onPressed: () => Navigator.pop(context, false),
+            compact: true,
+          ),
+          AppButton.validate(
+            onPressed: () => Navigator.pop(context, true),
+            compact: true,
+          ),
         ],
       ),
     );
@@ -158,12 +170,12 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final draftCount = _receipts.where((item) => item['status'] == 'draft').length;
+    final draftCount = _receipts
+        .where((item) => item['status'] == 'draft')
+        .length;
     return Scaffold(
       drawer: const AppNavigationDrawer(),
-      appBar: AppBar(
-        title: const Text('Réceptions'),
-      ),
+      appBar: AppBar(title: const Text('Réceptions')),
       floatingActionButton: AppFab(
         tooltip: 'Nouvelle réception',
         onPressed: _organizationId == null ? null : _openCreate,
@@ -197,9 +209,16 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
               Card(
                 color: AppTheme.orange.withValues(alpha: .07),
                 child: ListTile(
-                  leading: const Icon(Icons.cloud_upload_outlined, color: AppTheme.orange),
-                  title: Text('$_pending réception(s) en attente de synchronisation'),
-                  subtitle: const Text('La synchronisation sera retentée automatiquement.'),
+                  leading: const Icon(
+                    Icons.cloud_upload_outlined,
+                    color: AppTheme.orange,
+                  ),
+                  title: Text(
+                    '$_pending réception(s) en attente de synchronisation',
+                  ),
+                  subtitle: const Text(
+                    'La synchronisation sera retentée automatiquement.',
+                  ),
                 ),
               ),
             ],
@@ -242,7 +261,11 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
                   padding: EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      Icon(Icons.move_to_inbox_outlined, size: 42, color: AppTheme.muted),
+                      Icon(
+                        Icons.move_to_inbox_outlined,
+                        size: 42,
+                        color: AppTheme.muted,
+                      ),
                       SizedBox(height: 10),
                       Text('Aucune réception enregistrée'),
                     ],
@@ -250,12 +273,13 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
                 ),
               )
             else
-              for (final receipt in _receipts) _ReceiptCard(
-                receipt: receipt,
-                onValidate: receipt['status'] == 'draft'
-                    ? () => _validate(receipt)
-                    : null,
-              ),
+              for (final receipt in _receipts)
+                _ReceiptCard(
+                  receipt: receipt,
+                  onValidate: receipt['status'] == 'draft'
+                      ? () => _validate(receipt)
+                      : null,
+                ),
             const SizedBox(height: 90),
           ],
         ),
@@ -293,8 +317,17 @@ class _Summary extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-                Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 11, color: AppTheme.muted),
+                ),
               ],
             ),
           ],
@@ -326,11 +359,17 @@ class _ReceiptCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '${receipt['reference']}',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: (validated ? AppTheme.green : AppTheme.orange)
                         .withValues(alpha: .10),
@@ -398,7 +437,11 @@ class _ReceiptForm extends StatefulWidget {
 }
 
 class _ReceiptFormState extends State<_ReceiptForm> {
-  final _formKey = GlobalKey<FormState>();
+  final _informationKey = GlobalKey<FormState>();
+  final _productsKey = GlobalKey<FormState>();
+  final _lotsKey = GlobalKey<FormState>();
+  final _pages = PageController();
+  int _step = 0;
   final _reference = TextEditingController(
     text: 'REC-${DateTime.now().millisecondsSinceEpoch}',
   );
@@ -413,6 +456,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
 
   @override
   void dispose() {
+    _pages.dispose();
     _reference.dispose();
     _orderReference.dispose();
     _notes.dispose();
@@ -423,7 +467,11 @@ class _ReceiptFormState extends State<_ReceiptForm> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!(_informationKey.currentState?.validate() ?? false) ||
+        !(_productsKey.currentState?.validate() ?? false) ||
+        !(_lotsKey.currentState?.validate() ?? false)) {
+      return;
+    }
     for (var index = 0; index < _lines.length; index++) {
       final line = _lines[index];
       final received = line.number(line.received.text);
@@ -468,6 +516,485 @@ class _ReceiptFormState extends State<_ReceiptForm> {
 
   @override
   Widget build(BuildContext context) {
+    const labels = ['Informations', 'Produits', 'Lots & péremptions', 'Résumé'];
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * .74,
+      child: Column(
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: List.generate(
+                labels.length,
+                (index) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text('${index + 1}. ${labels[index]}'),
+                    selected: _step == index,
+                    onSelected: (_) => _goTo(index),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: PageView(
+              controller: _pages,
+              onPageChanged: (index) async {
+                if (index > _step && !_validStep(_step)) {
+                  await _pages.animateToPage(
+                    _step,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                  );
+                  return;
+                }
+                setState(() => _step = index);
+              },
+              children: [
+                _body(
+                  Form(
+                    key: _informationKey,
+                    child: Column(
+                      children: [
+                        DropdownButtonFormField<String>(
+                          initialValue: _siteId,
+                          decoration: const InputDecoration(
+                            labelText: 'Point de dispensation destinataire *',
+                            prefixIcon: Icon(Icons.location_on_outlined),
+                          ),
+                          items: widget.sites
+                              .map(
+                                (site) => DropdownMenuItem(
+                                  value: '${site['id']}',
+                                  child: Text(
+                                    '${site['name']}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) => _siteId = value,
+                          validator: (value) => value == null
+                              ? 'Sélectionnez un point de dispensation.'
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: _supplierId,
+                          decoration: const InputDecoration(
+                            labelText: 'Fournisseur / origine',
+                            prefixIcon: Icon(Icons.local_shipping_outlined),
+                          ),
+                          items: widget.suppliers
+                              .map(
+                                (supplier) => DropdownMenuItem(
+                                  value: '${supplier['id']}',
+                                  child: Text('${supplier['name']}'),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) => _supplierId = value,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _reference,
+                          decoration: const InputDecoration(
+                            labelText: 'Référence de réception *',
+                          ),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? 'La référence est obligatoire.'
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _orderReference,
+                          decoration: const InputDecoration(
+                            labelText: 'Référence du bon de commande',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        InkWell(
+                          onTap: _saving ? null : _pickReceivedDate,
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Date de réception',
+                              prefixIcon: Icon(Icons.calendar_today_outlined),
+                            ),
+                            child: Text(_date(_receivedOn)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                _body(
+                  Form(
+                    key: _productsKey,
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Produits reçus',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            AppButton.add(
+                              label: 'Produit',
+                              compact: true,
+                              onPressed: () =>
+                                  setState(() => _lines.add(_ReceiptLine())),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        for (var index = 0; index < _lines.length; index++)
+                          _productCard(index),
+                      ],
+                    ),
+                  ),
+                ),
+                _body(
+                  Form(
+                    key: _lotsKey,
+                    child: Column(
+                      children: [
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Lots et péremptions',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        for (var index = 0; index < _lines.length; index++)
+                          _lotCard(index),
+                      ],
+                    ),
+                  ),
+                ),
+                _body(
+                  Column(
+                    children: [
+                      _ReceiptSummaryLine(
+                        'Origine',
+                        widget.suppliers
+                                .where((s) => '${s['id']}' == _supplierId)
+                                .firstOrNull?['name']
+                                ?.toString() ??
+                            'Non renseignée',
+                      ),
+                      _ReceiptSummaryLine('Date', _date(_receivedOn)),
+                      _ReceiptSummaryLine('Référence', _reference.text),
+                      _ReceiptSummaryLine(
+                        'Commande liée',
+                        _orderReference.text,
+                      ),
+                      for (var index = 0; index < _lines.length; index++)
+                        Card(
+                          child: ListTile(
+                            title: Text(
+                              widget.products
+                                      .where(
+                                        (p) =>
+                                            '${p['id']}' ==
+                                            _lines[index].productId,
+                                      )
+                                      .firstOrNull?['name']
+                                      ?.toString() ??
+                                  'Produit ${index + 1}',
+                            ),
+                            subtitle: Text(
+                              'Lot ${_lines[index].batch.text} · reçu ${_lines[index].received.text} · accepté ${_lines[index].accepted.text}\nPéremption ${_lines[index].expiry.text}',
+                            ),
+                          ),
+                        ),
+                      TextFormField(
+                        controller: _notes,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Observations',
+                        ),
+                      ),
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(color: AppTheme.red),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+            child: Row(
+              children: [
+                Expanded(
+                  child: AppButton.cancel(
+                    label: _step == 0 ? 'Annuler' : 'Précédent',
+                    onPressed: _saving
+                        ? null
+                        : () => _step == 0
+                              ? Navigator.pop(context)
+                              : _goTo(_step - 1),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _step == 3
+                      ? AppButton.save(
+                          label: 'Enregistrer la réception',
+                          loading: _saving,
+                          onPressed: _save,
+                        )
+                      : AppButton.primary(
+                          label: 'Suivant',
+                          icon: Icons.arrow_forward_rounded,
+                          onPressed: () => _goTo(_step + 1),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(Widget child) => SingleChildScrollView(
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+    child: child,
+  );
+
+  Widget _productCard(int index) {
+    final line = _lines[index];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Produit ${index + 1}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                if (_lines.length > 1)
+                  IconButton(
+                    onPressed: () => setState(() {
+                      final removed = _lines.removeAt(index);
+                      removed.dispose();
+                    }),
+                    icon: const Icon(Icons.delete_outline),
+                  ),
+              ],
+            ),
+            DropdownButtonFormField<String>(
+              initialValue: line.productId,
+              decoration: const InputDecoration(labelText: 'Produit *'),
+              items: widget.products
+                  .map(
+                    (product) => DropdownMenuItem(
+                      value: '${product['id']}',
+                      child: Text(
+                        '${product['code']} · ${product['name']}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => line.productId = value,
+              validator: (value) =>
+                  value == null ? 'Sélectionnez un produit.' : null,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _numberField(
+                    line.ordered,
+                    'Commandée',
+                    allowZero: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _numberField(
+                    line.received,
+                    'Livrée',
+                    onChanged: (value) {
+                      if (line.accepted.text.isEmpty) {
+                        line.accepted.text = value;
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _lotCard(int index) {
+    final line = _lines[index];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Lot — produit ${index + 1}',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: line.batch,
+              decoration: const InputDecoration(labelText: 'Numéro de lot *'),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Numéro obligatoire.'
+                  : null,
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: line.expiry,
+              keyboardType: TextInputType.datetime,
+              decoration: const InputDecoration(
+                labelText: 'Date de péremption *',
+                hintText: 'AAAA-MM-JJ',
+              ),
+              validator: (value) {
+                final date = DateTime.tryParse(value ?? '');
+                return date == null || !date.isAfter(DateTime.now())
+                    ? 'Date future obligatoire.'
+                    : null;
+              },
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _numberField(
+                    line.accepted,
+                    'Acceptée',
+                    allowZero: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _numberField(
+                    line.rejected,
+                    'Rejetée',
+                    allowZero: true,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _numberField(line.cost, 'Coût unitaire', allowZero: true),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: line.reason,
+              minLines: 2,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Justification si écart ou rejet',
+              ),
+              validator: (value) {
+                final hasGap =
+                    (line.number(line.ordered.text) -
+                                line.number(line.received.text))
+                            .abs() >
+                        .0001 ||
+                    line.number(line.rejected.text) > 0;
+                return hasGap && (value == null || value.trim().length < 5)
+                    ? 'Justifiez l’écart ou le rejet.'
+                    : null;
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _validStep(int step) {
+    final valid = switch (step) {
+      0 => _informationKey.currentState?.validate() ?? false,
+      1 => _productsKey.currentState?.validate() ?? false,
+      2 => _lotsKey.currentState?.validate() ?? false,
+      _ => true,
+    };
+    if (!valid || step != 2) return valid;
+    for (final line in _lines) {
+      if ((line.number(line.accepted.text) +
+                  line.number(line.rejected.text) -
+                  line.number(line.received.text))
+              .abs() >
+          .0001) {
+        setState(
+          () => _error =
+              'La somme acceptée + rejetée doit correspondre à la quantité livrée.',
+        );
+        return false;
+      }
+    }
+    setState(() => _error = null);
+    return true;
+  }
+
+  Widget _numberField(
+    TextEditingController controller,
+    String label, {
+    bool allowZero = false,
+    ValueChanged<String>? onChanged,
+  }) => TextFormField(
+    controller: controller,
+    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+    decoration: InputDecoration(labelText: label),
+    onChanged: onChanged,
+    validator: (value) {
+      final number = double.tryParse((value ?? '').replaceAll(',', '.'));
+      if (number == null || (allowZero ? number < 0 : number <= 0)) {
+        return allowZero ? '≥ 0 requis' : '> 0 requis';
+      }
+      return null;
+    },
+  );
+
+  Future<void> _goTo(int target) async {
+    if (target > _step && !_validStep(_step)) return;
+    await _pages.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOut,
+    );
+  }
+
+  /*
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Form(
@@ -596,6 +1123,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
     );
   }
 
+*/
   static String _date(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
@@ -651,6 +1179,30 @@ class _ReceiptLine {
   }
 }
 
+class _ReceiptSummaryLine extends StatelessWidget {
+  const _ReceiptSummaryLine(this.label, this.value);
+  final String label, value;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(label, style: const TextStyle(color: AppTheme.muted)),
+        ),
+        Expanded(
+          child: Text(
+            value.trim().isEmpty ? '—' : value,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/* Legacy line card retained temporarily as migration reference.
 class _ReceiptLineCard extends StatelessWidget {
   const _ReceiptLineCard({
     super.key,
@@ -692,7 +1244,9 @@ class _ReceiptLineCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(labelText: 'Médicament / produit'),
+              decoration: const InputDecoration(
+                labelText: 'Médicament / produit',
+              ),
               items: products
                   .map(
                     (product) => DropdownMenuItem(
@@ -705,7 +1259,8 @@ class _ReceiptLineCard extends StatelessWidget {
                   )
                   .toList(),
               onChanged: (value) => line.productId = value,
-              validator: (value) => value == null ? 'Sélectionnez un produit.' : null,
+              validator: (value) =>
+                  value == null ? 'Sélectionnez un produit.' : null,
             ),
             const SizedBox(height: 10),
             TextFormField(
@@ -733,14 +1288,21 @@ class _ReceiptLineCard extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: _numberField(line.ordered, 'Commandée', allowZero: true)),
+                Expanded(
+                  child: _numberField(
+                    line.ordered,
+                    'Commandée',
+                    allowZero: true,
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _numberField(
                     line.received,
                     'Reçue',
                     onChanged: (value) {
-                      if (line.accepted.text.isEmpty) line.accepted.text = value;
+                      if (line.accepted.text.isEmpty)
+                        line.accepted.text = value;
                     },
                   ),
                 ),
@@ -749,9 +1311,21 @@ class _ReceiptLineCard extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: _numberField(line.accepted, 'Acceptée', allowZero: true)),
+                Expanded(
+                  child: _numberField(
+                    line.accepted,
+                    'Acceptée',
+                    allowZero: true,
+                  ),
+                ),
                 const SizedBox(width: 8),
-                Expanded(child: _numberField(line.rejected, 'Rejetée', allowZero: true)),
+                Expanded(
+                  child: _numberField(
+                    line.rejected,
+                    'Rejetée',
+                    allowZero: true,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -803,3 +1377,4 @@ class _ReceiptLineCard extends StatelessWidget {
     );
   }
 }
+*/

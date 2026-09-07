@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/security/password_policy.dart';
+import '../../../core/sync/sync_bootstrap.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_empty_state.dart';
@@ -8,7 +10,36 @@ import '../../../core/widgets/app_form_sheet.dart';
 import '../../auth/data/auth_service.dart';
 import '../../organizations/data/organization_service.dart';
 import '../../structures/data/structure_service.dart';
+import '../../structures/presentation/facilities_page.dart';
 import '../data/user_service.dart';
+
+@visibleForTesting
+List<Map<String, dynamic>> sitesForFacility(
+  Iterable<Map<String, dynamic>> sites,
+  String facilityId,
+) {
+  final unique = <String, Map<String, dynamic>>{};
+  for (final site in sites.where(
+    (site) => '${site['health_facility_id']}' == facilityId,
+  )) {
+    final id = '${site['id'] ?? ''}';
+    if (id.isNotEmpty) unique[id] = site;
+  }
+  return unique.values.toList(growable: false);
+}
+
+@visibleForTesting
+bool isPersistedScopeId(Object? value) => RegExp(
+  r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+).hasMatch('$value');
+
+List<Map<String, dynamic>> persistedSitesForFacility(
+  Iterable<Map<String, dynamic>> sites,
+  String facilityId,
+) => sitesForFacility(
+  sites,
+  facilityId,
+).where((site) => isPersistedScopeId(site['id'])).toList(growable: false);
 
 class ScopedUsersPage extends StatefulWidget {
   const ScopedUsersPage({super.key});
@@ -24,6 +55,7 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
   List<Map<String, dynamic>> _users = [],
       _roles = [],
       _projects = [],
+      _facilities = [],
       _sites = [];
   String? _organizationId, _currentUserId, _error;
   bool _loading = true, _archived = false, _offline = false;
@@ -58,6 +90,7 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
       );
       var roles = <Map<String, dynamic>>[];
       var projects = <Map<String, dynamic>>[];
+      var facilities = <Map<String, dynamic>>[];
       var sites = <Map<String, dynamic>>[];
       var offline = false;
       try {
@@ -66,13 +99,23 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
           _organizations.projects(organizationId: _organizationId!),
           _structures.list(_organizationId!),
         ]);
-        roles = values[0] as List<Map<String, dynamic>>;
+        roles = _deduplicateById(values[0] as List<Map<String, dynamic>>);
         projects = values[1] as List<Map<String, dynamic>>;
         final structures = values[2] as Map<String, dynamic>;
-        sites = (structures['sites'] as List<dynamic>? ?? const [])
-            .whereType<Map>()
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
+        final facilityPagination =
+            structures['facilities'] as Map<String, dynamic>? ?? const {};
+        facilities = _deduplicateById(
+          (facilityPagination['data'] as List<dynamic>? ?? const [])
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList(),
+        );
+        sites = _deduplicateById(
+          (structures['sites'] as List<dynamic>? ?? const [])
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList(),
+        );
         offline = structures['offline'] == true;
       } on DioException catch (error) {
         if (error.response != null) rethrow;
@@ -83,6 +126,7 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
         _users = users;
         _roles = roles;
         _projects = projects;
+        _facilities = facilities;
         _sites = sites;
         _offline = offline;
       });
@@ -142,7 +186,11 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
     String roleCode =
         '${_roles.firstWhere((item) => item['id'] == roleId, orElse: () => _roles.first)['code']}';
     String scopeId = _initialScopeId(user, roleCode);
-    bool active = user?['is_active'] != false, obscure = true, saving = false;
+    String facilityId = _facilityIdForSite(scopeId);
+    bool active = user?['is_active'] != false,
+        obscure = true,
+        saving = false,
+        synchronizing = false;
     final result = await showAppFormSheet<Map<String, dynamic>>(
       context: context,
       title: editing ? 'Modifier l’utilisateur' : 'Créer un utilisateur',
@@ -152,6 +200,19 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
           final scopes = roleCode == 'project_admin' ? _projects : _sites;
           if (!scopes.any((item) => '${item['id']}' == scopeId)) {
             scopeId = scopes.isEmpty ? '' : '${scopes.first['id']}';
+          }
+          if (roleCode != 'project_admin') {
+            if (!_facilities.any((item) => '${item['id']}' == facilityId)) {
+              facilityId = _facilities.isEmpty
+                  ? ''
+                  : '${_facilities.first['id']}';
+            }
+            final filteredSites = persistedSitesForFacility(_sites, facilityId);
+            if (!filteredSites.any((item) => '${item['id']}' == scopeId)) {
+              scopeId = filteredSites.isEmpty
+                  ? ''
+                  : '${filteredSites.first['id']}';
+            }
           }
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -216,49 +277,220 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  DropdownButtonFormField<int>(
-                    initialValue: roleId,
-                    decoration: const InputDecoration(labelText: 'Rôle *'),
-                    items: _roles
-                        .map(
-                          (role) => DropdownMenuItem(
-                            value: role['id'] as int,
-                            child: Text('${role['name']}'),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: editing
-                        ? null
-                        : (value) => setSheetState(() {
-                            roleId = value ?? roleId;
-                            roleCode =
-                                '${_roles.firstWhere((item) => item['id'] == roleId)['code']}';
-                            scopeId = '';
-                          }),
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: scopeId.isEmpty ? null : scopeId,
-                    decoration: InputDecoration(
-                      labelText: roleCode == 'project_admin'
-                          ? 'Projet *'
-                          : 'Site *',
+                  if (editing)
+                    InputDecorator(
+                      decoration: const InputDecoration(labelText: 'Rôle'),
+                      child: Text('${currentRole?['name'] ?? 'Rôle actuel'}'),
+                    )
+                  else
+                    DropdownButtonFormField<int>(
+                      initialValue: roleId,
+                      decoration: const InputDecoration(labelText: 'Rôle *'),
+                      items: _roles
+                          .map(
+                            (role) => DropdownMenuItem(
+                              value: role['id'] as int,
+                              child: Text('${role['name']}'),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => setSheetState(() {
+                        roleId = value ?? roleId;
+                        roleCode =
+                            '${_roles.firstWhere((item) => item['id'] == roleId)['code']}';
+                        scopeId = '';
+                        facilityId = _facilities.isEmpty
+                            ? ''
+                            : '${_facilities.first['id']}';
+                      }),
                     ),
-                    items: scopes
-                        .map(
-                          (scope) => DropdownMenuItem(
-                            value: '${scope['id']}',
-                            child: Text('${scope['name']}'),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: editing
-                        ? null
-                        : (value) => scopeId = value ?? scopeId,
-                    validator: (value) => value == null || value.isEmpty
-                        ? 'Périmètre obligatoire'
-                        : null,
-                  ),
+                  const SizedBox(height: 14),
+                  if (editing)
+                    InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Périmètre actuel',
+                      ),
+                      child: Text(_currentScopeLabel(user, roleCode)),
+                    )
+                  else if (roleCode == 'project_admin')
+                    DropdownButtonFormField<String>(
+                      initialValue: scopeId.isEmpty ? null : scopeId,
+                      decoration: InputDecoration(labelText: 'Projet *'),
+                      items: scopes
+                          .map(
+                            (scope) => DropdownMenuItem(
+                              value: '${scope['id']}',
+                              child: Text(_scopeLabel(scope, roleCode)),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => scopeId = value ?? scopeId,
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Périmètre obligatoire'
+                          : null,
+                    ),
+                  if (!editing && roleCode != 'project_admin') ...[
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('facility-$facilityId'),
+                      initialValue: facilityId.isEmpty ? null : facilityId,
+                      decoration: const InputDecoration(
+                        labelText: 'Formation sanitaire *',
+                      ),
+                      items: _facilities
+                          .map(
+                            (facility) => DropdownMenuItem(
+                              value: '${facility['id']}',
+                              child: Text('${facility['name']}'),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => setSheetState(() {
+                        facilityId = value ?? '';
+                        scopeId = '';
+                      }),
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Formation sanitaire obligatoire'
+                          : null,
+                    ),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('site-$facilityId-$scopeId'),
+                      initialValue: scopeId.isEmpty ? null : scopeId,
+                      decoration: const InputDecoration(
+                        labelText: 'Point de dispensation *',
+                      ),
+                      items: sitesForFacility(_sites, facilityId)
+                          .where((site) => isPersistedScopeId(site['id']))
+                          .map(
+                            (site) => DropdownMenuItem(
+                              value: '${site['id']}',
+                              child: Text('${site['name']}'),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => scopeId = value ?? '',
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Point de dispensation obligatoire'
+                          : null,
+                    ),
+                  ],
+                  if (roleCode != 'project_admin' &&
+                      persistedSitesForFacility(
+                        _sites,
+                        facilityId,
+                      ).isEmpty) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        facilityId.isEmpty
+                            ? 'Aucune formation sanitaire accessible.'
+                            : sitesForFacility(_sites, facilityId).isNotEmpty
+                            ? 'Le point de dispensation est en attente de synchronisation. Synchronisez les données avant de créer son utilisateur.'
+                            : 'Aucun point de dispensation n’est encore configuré pour cette formation sanitaire.',
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: facilityId.isEmpty || synchronizing
+                            ? null
+                            : () async {
+                                if (sitesForFacility(
+                                  _sites,
+                                  facilityId,
+                                ).isNotEmpty) {
+                                  setSheetState(() => synchronizing = true);
+                                  final report = await SyncBootstrap.syncNow();
+                                  final structures = await _structures.list(
+                                    _organizationId!,
+                                  );
+                                  final refreshedSites = _deduplicateById(
+                                    (structures['sites'] as List<dynamic>? ??
+                                            const [])
+                                        .whereType<Map>()
+                                        .map(
+                                          (item) =>
+                                              Map<String, dynamic>.from(item),
+                                        )
+                                        .toList(),
+                                  );
+                                  if (!sheetContext.mounted) return;
+                                  setState(() => _sites = refreshedSites);
+                                  setSheetState(() {
+                                    synchronizing = false;
+                                    final available = persistedSitesForFacility(
+                                      refreshedSites,
+                                      facilityId,
+                                    );
+                                    scopeId = available.isEmpty
+                                        ? ''
+                                        : '${available.last['id']}';
+                                  });
+                                  if (report.failed > 0 &&
+                                      sheetContext.mounted) {
+                                    ScaffoldMessenger.of(
+                                      sheetContext,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'La synchronisation a échoué. La donnée reste conservée pour une nouvelle tentative.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                final facility = _facilities.firstWhere(
+                                  (item) => '${item['id']}' == facilityId,
+                                );
+                                final saved = await showDispensingSiteFormSheet(
+                                  context: sheetContext,
+                                  organizationId: _organizationId!,
+                                  facility: facility,
+                                  service: _structures,
+                                );
+                                if (saved == null) return;
+                                final structures = await _structures.list(
+                                  _organizationId!,
+                                );
+                                final refreshedSites = _deduplicateById(
+                                  (structures['sites'] as List<dynamic>? ??
+                                          const [])
+                                      .whereType<Map>()
+                                      .map(
+                                        (item) =>
+                                            Map<String, dynamic>.from(item),
+                                      )
+                                      .toList(),
+                                );
+                                if (!sheetContext.mounted) return;
+                                setState(() => _sites = refreshedSites);
+                                setSheetState(() {
+                                  final available = persistedSitesForFacility(
+                                    refreshedSites,
+                                    facilityId,
+                                  );
+                                  scopeId = available.isEmpty
+                                      ? ''
+                                      : '${available.last['id']}';
+                                });
+                              },
+                        icon: Icon(
+                          sitesForFacility(_sites, facilityId).isNotEmpty
+                              ? Icons.sync
+                              : Icons.add_business_outlined,
+                        ),
+                        label: Text(
+                          synchronizing
+                              ? 'Synchronisation…'
+                              : sitesForFacility(_sites, facilityId).isNotEmpty
+                              ? 'Synchroniser maintenant'
+                              : 'Créer un point de dispensation',
+                        ),
+                      ),
+                    ),
+                  ],
                   if (!editing) ...[
                     const SizedBox(height: 14),
                     TextFormField(
@@ -278,6 +510,9 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                           ),
                         ),
                       ),
+                      validator: (value) => (value ?? '').isEmpty
+                          ? null
+                          : PasswordPolicy.validate(value),
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
@@ -322,6 +557,20 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                               : () async {
                                   if (!(key.currentState?.validate() ??
                                       false)) {
+                                    return;
+                                  }
+                                  if (!editing &&
+                                      roleCode != 'project_admin' &&
+                                      !isPersistedScopeId(scopeId)) {
+                                    ScaffoldMessenger.of(
+                                      sheetContext,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Synchronisez d’abord le point de dispensation avant de créer son utilisateur.',
+                                        ),
+                                      ),
+                                    );
                                     return;
                                   }
                                   setSheetState(() => saving = true);
@@ -369,7 +618,7 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                                         content: Text(
                                           error.response?.statusCode == 403
                                               ? 'Rôle ou périmètre non autorisé.'
-                                              : 'Vérifiez les informations et la robustesse du mot de passe.',
+                                              : _userCreationError(error),
                                         ),
                                       ),
                                     );
@@ -403,11 +652,65 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
     );
   }
 
+  String _userCreationError(DioException error) {
+    final data = error.response?.data;
+    if (data is Map) {
+      final errors = data['errors'];
+      if (errors is Map) {
+        for (final value in errors.values) {
+          if (value is List && value.isNotEmpty) return '${value.first}';
+          if (value is String && value.isNotEmpty) return value;
+        }
+      }
+      final message = data['message'];
+      if (message is String && message.isNotEmpty) return message;
+    }
+    return 'Impossible de créer l’utilisateur. Veuillez réessayer.';
+  }
+
+  String _scopeLabel(Map<String, dynamic> scope, String roleCode) {
+    if (roleCode == 'project_admin') return '${scope['name']}';
+    final facility = scope['health_facility'] as Map?;
+    final facilityName = '${facility?['name'] ?? 'Formation sanitaire'}';
+    final code = '${facility?['code'] ?? ''}';
+    final locality = '${facility?['locality'] ?? ''}';
+    final details = [
+      code,
+      locality,
+    ].where((value) => value.isNotEmpty).join(' · ');
+    return '$facilityName — ${scope['name']}${details.isEmpty ? '' : ' ($details)'}';
+  }
+
+  String _currentScopeLabel(Map<String, dynamic>? user, String roleCode) {
+    final id = _initialScopeId(user, roleCode);
+    final source = roleCode == 'project_admin' ? _projects : _sites;
+    final match = source.where((item) => '${item['id']}' == id).firstOrNull;
+    return match == null
+        ? 'Périmètre actuel conservé'
+        : _scopeLabel(match, roleCode);
+  }
+
+  static List<Map<String, dynamic>> _deduplicateById(
+    List<Map<String, dynamic>> values,
+  ) {
+    final unique = <String, Map<String, dynamic>>{};
+    for (final value in values) {
+      final id = '${value['id'] ?? ''}';
+      if (id.isNotEmpty) unique[id] = value;
+    }
+    return unique.values.toList(growable: false);
+  }
+
   String _initialScopeId(Map<String, dynamic>? user, String roleCode) {
     final roles = user?['roles'] as List<dynamic>? ?? const [];
     final role = roles.whereType<Map>().firstOrNull;
     final pivot = role?['pivot'] as Map?;
     return '${pivot?['scope_id'] ?? (roleCode == 'project_admin' ? (_projects.firstOrNull?['id'] ?? '') : (_sites.firstOrNull?['id'] ?? ''))}';
+  }
+
+  String _facilityIdForSite(String siteId) {
+    final site = _sites.where((item) => '${item['id']}' == siteId).firstOrNull;
+    return '${site?['health_facility_id'] ?? (_facilities.firstOrNull?['id'] ?? '')}';
   }
 
   String? _required(String? value) =>

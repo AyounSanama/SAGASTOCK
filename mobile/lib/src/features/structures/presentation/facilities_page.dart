@@ -7,15 +7,49 @@ import '../../../core/widgets/app_form_sheet.dart';
 import '../../organizations/data/organization_service.dart';
 import '../data/structure_service.dart';
 
+@visibleForTesting
+int? facilityFormFirstInvalidStep({
+  required String code,
+  required String name,
+  required String? careLevel,
+  required String facilityType,
+}) {
+  if (code.trim().isEmpty || name.trim().isEmpty) return 0;
+  if (careLevel == null ||
+      !_FacilityFormState._types.containsKey(facilityType)) {
+    return 1;
+  }
+  return null;
+}
+
+Future<String?> showDispensingSiteFormSheet({
+  required BuildContext context,
+  required String organizationId,
+  required Map<String, dynamic> facility,
+  required StructureService service,
+}) => showAppFormSheet<String>(
+  context: context,
+  title: 'Ajouter un point de dispensation',
+  description: 'Ce site sera rattaché à ${facility['name']}.',
+  builder: (_) => _ChildForm(
+    organizationId: organizationId,
+    facilityId: '${facility['id']}',
+    kind: 'site',
+    service: service,
+  ),
+);
+
 class FacilitiesPage extends StatefulWidget {
   const FacilitiesPage({
     required this.organizationId,
     required this.organizationName,
+    this.scopedProject,
     super.key,
   });
 
   final String organizationId;
   final String organizationName;
+  final Map<String, dynamic>? scopedProject;
 
   @override
   State<FacilitiesPage> createState() => _FacilitiesPageState();
@@ -72,6 +106,12 @@ class _FacilitiesPageState extends State<FacilitiesPage>
         _offline = result['offline'] == true;
         _missions = values[1] as List<Map<String, dynamic>>;
         _projects = values[2] as List<Map<String, dynamic>>;
+        if (widget.scopedProject != null &&
+            !_projects.any(
+              (item) => '${item['id']}' == '${widget.scopedProject!['id']}',
+            )) {
+          _projects = [widget.scopedProject!, ..._projects];
+        }
       });
     } on DioException catch (error) {
       if (mounted) {
@@ -345,13 +385,22 @@ class _FacilityForm extends StatefulWidget {
 }
 
 class _FacilityFormState extends State<_FacilityForm> {
-  final _formKey = GlobalKey<FormState>();
+  final _informationKey = GlobalKey<FormState>();
+  final _classificationKey = GlobalKey<FormState>();
+  final _locationKey = GlobalKey<FormState>();
+  final _pages = PageController();
+  int _step = 0;
   late final TextEditingController _code;
   late final TextEditingController _name;
-  late final TextEditingController _careLevel;
+  String? _careLevel;
   late final TextEditingController _email;
   late final TextEditingController _phone;
   late final TextEditingController _address;
+  late final TextEditingController _region;
+  late final TextEditingController _district;
+  late final TextEditingController _locality;
+  late final TextEditingController _latitude;
+  late final TextEditingController _longitude;
   late String _type;
   String? _missionId;
   late Set<String> _projectIds;
@@ -366,6 +415,12 @@ class _FacilityFormState extends State<_FacilityForm> {
     'community': 'Structure communautaire',
     'other': 'Autre',
   };
+  static const _careLevels = {
+    'primary': 'Primaire',
+    'secondary': 'Secondaire',
+    'tertiary': 'Tertiaire',
+    'national': 'National',
+  };
 
   @override
   void initState() {
@@ -373,10 +428,18 @@ class _FacilityFormState extends State<_FacilityForm> {
     final value = widget.facility ?? const <String, dynamic>{};
     _code = TextEditingController(text: '${value['code'] ?? ''}');
     _name = TextEditingController(text: '${value['name'] ?? ''}');
-    _careLevel = TextEditingController(text: '${value['care_level'] ?? ''}');
+    final savedCareLevel = '${value['care_level'] ?? ''}';
+    _careLevel = _careLevels.containsKey(savedCareLevel)
+        ? savedCareLevel
+        : null;
     _email = TextEditingController(text: '${value['email'] ?? ''}');
     _phone = TextEditingController(text: '${value['phone'] ?? ''}');
     _address = TextEditingController(text: '${value['address'] ?? ''}');
+    _region = TextEditingController(text: '${value['region'] ?? ''}');
+    _district = TextEditingController(text: '${value['district'] ?? ''}');
+    _locality = TextEditingController(text: '${value['locality'] ?? ''}');
+    _latitude = TextEditingController(text: '${value['latitude'] ?? ''}');
+    _longitude = TextEditingController(text: '${value['longitude'] ?? ''}');
     _type = '${value['facility_type'] ?? 'health_center'}';
     final savedMissionId = value['mission_id']?.toString();
     _missionId =
@@ -390,22 +453,47 @@ class _FacilityFormState extends State<_FacilityForm> {
         .map((item) => '${(item as Map)['id']}')
         .where(availableProjectIds.contains)
         .toSet();
+    if (widget.facility == null &&
+        _projectIds.isEmpty &&
+        widget.projects.length == 1) {
+      _projectIds = {'${widget.projects.single['id']}'};
+      _missionId ??= widget.projects.single['mission_id']?.toString();
+    }
     _isActive = value['is_active'] != false;
   }
 
+  String get _selectedProjectNames => widget.projects
+      .where((project) => _projectIds.contains('${project['id']}'))
+      .map((project) => '${project['name']}')
+      .where((name) => name.trim().isNotEmpty)
+      .join(', ');
+
   @override
   void dispose() {
+    _pages.dispose();
     _code.dispose();
     _name.dispose();
-    _careLevel.dispose();
     _email.dispose();
     _phone.dispose();
     _address.dispose();
+    _region.dispose();
+    _district.dispose();
+    _locality.dispose();
+    _latitude.dispose();
+    _longitude.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_saving) return;
+
+    final invalidStep = _firstInvalidStep();
+    if (invalidStep != null) {
+      await _goTo(invalidStep, validateCurrentStep: false);
+      if (!mounted) return;
+      _formKeyFor(invalidStep)?.currentState?.validate();
+      return;
+    }
     setState(() => _saving = true);
     try {
       final synchronized = await widget.service.saveFacility(
@@ -415,10 +503,15 @@ class _FacilityFormState extends State<_FacilityForm> {
           'code': _code.text.trim(),
           'name': _name.text.trim(),
           'facility_type': _type,
-          'care_level': _careLevel.text.trim(),
+          'care_level': _careLevel,
           'email': _email.text.trim(),
           'phone': _phone.text.trim(),
           'address': _address.text.trim(),
+          'region': _region.text.trim(),
+          'district': _district.text.trim(),
+          'locality': _locality.text.trim(),
+          'latitude': double.tryParse(_latitude.text.replaceAll(',', '.')),
+          'longitude': double.tryParse(_longitude.text.replaceAll(',', '.')),
           'mission_id': _missionId,
           'project_ids': _projectIds.toList(growable: false),
           'is_active': _isActive,
@@ -445,11 +538,408 @@ class _FacilityFormState extends State<_FacilityForm> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Form(
-        key: _formKey,
-        child: Column(
+    const labels = ['Informations', 'Classification', 'Localisation', 'Résumé'];
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * .72,
+      child: Column(
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: List.generate(
+                labels.length,
+                (index) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text('${index + 1}. ${labels[index]}'),
+                    selected: _step == index,
+                    onSelected: (_) => _goTo(index),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: PageView(
+              controller: _pages,
+              onPageChanged: (index) async {
+                if (index > _step && !_validStep(_step)) {
+                  await _pages.animateToPage(
+                    _step,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                  );
+                  return;
+                }
+                setState(() => _step = index);
+              },
+              children: [
+                _stepBody(
+                  Form(
+                    key: _informationKey,
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _code,
+                                decoration: const InputDecoration(
+                                  labelText: 'Code établissement *',
+                                  prefixIcon: Icon(Icons.tag_rounded),
+                                ),
+                                validator: _required,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _name,
+                                decoration: const InputDecoration(
+                                  labelText: 'Nom officiel *',
+                                  prefixIcon: Icon(Icons.business_outlined),
+                                ),
+                                validator: _required,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (widget.projects.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          _InheritedValue(
+                            label: 'Projet hérité',
+                            value: _selectedProjectNames,
+                          ),
+                        ],
+                        if (widget.missions.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String?>(
+                            initialValue: _missionId,
+                            decoration: const InputDecoration(
+                              labelText: 'Coordination / Mission',
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('Mission héritée du projet'),
+                              ),
+                              for (final mission in widget.missions)
+                                DropdownMenuItem<String?>(
+                                  value: '${mission['id']}',
+                                  child: Text('${mission['name']}'),
+                                ),
+                            ],
+                            onChanged: (value) => _missionId = value,
+                          ),
+                        ],
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Formation sanitaire active'),
+                          value: _isActive,
+                          onChanged: _saving
+                              ? null
+                              : (value) => setState(() => _isActive = value),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                _stepBody(
+                  Form(
+                    key: _classificationKey,
+                    child: Column(
+                      children: [
+                        DropdownButtonFormField<String>(
+                          initialValue: _careLevel,
+                          decoration: const InputDecoration(
+                            labelText: 'Niveau de soins *',
+                            prefixIcon: Icon(Icons.health_and_safety_outlined),
+                          ),
+                          items: _careLevels.entries
+                              .map(
+                                (entry) => DropdownMenuItem(
+                                  value: entry.key,
+                                  child: Text(entry.value),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) =>
+                              setState(() => _careLevel = value),
+                          validator: (value) =>
+                              value == null ? 'Sélection obligatoire' : null,
+                        ),
+                        const SizedBox(height: 14),
+                        DropdownButtonFormField<String>(
+                          initialValue: _type,
+                          decoration: const InputDecoration(
+                            labelText: 'Catégorie de formation sanitaire *',
+                            prefixIcon: Icon(Icons.local_hospital_outlined),
+                          ),
+                          items: _types.entries
+                              .map(
+                                (entry) => DropdownMenuItem(
+                                  value: entry.key,
+                                  child: Text(entry.value),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) => _type = value ?? _type,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                _stepBody(
+                  Form(
+                    key: _locationKey,
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _region,
+                                decoration: const InputDecoration(
+                                  labelText: 'Région',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _district,
+                                decoration: const InputDecoration(
+                                  labelText: 'District sanitaire',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: _locality,
+                          decoration: const InputDecoration(
+                            labelText: 'Localité',
+                            prefixIcon: Icon(Icons.place_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: _address,
+                          minLines: 2,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: 'Adresse',
+                            prefixIcon: Icon(Icons.location_on_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _latitude,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                      signed: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Latitude (facultatif)',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _longitude,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                      signed: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Longitude (facultatif)',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: _email,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            labelText: 'Adresse e-mail',
+                            prefixIcon: Icon(Icons.email_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: _phone,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                            labelText: 'Téléphone',
+                            prefixIcon: Icon(Icons.phone_outlined),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                _stepBody(
+                  Column(
+                    children: [
+                      _SummaryLine('Nom', _name.text),
+                      _SummaryLine('Code', _code.text),
+                      _SummaryLine(
+                        'Niveau de soins',
+                        _careLevels[_careLevel] ?? '—',
+                      ),
+                      _SummaryLine('Catégorie', _types[_type] ?? '—'),
+                      _SummaryLine('Région', _region.text),
+                      _SummaryLine('District', _district.text),
+                      _SummaryLine('Localité', _locality.text),
+                      _SummaryLine('Adresse', _address.text),
+                      _SummaryLine(
+                        'GPS',
+                        [
+                          _latitude.text,
+                          _longitude.text,
+                        ].where((v) => v.isNotEmpty).join(', '),
+                      ),
+                      _SummaryLine('Projet', _selectedProjectNames),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+            child: Row(
+              children: [
+                Expanded(
+                  child: AppButton.cancel(
+                    label: _step == 0 ? 'Annuler' : 'Précédent',
+                    onPressed: _saving
+                        ? null
+                        : () => _step == 0
+                              ? Navigator.pop(context)
+                              : _goTo(_step - 1),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _step == 3
+                      ? AppButton.save(
+                          label: widget.facility == null
+                              ? 'Créer'
+                              : 'Enregistrer',
+                          loading: _saving,
+                          onPressed: _save,
+                        )
+                      : AppButton.primary(
+                          label: 'Suivant',
+                          icon: Icons.arrow_forward_rounded,
+                          onPressed: () => _goTo(_step + 1),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepBody(Widget child) => SingleChildScrollView(
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+    child: child,
+  );
+
+  bool _validStep(int step) => switch (step) {
+    0 => _informationKey.currentState?.validate() ?? _informationIsValid,
+    1 => _classificationKey.currentState?.validate() ?? _classificationIsValid,
+    2 => _locationKey.currentState?.validate() ?? true,
+    _ => true,
+  };
+
+  bool get _informationIsValid =>
+      _code.text.trim().isNotEmpty && _name.text.trim().isNotEmpty;
+
+  bool get _classificationIsValid =>
+      _careLevel != null && _types.containsKey(_type);
+
+  int? _firstInvalidStep() {
+    return facilityFormFirstInvalidStep(
+      code: _code.text,
+      name: _name.text,
+      careLevel: _careLevel,
+      facilityType: _type,
+    );
+  }
+
+  GlobalKey<FormState>? _formKeyFor(int step) => switch (step) {
+    0 => _informationKey,
+    1 => _classificationKey,
+    2 => _locationKey,
+    _ => null,
+  };
+
+  Future<void> _goTo(int target, {bool validateCurrentStep = true}) async {
+    if (validateCurrentStep && target > _step && !_validStep(_step)) return;
+    await _pages.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOut,
+    );
+  }
+
+  String? _required(String? value) =>
+      value == null || value.trim().isEmpty ? 'Champ obligatoire' : null;
+}
+
+class _InheritedValue extends StatelessWidget {
+  const _InheritedValue({required this.label, required this.value});
+  final String label, value;
+  @override
+  Widget build(BuildContext context) => InputDecorator(
+    decoration: InputDecoration(
+      labelText: label,
+      prefixIcon: const Icon(Icons.lock_outline_rounded),
+    ),
+    child: Text(value.isEmpty ? 'Déterminé automatiquement' : value),
+  );
+}
+
+class _SummaryLine extends StatelessWidget {
+  const _SummaryLine(this.label, this.value);
+  final String label, value;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 7),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 125,
+          child: Text(label, style: const TextStyle(color: AppTheme.muted)),
+        ),
+        Expanded(
+          child: Text(
+            value.trim().isEmpty ? '—' : value,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/* Previous single-page implementation removed after migration to PageView.
           children: [
             Row(
               children: [
@@ -550,13 +1040,23 @@ class _FacilityFormState extends State<_FacilityForm> {
               ),
             ],
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _careLevel,
+            DropdownButtonFormField<String>(
+              initialValue: _careLevel,
               decoration: const InputDecoration(
-                labelText: 'Niveau de soins',
-                hintText: 'Primaire, secondaire, communautaire…',
+                labelText: 'Niveau de soins *',
                 prefixIcon: Icon(Icons.health_and_safety_outlined),
               ),
+              items: _careLevels.entries
+                  .map(
+                    (entry) => DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _careLevel = value),
+              validator: (value) =>
+                  value == null ? 'Sélection obligatoire' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -585,6 +1085,62 @@ class _FacilityFormState extends State<_FacilityForm> {
                 labelText: 'Adresse / localisation',
                 prefixIcon: Icon(Icons.location_on_outlined),
               ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _region,
+                    decoration: const InputDecoration(labelText: 'Région'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _district,
+                    decoration: const InputDecoration(labelText: 'District'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _locality,
+              decoration: const InputDecoration(
+                labelText: 'Localité',
+                prefixIcon: Icon(Icons.place_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _latitude,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Latitude (facultatif)',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _longitude,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Longitude (facultatif)',
+                    ),
+                  ),
+                ),
+              ],
             ),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
@@ -618,6 +1174,7 @@ class _FacilityFormState extends State<_FacilityForm> {
       value == null || value.trim().isEmpty ? 'Champ obligatoire' : null;
 }
 
+*/
 class FacilityDetailsPage extends StatefulWidget {
   const FacilityDetailsPage({
     required this.organizationId,
@@ -657,7 +1214,7 @@ class _FacilityDetailsPageState extends State<FacilityDetailsPage> {
   }
 
   Future<void> _openChild(String kind, [Map<String, dynamic>? existing]) async {
-    final saved = await showAppFormSheet<bool>(
+    final saved = await showAppFormSheet<String>(
       context: context,
       title: existing == null
           ? 'Ajouter ${_kindLabel(kind).toLowerCase()}'
@@ -671,7 +1228,22 @@ class _FacilityDetailsPageState extends State<FacilityDetailsPage> {
         service: widget.service,
       ),
     );
-    if (saved == true) await _refresh();
+    if (saved != null) {
+      await _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: saved == 'pending'
+              ? AppTheme.orange
+              : AppTheme.green,
+          content: Text(
+            saved == 'pending'
+                ? '${_kindLabel(kind)} enregistré hors connexion. Synchronisation en attente.'
+                : '${_kindLabel(kind)} enregistré avec succès.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _archiveChild(String kind, Map<String, dynamic> child) async {
@@ -852,7 +1424,7 @@ class _ChildFormState extends State<_ChildForm> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
     try {
-      await widget.service.saveChild(
+      final synchronized = await widget.service.saveChild(
         organizationId: widget.organizationId,
         facilityId: widget.facilityId,
         kind: widget.kind,
@@ -865,7 +1437,7 @@ class _ChildFormState extends State<_ChildForm> {
           'is_active': true,
         },
       );
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) Navigator.pop(context, synchronized ? 'saved' : 'pending');
     } on DioException catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);

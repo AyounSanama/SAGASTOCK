@@ -8,7 +8,7 @@ class ApiIdempotencyKey extends Model
 {
     protected $fillable = [
         'user_id', 'key', 'method', 'path', 'response_status',
-        'response_body', 'content_type', 'expires_at',
+        'request_hash', 'authorization_hash', 'response_body', 'content_type', 'expires_at',
     ];
 
     protected function casts(): array

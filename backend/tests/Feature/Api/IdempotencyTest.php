@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -35,5 +36,27 @@ class IdempotencyTest extends TestCase
 
         $this->assertSame(1, $calls);
         $this->assertDatabaseCount('api_idempotency_keys', 1);
+
+        $this->postJson('/api/v1/test-idempotency', ['changed' => true], ['Idempotency-Key' => $key])
+            ->assertConflict();
+    }
+
+    public function test_cached_response_is_rejected_after_authorization_context_changes(): void
+    {
+        Route::post('/api/v1/test-idempotency-scope', fn () => response()->json(['private' => true]))
+            ->middleware(['auth:sanctum', 'idempotency']);
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $key = '1d6f0a66-7a62-4cb1-999c-81435c806998';
+
+        $this->postJson('/api/v1/test-idempotency-scope', [], ['Idempotency-Key' => $key])
+            ->assertOk();
+
+        $permission = Permission::create(['code' => 'scope.changed', 'name' => 'Scope changed']);
+        $user->directPermissions()->attach($permission);
+
+        $this->postJson('/api/v1/test-idempotency-scope', [], ['Idempotency-Key' => $key])
+            ->assertConflict();
     }
 }

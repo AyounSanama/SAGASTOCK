@@ -151,4 +151,79 @@ class DispensationManagementTest extends TestCase
             'site_id' => $c['site']->id,
         ]);
     }
+
+    public function test_offline_replay_cannot_read_another_fosa_prescription_or_dispensation(): void
+    {
+        $c = $this->context();
+        $patient = $this->patient($c);
+        $clientReference = fake()->uuid();
+        $prescription = $this->postJson("/api/v1/organizations/{$c['organization']->id}/prescriptions", [
+            'client_reference' => $clientReference,
+            'patient_id' => $patient['id'],
+            'site_id' => $c['site']->id,
+            'reference' => 'ORD-REPLAY',
+            'prescribed_on' => today()->toDateString(),
+            'prescriber_name' => 'Dr Scope',
+            'items' => [[
+                'product_id' => $c['product']->id,
+                'quantity_prescribed' => 1,
+                'dosage' => '1 comprimé',
+                'frequency' => 'Une fois par jour',
+                'duration' => '1 jour',
+            ]],
+        ])->assertCreated()->json('prescription');
+        $this->approve($c, $prescription);
+
+        $offlineUuid = fake()->uuid();
+        $this->postJson("/api/v1/organizations/{$c['organization']->id}/dispensations", [
+            'offline_uuid' => $offlineUuid,
+            'reference' => 'DIS-REPLAY',
+            'patient_id' => $patient['id'],
+            'prescription_id' => $prescription['id'],
+            'site_id' => $c['site']->id,
+            'dispensed_at' => now()->toISOString(),
+            'items' => [[
+                'prescription_item_id' => $prescription['items'][0]['id'],
+                'product_id' => $c['product']->id,
+                'quantity' => 1,
+            ]],
+        ])->assertCreated();
+
+        $otherFacility = HealthFacility::create([
+            'organization_id' => $c['organization']->id,
+            'code' => 'FOSA-REPLAY',
+            'name' => 'Autre FOSA',
+            'facility_type' => 'clinic',
+        ]);
+        $otherSite = Site::create([
+            'organization_id' => $c['organization']->id,
+            'health_facility_id' => $otherFacility->id,
+            'code' => 'SITE-REPLAY',
+            'name' => 'Autre pharmacie',
+            'site_type' => 'dispensing',
+        ]);
+        $otherUser = User::factory()->create([
+            'is_active' => true,
+            'organization_id' => $c['organization']->id,
+        ]);
+        $siteRole = Role::firstOrCreate(
+            ['code' => 'site_admin'],
+            ['name' => 'Gérant FOSA'],
+        );
+        $siteRole->permissions()->syncWithoutDetaching(
+            $c['role']->permissions()->pluck('permissions.id'),
+        );
+        $otherUser->roles()->attach($siteRole, [
+            'scope_type' => 'site',
+            'scope_id' => $otherSite->id,
+        ]);
+        Sanctum::actingAs($otherUser);
+
+        $this->postJson("/api/v1/organizations/{$c['organization']->id}/prescriptions", [
+            'client_reference' => $clientReference,
+        ])->assertNotFound();
+        $this->postJson("/api/v1/organizations/{$c['organization']->id}/dispensations", [
+            'offline_uuid' => $offlineUuid,
+        ])->assertNotFound();
+    }
 }

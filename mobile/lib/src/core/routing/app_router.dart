@@ -20,6 +20,8 @@ import '../../features/organizations/presentation/project_configuration_page.dar
 import '../../features/receipts/presentation/receipts_page.dart';
 import '../../features/dispensations/presentation/clinical_supply_page.dart';
 import '../../features/inventories/presentation/inventories_page.dart';
+import '../../features/notifications/presentation/notifications_page.dart';
+import '../../features/reports/presentation/operational_reports_page.dart';
 import '../../features/orders/presentation/orders_page.dart';
 import '../../features/stocks/presentation/stocks_page.dart';
 import '../../features/stocks/presentation/batches_page.dart';
@@ -104,6 +106,10 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
         ),
         GoRoute(path: '/home', builder: (context, state) => const HomePage()),
         GoRoute(
+          path: '/notifications',
+          builder: (context, state) => const NotificationsPage(),
+        ),
+        GoRoute(
           path: '/sago/dashboard',
           builder: (context, state) => const HomePage(),
         ),
@@ -138,6 +144,10 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
         GoRoute(
           path: '/orders',
           builder: (context, state) => const OrdersPage(),
+        ),
+        GoRoute(
+          path: '/reports',
+          builder: (context, state) => const OperationalReportsPage(),
         ),
         GoRoute(
           path: '/organizations',
@@ -178,7 +188,6 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
           builder: (context, state) => const StandardListEntryPage(),
         ),
         for (final module in const <(String, String, IconData)>[
-          ('/reports', 'Rapports', Icons.assessment_outlined),
           ('/synchronization', 'Synchronisation', Icons.sync_outlined),
           ('/settings', 'Paramètres organisation', Icons.settings_outlined),
           ('/project-settings', 'Paramètres du projet', Icons.tune_outlined),

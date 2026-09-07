@@ -42,12 +42,22 @@ class _OrdersPageState extends State<OrdersPage> {
   }
 
   Future<void> _create() async {
-    final sites = (options['sites'] as List? ?? [])
+    final allSites = (options['sites'] as List? ?? [])
             .cast<Map<String, dynamic>>(),
+        sites = (options['sites'] as List? ?? [])
+            .cast<Map<String, dynamic>>()
+            .where((site) => site['order_proposal_ready'] == true)
+            .toList(),
         products = (options['products'] as List? ?? [])
             .cast<Map<String, dynamic>>();
-    if (sites.isEmpty || products.isEmpty) {
-      _message('Ajoutez d’abord un site et un produit actif.');
+    if (allSites.isEmpty || products.isEmpty) {
+      _message('Ajoutez d’abord un point de dispensation et un produit actif.');
+      return;
+    }
+    if (sites.isEmpty) {
+      _message(
+        'Clôturez et validez d’abord un inventaire pour ce point de dispensation.',
+      );
       return;
     }
     String? site = sites.first['id']?.toString(),

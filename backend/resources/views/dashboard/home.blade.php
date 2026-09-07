@@ -282,13 +282,23 @@
                 </header>
                 <div class="dashboard-card-body activity-list">
                     @forelse($activities as $activity)
-                        <div class="dashboard-activity"><span class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 2M21 12a9 9 0 1 1-9-9"/></svg></span><div><p><strong>{{ $activity->user?->name ?? 'Système' }}</strong><br>{{ str_replace(['.','_'],' ',ucfirst($activity->event)) }}</p><small>{{ $activity->created_at->locale('fr')->diffForHumans() }}</small></div></div>
+                        @php($activityLabel = match($activity->event) {
+                            'facility.created' => 'Formation sanitaire créée',
+                            'facility.updated' => 'Formation sanitaire modifiée',
+                            'site.created' => 'Point de dispensation créé',
+                            'site.updated' => 'Point de dispensation modifié',
+                            'user.created' => 'Utilisateur créé',
+                            'user.updated' => 'Utilisateur modifié',
+                            default => str_replace(['.','_'],' ',ucfirst($activity->event)),
+                        })
+                        <div class="dashboard-activity"><span class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 2M21 12a9 9 0 1 1-9-9"/></svg></span><div><p><strong>{{ $activity->user?->name ?? 'Système' }}</strong><br>{{ $activityLabel }}</p><small>{{ $activity->created_at->locale('fr')->diffForHumans() }}</small></div></div>
                     @empty
                         <div class="dashboard-empty"><span class="dashboard-empty-icon">✓</span><span>Aucune activité récente.</span></div>
                     @endforelse
                 </div>
             </article>
 
+            @unless($dashboardRole === \App\Services\GovernanceService::PROJECT_ADMIN)
             <article class="dashboard-card">
                 <header class="dashboard-card-head">
                     <div class="dashboard-card-title">
@@ -304,6 +314,7 @@
                     @endforelse
                 </div>
             </article>
+            @endunless
         </aside>
     </section>
 </main>

@@ -66,7 +66,10 @@ class ProjectCreationEntryPointsTest extends TestCase
             ->assertDontSee('Créer un projet');
         $this->actingAs($actor)->get('/dashboard')
             ->assertOk()
-            ->assertDontSee('Créer un projet');
+            ->assertDontSee('Créer un projet')
+            ->assertDontSee('Organisations accessibles')
+            ->assertDontSee('Votre périmètre actuel')
+            ->assertDontSee('Aucune organisation accessible');
     }
 
     public function test_mission_scope_alone_resolves_its_organization(): void

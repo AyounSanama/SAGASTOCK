@@ -12,7 +12,9 @@ use App\Http\Controllers\Api\V1\EffectiveConfigurationController;
 use App\Http\Controllers\Api\V1\FundingController;
 use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\MissionController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OrganizationController;
+use App\Http\Controllers\Api\V1\OperationalReportController;
 use App\Http\Controllers\Api\V1\PasswordController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\PlatformConfigurationController;
@@ -42,6 +44,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/configuration/workflows/{workflow}', [ConfigurationWorkflowController::class, 'show'])->middleware('permission:configuration.view');
         Route::put('/configuration/workflows/{workflow}/draft', [ConfigurationWorkflowController::class, 'draft'])->middleware('permission:configuration.view');
         Route::get('/dashboard', [DashboardController::class, 'index']);
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'read']);
+        Route::get('/organizations/{organization}/operational-report', [OperationalReportController::class, 'index']);
         Route::get('/projects/{project}', [ProjectController::class, 'show'])->middleware('permission:projects.view');
         Route::middleware(['role:sago_admin', 'permission:platform_standards.view'])->prefix('platform-configuration')->group(function (): void {
             Route::get('/', [PlatformConfigurationController::class, 'home']);
@@ -132,9 +138,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/users/archived/{user}/restore', [UserController::class, 'restore'])->middleware('permission:users.manage');
         Route::post('/users', [UserController::class, 'store'])->middleware('permission:users.manage|users.create_site_admin');
         Route::get('/users/{user}', [UserController::class, 'show'])->middleware('permission:users.view');
-        Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:users.manage');
-        Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.manage');
-        Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->middleware('permission:users.manage');
+        Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:users.manage|users.update_site_admin');
+        Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.manage|users.suspend_site_admin');
+        Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->middleware('permission:users.manage|users.update_site_admin');
         Route::get('/organizations', [OrganizationController::class, 'index'])->middleware('permission:organizations.view');
         Route::get('/organizations/archived', [OrganizationController::class, 'archived'])->middleware('permission:organizations.view');
         Route::post('/organizations/archived/{organization}/restore', [OrganizationController::class, 'restore'])->middleware('permission:organizations.manage');
@@ -172,6 +178,7 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/organizations/{organization}/projects/{project}/programs/{program}', [FundingController::class, 'detachProgram'])->middleware('permission:funding.manage');
         Route::get('/organizations/{organization}/structures', [StructureController::class, 'index'])->middleware('permission:structures.view|health_facilities.view');
         Route::post('/organizations/{organization}/facilities', [StructureController::class, 'storeFacility'])->middleware('permission:structures.manage|health_facilities.manage');
+        Route::get('/organizations/{organization}/facilities/{facility}', [StructureController::class, 'showFacility'])->middleware('permission:structures.view|health_facilities.view');
         Route::put('/organizations/{organization}/facilities/{facility}', [StructureController::class, 'updateFacility'])->middleware('permission:structures.manage|health_facilities.manage');
         Route::delete('/organizations/{organization}/facilities/{facility}', [StructureController::class, 'archiveFacility'])->middleware('permission:structures.manage|health_facilities.manage');
         Route::post('/organizations/{organization}/facilities/archived/{facility}/restore', [StructureController::class, 'restoreFacility'])->middleware('permission:structures.manage|health_facilities.manage');
@@ -184,6 +191,7 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/organizations/{organization}/facilities/{facility}/pharmacies/{pharmacy}', [StructureController::class, 'archivePharmacy'])->middleware('permission:structures.manage|health_facilities.manage');
         Route::post('/organizations/{organization}/facilities/{facility}/pharmacies/archived/{pharmacy}/restore', [StructureController::class, 'restorePharmacy'])->middleware('permission:structures.manage|health_facilities.manage');
         Route::post('/organizations/{organization}/facilities/{facility}/sites', [StructureController::class, 'storeSite'])->middleware('permission:structures.manage|dispensing_sites.manage');
+        Route::get('/organizations/{organization}/facilities/{facility}/sites/{site}', [StructureController::class, 'showSite'])->middleware('permission:structures.view|dispensing_sites.view');
         Route::put('/organizations/{organization}/facilities/{facility}/sites/{site}', [StructureController::class, 'updateSite'])->middleware('permission:structures.manage|dispensing_sites.manage');
         Route::delete('/organizations/{organization}/facilities/{facility}/sites/{site}', [StructureController::class, 'archiveSite'])->middleware('permission:structures.manage|dispensing_sites.manage');
         Route::post('/organizations/{organization}/facilities/{facility}/sites/archived/{site}/restore', [StructureController::class, 'restoreSite'])->middleware('permission:structures.manage|dispensing_sites.manage');

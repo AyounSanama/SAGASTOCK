@@ -184,6 +184,15 @@ class LocalFirstRepository {
       '_sync_status': 'pending',
       '_operation_id': operationId,
     };
+    String? dependencyOperationId;
+    for (final value in <Object?>[endpoint, ...payload.values]) {
+      if (value is String && value.startsWith('local-')) {
+        dependencyOperationId ??= await database.dependencyForLocalReference(
+          identity.userId,
+          value,
+        );
+      }
+    }
     await database.transaction(() async {
       await database.putEntity(
         localId: databaseLocalId,
@@ -205,6 +214,7 @@ class LocalFirstRepository {
           method: method.toUpperCase(),
           endpoint: endpoint,
           payloadJson: jsonEncode(payload),
+          dependencyOperationId: Value(dependencyOperationId),
           createdAt: DateTime.now().toUtc(),
           updatedAt: DateTime.now().toUtc(),
         ),

@@ -10,7 +10,8 @@ import '../database/app_database.dart';
 import '../network/api_client.dart';
 import 'offline_request_data.dart';
 
-typedef OperationSender = Future<void> Function(OfflineOperation operation);
+typedef OperationSender =
+    Future<Map<String, dynamic>?> Function(OfflineOperation operation);
 
 class SyncReport {
   const SyncReport({
@@ -86,9 +87,8 @@ class SyncService {
         processed++;
         await database.markOperationSyncing(operation.operationId);
         try {
-          await (_sender ?? _send)(operation);
-          await database.updateEntitySyncStateForOperation(operation, 'synced');
-          await database.completeOperation(operation.operationId);
+          final response = await (_sender ?? _send)(operation);
+          await database.completeOperationWithResponse(operation, response);
           succeeded++;
         } on DioException catch (error) {
           final result = await _handleDioFailure(operation, error);
@@ -118,16 +118,20 @@ class SyncService {
     return dependency == null;
   }
 
-  Future<void> _send(OfflineOperation operation) async {
+  Future<Map<String, dynamic>?> _send(OfflineOperation operation) async {
     final token = await _storage.read(key: 'auth_token');
     if (token == null || token.isEmpty) {
       throw StateError('Session locale absente pour la synchronisation.');
     }
-    await _client.dio.request<void>(
-      operation.endpoint,
-      data: await prepareOfflineRequestData(
-        (jsonDecode(operation.payloadJson) as Map).cast<String, dynamic>(),
-      ),
+    final mappings = await database.localToRemoteIds(ownerUserId);
+    final endpoint = _resolveString(operation.endpoint, mappings);
+    final payload = _resolveReferences(
+      (jsonDecode(operation.payloadJson) as Map).cast<String, dynamic>(),
+      mappings,
+    );
+    final response = await _client.dio.request<Map<String, dynamic>>(
+      endpoint,
+      data: await prepareOfflineRequestData(payload),
       options: Options(
         method: operation.method.toUpperCase(),
         headers: {
@@ -136,6 +140,35 @@ class SyncService {
         },
       ),
     );
+    return response.data;
+  }
+
+  String _resolveString(String value, Map<String, String> mappings) {
+    var resolved = value;
+    for (final entry in mappings.entries) {
+      resolved = resolved.replaceAll(entry.key, entry.value);
+    }
+    return resolved;
+  }
+
+  Map<String, dynamic> _resolveReferences(
+    Map<String, dynamic> payload,
+    Map<String, String> mappings,
+  ) => payload.map(
+    (key, value) => MapEntry(key, _resolveValue(value, mappings)),
+  );
+
+  dynamic _resolveValue(dynamic value, Map<String, String> mappings) {
+    if (value is String) return mappings[value] ?? value;
+    if (value is List) {
+      return value.map((item) => _resolveValue(item, mappings)).toList();
+    }
+    if (value is Map) {
+      return value.map(
+        (key, item) => MapEntry('$key', _resolveValue(item, mappings)),
+      );
+    }
+    return value;
   }
 
   Future<String> _handleDioFailure(

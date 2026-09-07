@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Inventory;
 use App\Models\InventoryLine;
 use App\Models\Organization;
+use App\Notifications\OperationalNotification;
 use App\Models\Site;
 use App\Models\StockBalance;
 use App\Services\AuditService;
@@ -38,7 +39,11 @@ class InventoryController extends Controller
     {
         $this->access($request, $organization, 'inventories.manage');
         if ($request->filled('offline_uuid') && ($existing = Inventory::where('offline_uuid', $request->input('offline_uuid'))->first())) {
-            abort_unless($existing->organization_id === $organization->id, 404);
+            abort_unless(
+                $existing->organization_id === $organization->id
+                    && $this->siteIds($request, $organization)->contains($existing->site_id),
+                404,
+            );
             return response()->json(['inventory' => $existing->load(['site', 'lines.product', 'lines.batch'])]);
         }
         $data = $request->validate(['offline_uuid'=>['nullable','uuid','unique:inventories,offline_uuid'],'site_id'=>['required','uuid'],
@@ -100,6 +105,12 @@ class InventoryController extends Controller
             StockBalance::where('site_id',$inventory->site_id)->where('batch_id',$line->batch_id)->update(['physical_quantity'=>$line->physical_quantity]);
         }$inventory->update(['status'=>'validated','validated_by'=>$request->user()->id,'validated_at'=>now()]);});
         $this->audit->record($request,'inventory.validated',$inventory,[],['variance_value'=>$inventory->variance_value]);
+        $request->user()->notify(new OperationalNotification([
+            'title' => 'Inventaire validé',
+            'message' => "L’inventaire {$inventory->reference} a été clôturé.",
+            'category' => 'inventory',
+            'action_path' => '/inventories',
+        ]));
         return response()->json(['inventory'=>$inventory->fresh(['site','lines.product','lines.batch'])]);
     }
 

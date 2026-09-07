@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Batch;
 use App\Models\Organization;
+use App\Notifications\OperationalNotification;
 use App\Models\Receipt;
 use App\Models\Site;
 use App\Services\AuditService;
@@ -123,6 +124,12 @@ class ReceiptController extends Controller
             $receipt->update(['status' => 'validated', 'validated_by' => $request->user()->id, 'validated_at' => now()]);
         });
         $this->audit->record($request, 'receipt.validated', $receipt);
+        $request->user()->notify(new OperationalNotification([
+            'title' => 'Réception validée',
+            'message' => "La réception {$receipt->reference} a crédité le stock.",
+            'category' => 'receipt',
+            'action_path' => '/receipts',
+        ]));
 
         return response()->json(['receipt' => $receipt->fresh(['items', 'site', 'supplier'])]);
     }

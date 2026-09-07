@@ -7,6 +7,7 @@ use App\Models\Device;
 use App\Models\HealthFacility;
 use App\Models\Mission;
 use App\Models\Project;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\ApplicationNavigationService;
 use App\Services\GovernanceService;
@@ -73,7 +74,11 @@ class AuthController extends Controller
         $payload = $this->userPayload($user);
 
         return response()->json([
-            'token' => $user->createToken($data['device_id'])->plainTextToken,
+            'token' => $user->createToken(
+                $data['device_id'],
+                ['*'],
+                now()->addDays(30),
+            )->plainTextToken,
             'user' => $payload,
             'role' => strtoupper((string) $payload['role']),
             'permissions' => $payload['permissions'],
@@ -108,21 +113,32 @@ class AuthController extends Controller
     {
         $governance = app(GovernanceService::class);
         $navigation = app(ApplicationNavigationService::class);
+        $scopes = app(UserScopeService::class);
         $organization = $user->organization()
             ->with(['countries' => fn ($query) => $query
                 ->where('countries.is_active', true)
                 ->orderBy('countries.name')])
             ->first();
+        $site = Site::with(['healthFacility.projects', 'healthFacility.mission.country'])
+            ->whereIn('id', $scopes->directSiteIds($user))
+            ->first();
+        $facility = $site?->healthFacility;
         $mission = Mission::with('country')
             ->withCount('projects')
-            ->whereIn('id', app(UserScopeService::class)->coordinationMissionIds($user))
+            ->whereIn('id', $scopes->coordinationMissionIds($user))
             ->first();
         $project = Project::with([
             'organization:id,code,name',
             'mission.country:id,iso2,name',
             'donors:id,code,name',
             'programs:id,code,name',
-        ])->whereIn('id', app(UserScopeService::class)->directProjectIds($user))->first();
+        ])->whereIn('id', $scopes->directProjectIds($user))->first();
+        $project ??= $facility?->projects()->with([
+            'organization:id,code,name', 'mission.country:id,iso2,name',
+            'donors:id,code,name', 'programs:id,code,name',
+        ])->first();
+        $mission ??= $project?->mission()->with('country')->withCount('projects')->first()
+            ?? $facility?->mission()->with('country')->withCount('projects')->first();
 
         return [
             'id' => $user->uuid, 'name' => $user->name,
@@ -164,6 +180,10 @@ class AuthController extends Controller
             ] : null,
             'project_id' => $project?->id,
             'project' => $project,
+            'facility_id' => $facility?->id,
+            'facility' => $facility?->only(['id', 'organization_id', 'mission_id', 'code', 'name', 'facility_type', 'care_level', 'locality', 'is_active']),
+            'site_id' => $site?->id,
+            'site' => $site?->only(['id', 'organization_id', 'health_facility_id', 'code', 'name', 'site_type', 'location', 'is_active']),
             'roles' => $user->roles()->pluck('code')->all(),
             'role' => $governance->roleCode($user),
             'dashboard' => $governance->dashboard($user),

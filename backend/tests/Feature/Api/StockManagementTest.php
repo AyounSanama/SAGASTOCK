@@ -34,7 +34,7 @@ class StockManagementTest extends TestCase
 
     private function login(): User
     {
-        $permissions = collect(['stocks.view', 'stocks.manage', 'stocks.adjust', 'transfers.manage', 'receipts.manage'])->map(fn ($code) => Permission::create(['code' => $code, 'name' => $code]));
+        $permissions = collect(['stocks.view', 'stocks.manage', 'stocks.adjust', 'transfers.manage', 'receipts.manage'])->map(fn ($code) => Permission::firstOrCreate(['code' => $code], ['name' => $code]));
         $role = Role::create(['code' => 'stock_admin', 'name' => 'Gestionnaire stock']);
         $role->permissions()->attach($permissions);
         $user = User::factory()->create(['is_active' => true]);

@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
+use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Site;
 use App\Models\SupplyOrder;
+use App\Notifications\OperationalNotification;
 use App\Services\AuditService;
 use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +35,12 @@ class SupplyOrderController extends Controller
     {
         $this->access($request, $organization, 'orders.manage');
         return response()->json([
-            'sites' => Site::with('healthFacility:id,name')->whereIn('id', $this->siteIds($request, $organization))->orderBy('name')->get(),
+            'sites' => Site::with('healthFacility:id,name')->whereIn('id', $this->siteIds($request, $organization))->orderBy('name')->get()->map(function (Site $site) {
+                $inventory = Inventory::where('site_id', $site->id)->where('status', 'validated')->latest('validated_at')->first();
+                $site->setAttribute('last_validated_inventory_at', $inventory?->validated_at?->toISOString());
+                $site->setAttribute('order_proposal_ready', $inventory !== null);
+                return $site;
+            }),
             'products' => Product::where('organization_id', $organization->id)->where('is_active', true)->orderBy('name')->get(['id','code','name','strength']),
         ]);
     }
@@ -42,7 +49,11 @@ class SupplyOrderController extends Controller
     {
         $this->access($request, $organization, 'orders.manage');
         if ($request->filled('offline_uuid') && ($existing = SupplyOrder::where('offline_uuid', $request->input('offline_uuid'))->first())) {
-            abort_unless($existing->organization_id === $organization->id, 404);
+            abort_unless(
+                $existing->organization_id === $organization->id
+                    && $this->siteIds($request, $organization)->contains($existing->requesting_site_id),
+                404,
+            );
             return response()->json(['order' => $existing->load('lines.product')]);
         }
         $data = $request->validate([
@@ -54,7 +65,12 @@ class SupplyOrderController extends Controller
             'lines'=>['required','array','min:1'],'lines.*.product_id'=>['required','uuid','distinct'],
             'lines.*.requested_quantity'=>['required','numeric','gt:0'],'lines.*.justification'=>['nullable','string','max:1000'],
         ]);
-        $this->site($request,$organization,$data['requesting_site_id']);
+        $site = $this->site($request,$organization,$data['requesting_site_id']);
+        abort_unless(
+            Inventory::where('site_id', $site->id)->where('status', 'validated')->exists(),
+            422,
+            'Un inventaire clôturé et validé est obligatoire avant de créer une proposition de commande.'
+        );
         if ($data['supplying_site_id'] ?? null) $this->site($request,$organization,$data['supplying_site_id']);
         $productIds = collect($data['lines'])->pluck('product_id');
         abort_unless(Product::where('organization_id',$organization->id)->whereIn('id',$productIds)->count()===$productIds->unique()->count(),422,'Un produit est invalide pour cette organisation.');
@@ -74,6 +90,12 @@ class SupplyOrderController extends Controller
         $order->approvals()->delete();
         $order->update(['status'=>'submitted','current_approval_level'=>0,'rejection_reason'=>null,'submitted_by'=>$request->user()->id,'submitted_at'=>now(),'approved_at'=>null]);
         $this->audit->record($request,'order.submitted',$order);
+        $request->user()->notify(new OperationalNotification([
+            'title' => 'Proposition de commande soumise',
+            'message' => "La proposition {$order->reference} attend une décision.",
+            'category' => 'order',
+            'action_path' => '/orders',
+        ]));
         return response()->json(['order'=>$order->fresh(['lines.product','approvals'])]);
     }
 

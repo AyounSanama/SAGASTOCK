@@ -27,6 +27,9 @@ class EnsureIdempotentApiRequest
             'La clé d’idempotence doit être un UUID valide.'
         );
 
+        $requestHash = hash('sha256', $request->getContent());
+        $authorizationHash = $this->authorizationHash($user);
+
         $stored = ApiIdempotencyKey::query()
             ->where('user_id', $user->id)
             ->where('key', $key)
@@ -35,9 +38,11 @@ class EnsureIdempotentApiRequest
         if ($stored) {
             abort_unless(
                 $stored->method === $request->method() &&
-                $stored->path === '/'.$request->path(),
+                $stored->path === '/'.$request->path() &&
+                hash_equals((string) $stored->request_hash, $requestHash) &&
+                hash_equals((string) $stored->authorization_hash, $authorizationHash),
                 409,
-                'Cette clé d’idempotence a déjà été utilisée pour une autre opération.'
+                'Cette clé d’idempotence ne correspond plus à la requête ou au périmètre autorisé.'
             );
 
             return response(
@@ -54,6 +59,8 @@ class EnsureIdempotentApiRequest
                 'key' => $key,
                 'method' => $request->method(),
                 'path' => '/'.$request->path(),
+                'request_hash' => $requestHash,
+                'authorization_hash' => $authorizationHash,
                 'response_status' => $response->getStatusCode(),
                 'response_body' => $response->getContent(),
                 'content_type' => $response->headers->get('Content-Type'),
@@ -62,5 +69,18 @@ class EnsureIdempotentApiRequest
         }
 
         return $response;
+    }
+
+    private function authorizationHash($user): string
+    {
+        $roles = $user->roles()->with('permissions:id,code')->get()->map(fn ($role) => [
+            'code' => $role->code,
+            'scope_type' => $role->pivot->scope_type,
+            'scope_id' => $role->pivot->scope_id,
+            'permissions' => $role->permissions->pluck('code')->sort()->values()->all(),
+        ])->sortBy(fn (array $role) => implode(':', [$role['code'], $role['scope_type'], $role['scope_id']]))->values()->all();
+        $directPermissions = $user->directPermissions()->pluck('code')->sort()->values()->all();
+
+        return hash('sha256', json_encode([$roles, $directPermissions], JSON_THROW_ON_ERROR));
     }
 }

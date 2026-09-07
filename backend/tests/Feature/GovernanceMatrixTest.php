@@ -272,6 +272,30 @@ class GovernanceMatrixTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_project_admin_creates_a_site_only_inside_an_assigned_facility(): void
+    {
+        [$organization, $project, $allowedFacility] = $this->hierarchy('SITE-SCOPE-A');
+        [, , $outsideFacility] = $this->hierarchy('SITE-SCOPE-B', $organization);
+        $projectAdmin = $this->actor('project_admin', 'project', $project->id);
+
+        Sanctum::actingAs($projectAdmin);
+
+        $this->postJson("/api/v1/organizations/{$organization->id}/facilities/{$allowedFacility->id}/sites", [
+            'code' => 'PHARMA-A',
+            'name' => 'Pharmacie du projet',
+            'site_type' => 'stock_and_dispensing',
+            'is_active' => true,
+        ])->assertCreated()
+            ->assertJsonPath('site.organization_id', $organization->id)
+            ->assertJsonPath('site.health_facility_id', $allowedFacility->id);
+
+        $this->postJson("/api/v1/organizations/{$organization->id}/facilities/{$outsideFacility->id}/sites", [
+            'code' => 'PHARMA-B',
+            'name' => 'Pharmacie hors projet',
+            'site_type' => 'dispensing',
+        ])->assertForbidden();
+    }
+
     public function test_sensitive_user_and_organization_routes_are_guarded_before_controller_execution(): void
     {
         [$organization, , , $site] = $this->hierarchy('ROUTE-GUARDS');

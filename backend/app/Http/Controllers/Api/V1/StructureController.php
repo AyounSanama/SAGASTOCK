@@ -16,6 +16,7 @@ use App\Services\UserScopeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class StructureController extends Controller
@@ -34,6 +35,9 @@ class StructureController extends Controller
                 ->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
                 ->orderBy('name')->paginate(20),
             'archived_facilities' => $organization->healthFacilities()->onlyTrashed()->whereIn('id', $facilityIds)->latest('deleted_at')->get(),
+            'sites' => $organization->sites()->whereIn('health_facility_id', $facilityIds)
+                ->where('is_active', true)->with('healthFacility:id,name,code,locality')
+                ->orderBy('name')->get(),
             'module_activations' => ModuleActivation::where(function ($query) use ($organization) {
                 $query->where(fn ($q) => $q->where('target_type', 'organization')->where('target_id', $organization->id))
                     ->orWhere(fn ($q) => $q->where('target_type', 'project')->whereIn('target_id', $organization->projects()->pluck('id')))
@@ -48,10 +52,24 @@ class StructureController extends Controller
         $data = $this->facilityData($request, $organization);
         $projectIds = $data['project_ids'] ?? [];
         unset($data['project_ids']);
-        $facility = $organization->healthFacilities()->create($data);
-        $facility->projects()->sync($projectIds);
+        $facility = DB::transaction(function () use ($organization, $data, $projectIds) {
+            $facility = $organization->healthFacilities()->create($data);
+            $facility->projects()->sync($projectIds);
+
+            return $facility;
+        });
         $this->audit->record($request, 'facility.created', $facility, [], $facility->only(['organization_id', 'code', 'name', 'facility_type']));
-        return response()->json(['facility' => $facility->load(['mission', 'projects'])], 201);
+        return response()->json(['facility' => $facility->load(['organization:id,code,name', 'mission.country', 'projects:id,organization_id,mission_id,code,name'])], 201);
+    }
+
+    public function showFacility(Request $request, Organization $organization, HealthFacility $facility): JsonResponse
+    {
+        $this->facility($request, $organization, $facility);
+
+        return response()->json(['facility' => $facility->load([
+            'organization:id,code,name', 'mission.country', 'projects:id,organization_id,mission_id,code,name',
+            'departments', 'pharmacies', 'sites.department', 'sites.pharmacy',
+        ])]);
     }
 
     public function updateFacility(Request $request, Organization $organization, HealthFacility $facility): JsonResponse
@@ -132,12 +150,25 @@ class StructureController extends Controller
 
     public function storeSite(Request $request, Organization $organization, HealthFacility $facility): JsonResponse
     {
-        $this->facility($request, $organization, $facility);
+        $this->organization($request, $organization);
+        abort_unless(
+            $facility->organization_id === $organization->id
+                && $this->scopes->facilityIds($request->user())->contains($facility->id),
+            403,
+            'Cette formation sanitaire ne fait pas partie de votre projet.',
+        );
         $site = $facility->sites()->create([
             ...$this->siteData($request, $facility),
             'organization_id' => $organization->id,
         ]);
         return $this->created($request, 'site.created', $site, 'site');
+    }
+
+    public function showSite(Request $request, Organization $organization, HealthFacility $facility, Site $site): JsonResponse
+    {
+        $this->child($request, $organization, $facility, $site);
+
+        return response()->json(['site' => $site->load('healthFacility.projects:id,name')]);
     }
 
     public function updateSite(Request $request, Organization $organization, HealthFacility $facility, Site $site): JsonResponse
@@ -202,10 +233,22 @@ class StructureController extends Controller
             'code' => ['required', 'alpha_dash', 'max:50', Rule::unique('health_facilities')->where('organization_id', $organization->id)->ignore($facility?->id)],
             'name' => ['required', 'string', 'max:180'],
             'facility_type' => ['required', Rule::in(['hospital', 'health_center', 'clinic', 'warehouse', 'community', 'other'])],
-            'care_level' => ['nullable', 'string', 'max:50'], 'email' => ['nullable', 'email', 'max:190'],
+            'care_level' => ['nullable', Rule::in(['primary', 'secondary', 'tertiary', 'national'])], 'email' => ['nullable', 'email', 'max:190'],
             'phone' => ['nullable', 'string', 'max:40'], 'address' => ['nullable', 'string', 'max:1000'],
+            'region' => ['nullable', 'string', 'max:120'], 'district' => ['nullable', 'string', 'max:120'],
+            'locality' => ['nullable', 'string', 'max:190'], 'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
+        if (app(\App\Services\GovernanceService::class)->roleCode($request->user()) === \App\Services\GovernanceService::PROJECT_ADMIN) {
+            $projectIds = $this->scopes->directProjectIds($request->user())->unique()->values();
+            abort_unless($projectIds->count() === 1, 403, 'Le compte Admin Projet doit être rattaché à un projet unique.');
+            $project = Project::whereKey($projectIds->first())
+                ->where('organization_id', $organization->id)
+                ->firstOrFail();
+            $data['project_ids'] = [$project->id];
+            $data['mission_id'] = $project->mission_id;
+        }
         if (!empty($data['mission_id'])) abort_unless(Mission::whereKey($data['mission_id'])->where('organization_id', $organization->id)->exists(), 422);
         if (!empty($data['project_ids'])) {
             $projectIds = collect($data['project_ids'])->unique();

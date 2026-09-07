@@ -111,6 +111,31 @@ class _InventoriesPageState extends State<InventoriesPage> {
     }
   }
 
+  Future<void> openWorkflow(Map<String, dynamic> inventory) async {
+    final result = await Navigator.of(context).push<_InventoryWorkflowResult>(
+      MaterialPageRoute(
+        builder: (_) => _InventoryWorkflow(inventory: inventory),
+      ),
+    );
+    if (result == null || organizationId == null) return;
+    await action(
+      () async {
+        await service.count(
+          organizationId!,
+          '${inventory['id']}',
+          result.lines,
+        );
+        if (result.submit) {
+          await service.submit(organizationId!, '${inventory['id']}');
+        }
+        return true;
+      },
+      result.submit
+          ? 'Inventaire soumis.'
+          : 'Brouillon de comptage enregistré.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     drawer: const AppNavigationDrawer(),
@@ -203,20 +228,10 @@ class _InventoriesPageState extends State<InventoriesPage> {
               style: const TextStyle(color: AppTheme.muted),
             ),
             if (status == 'counting')
-              for (final line in lines)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    '${line['product']?['name']} · ${line['batch']?['batch_number']}',
-                  ),
-                  subtitle: Text(
-                    'Théorique ${line['theoretical_quantity']} · Physique ${line['physical_quantity'] ?? 'à compter'}',
-                  ),
-                  trailing: AppIconButton.edit(
-                    tooltip: 'Compter',
-                    onPressed: () => count(inv, line),
-                  ),
-                ),
+              Text(
+                '${lines.length} lot(s) à compter',
+                style: const TextStyle(color: AppTheme.muted),
+              ),
             const SizedBox(height: 8),
             if (status == 'draft')
               AppButton.primary(
@@ -229,19 +244,389 @@ class _InventoriesPageState extends State<InventoriesPage> {
                 ),
               ),
             if (status == 'counting')
-              AppButton.validate(
-                label: 'Soumettre pour validation',
+              AppButton.primary(
+                label: 'Continuer l’inventaire',
                 expanded: true,
-                onPressed: () => action(
-                  () => service.submit(organizationId!, '${inv['id']}'),
-                  'Inventaire soumis.',
-                ),
+                onPressed: () => openWorkflow(inv),
               ),
           ],
         ),
       ),
     );
   }
+}
+
+class _InventoryWorkflowResult {
+  const _InventoryWorkflowResult(this.lines, {required this.submit});
+  final List<Map<String, dynamic>> lines;
+  final bool submit;
+}
+
+class _InventoryWorkflow extends StatefulWidget {
+  const _InventoryWorkflow({required this.inventory});
+  final Map<String, dynamic> inventory;
+  @override
+  State<_InventoryWorkflow> createState() => _InventoryWorkflowState();
+}
+
+class _InventoryWorkflowState extends State<_InventoryWorkflow> {
+  final _pages = PageController();
+  late final List<Map<String, dynamic>> _lines;
+  late final Map<String, TextEditingController> _quantities;
+  late final Map<String, TextEditingController> _reasons;
+  int _step = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _lines = (widget.inventory['lines'] as List? ?? [])
+        .cast<Map<String, dynamic>>();
+    _quantities = {
+      for (final line in _lines)
+        '${line['id']}': TextEditingController(
+          text: '${line['physical_quantity'] ?? ''}',
+        ),
+    };
+    _reasons = {
+      for (final line in _lines)
+        '${line['id']}': TextEditingController(
+          text: '${line['justification'] ?? ''}',
+        ),
+    };
+  }
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    for (final c in _quantities.values) {
+      c.dispose();
+    }
+    for (final c in _reasons.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  double? _physical(Map<String, dynamic> line) =>
+      double.tryParse(_quantities['${line['id']}']!.text.replaceAll(',', '.'));
+  double _theoretical(Map<String, dynamic> line) =>
+      double.tryParse('${line['theoretical_quantity']}') ?? 0;
+  bool _countComplete() =>
+      _lines.isNotEmpty &&
+      _lines.every((line) => _physical(line) != null && _physical(line)! >= 0);
+  List<Map<String, dynamic>> _payload() => _lines
+      .map(
+        (line) => {
+          'id': line['id'],
+          'physical_quantity': _physical(line),
+          if (_reasons['${line['id']}']!.text.trim().isNotEmpty)
+            'justification': _reasons['${line['id']}']!.text.trim(),
+        },
+      )
+      .toList();
+  bool _valid(int step) {
+    if (step < 1) return true;
+    if (!_countComplete()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Terminez le comptage de tous les lots avant de continuer.',
+          ),
+        ),
+      );
+      return false;
+    }
+    for (final line in _lines) {
+      if ((_physical(line)! - _theoretical(line)).abs() > .0001 &&
+          _reasons['${line['id']}']!.text.trim().length < 5) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chaque écart doit être justifié.')),
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<void> _go(int target) async {
+    if (target > _step && !_valid(_step)) return;
+    await _pages.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOut,
+    );
+  }
+
+  /*  @override Widget build(BuildContext context) {
+    const labels = ['Informations', 'Comptage', 'Écarts', 'Résumé'];
+    return Scaffold(
+      appBar: AppBar(title: const Text('Inventaire physique')),
+      body: SafeArea(child: Column(children: [
+        SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(10), child: Row(children: List.generate(4, (index) => Padding(padding: const EdgeInsets.only(right: 8), child: ChoiceChip(label: Text('${index + 1}. ${labels[index]}'), selected: _step == index, onSelected: (_) => _go(index))))),
+        Expanded(child: PageView(controller: _pages, onPageChanged: (index) async { if (index > _step && !_valid(_step)) { await _pages.animateToPage(_step, duration: const Duration(milliseconds: 220), curve: Curves.easeOut); return; } setState(() => _step = index); }, children: [
+          _page(Column(children: [
+            _InventorySummaryLine('Référence', '${widget.inventory['reference']}'), _InventorySummaryLine('Date', '${widget.inventory['period_date']}'),
+            _InventorySummaryLine('FOSA / Point', '${widget.inventory['site']?['name'] ?? ''}'), _InventorySummaryLine('Statut', 'Comptage en cours'),
+          ])),
+          _page(Column(children: [for (final line in _lines) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${line['product']?['code'] ?? ''} · ${line['product']?['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
+            Text('Lot ${line['batch']?['batch_number'] ?? ''} · Exp. ${line['batch']?['expires_on'] ?? '—'}'),
+            const SizedBox(height: 8), Text('Stock théorique : ${line['theoretical_quantity']}'), const SizedBox(height: 8),
+            TextField(controller: _quantities['${line['id']}'], keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Quantité comptée *')),
+            const SizedBox(height: 8), TextField(controller: _reasons['${line['id']}'], decoration: const InputDecoration(labelText: 'Justification si écart')),
+          ])))])),
+          _page(Column(children: [for (final line in _lines) _differenceCard(line)])),
+          _page(_summary()),
+        ])),
+        Padding(padding: const EdgeInsets.all(14), child: Row(children: [
+          Expanded(child: AppButton.cancel(label: _step == 0 ? 'Retour' : 'Précédent', onPressed: () => _step == 0 ? Navigator.pop(context) : _go(_step - 1))), const SizedBox(width: 10),
+          if (_step < 3) Expanded(child: AppButton.primary(label: 'Suivant', icon: Icons.arrow_forward, onPressed: () => _go(_step + 1))) else ...[
+            Expanded(child: AppButton.save(label: 'Enregistrer brouillon', onPressed: () => Navigator.pop(context, _InventoryWorkflowResult(_payload(), submit: false)))), const SizedBox(width: 8),
+            Expanded(child: AppButton.validate(label: 'Clôturer', onPressed: () { if (_valid(2)) Navigator.pop(context, _InventoryWorkflowResult(_payload(), submit: true)); })),
+          ],
+        ])),
+      ])),
+    );
+  }
+*/
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['Informations', 'Comptage', 'Écarts', 'Résumé'];
+    return Scaffold(
+      appBar: AppBar(title: const Text('Inventaire physique')),
+      body: SafeArea(
+        child: Column(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: List.generate(
+                  4,
+                  (index) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text('${index + 1}. ${labels[index]}'),
+                      selected: _step == index,
+                      onSelected: (_) => _go(index),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: PageView(
+                controller: _pages,
+                onPageChanged: (index) async {
+                  if (index > _step && !_valid(_step)) {
+                    await _pages.animateToPage(
+                      _step,
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                    );
+                    return;
+                  }
+                  setState(() => _step = index);
+                },
+                children: [
+                  _page(
+                    Column(
+                      children: [
+                        _InventorySummaryLine(
+                          'Référence',
+                          '${widget.inventory['reference']}',
+                        ),
+                        _InventorySummaryLine(
+                          'Date',
+                          '${widget.inventory['period_date']}',
+                        ),
+                        _InventorySummaryLine(
+                          'FOSA / Point',
+                          '${widget.inventory['site']?['name'] ?? ''}',
+                        ),
+                        const _InventorySummaryLine(
+                          'Statut',
+                          'Comptage en cours',
+                        ),
+                      ],
+                    ),
+                  ),
+                  _page(
+                    Column(
+                      children: [for (final line in _lines) _countCard(line)],
+                    ),
+                  ),
+                  _page(
+                    Column(
+                      children: [
+                        for (final line in _lines) _differenceCard(line),
+                      ],
+                    ),
+                  ),
+                  _page(_summary()),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: AppButton.cancel(
+                      label: _step == 0 ? 'Retour' : 'Précédent',
+                      onPressed: () =>
+                          _step == 0 ? Navigator.pop(context) : _go(_step - 1),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  if (_step < 3)
+                    Expanded(
+                      child: AppButton.primary(
+                        label: 'Suivant',
+                        icon: Icons.arrow_forward,
+                        onPressed: () => _go(_step + 1),
+                      ),
+                    )
+                  else ...[
+                    Expanded(
+                      child: AppButton.save(
+                        label: 'Enregistrer brouillon',
+                        onPressed: () => Navigator.pop(
+                          context,
+                          _InventoryWorkflowResult(_payload(), submit: false),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: AppButton.validate(
+                        label: 'Soumettre',
+                        onPressed: () {
+                          if (_valid(2)) {
+                            Navigator.pop(
+                              context,
+                              _InventoryWorkflowResult(
+                                _payload(),
+                                submit: true,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _page(Widget child) =>
+      SingleChildScrollView(padding: const EdgeInsets.all(16), child: child);
+  Widget _countCard(Map<String, dynamic> line) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${line['product']?['code'] ?? ''} · ${line['product']?['name'] ?? ''}',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          Text(
+            'Lot ${line['batch']?['batch_number'] ?? ''} · Exp. ${line['batch']?['expires_on'] ?? '—'}',
+          ),
+          const SizedBox(height: 8),
+          Text('Stock théorique : ${line['theoretical_quantity']}'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _quantities['${line['id']}'],
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Quantité comptée *'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _reasons['${line['id']}'],
+            decoration: const InputDecoration(
+              labelText: 'Justification si écart',
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+  Widget _differenceCard(Map<String, dynamic> line) {
+    final physical = _physical(line);
+    final gap = physical == null ? null : physical - _theoretical(line);
+    return Card(
+      child: ListTile(
+        title: Text(
+          '${line['product']?['name']} · lot ${line['batch']?['batch_number']}',
+        ),
+        subtitle: Text(
+          'Théorique ${_theoretical(line)} · Compté ${physical ?? '—'}',
+        ),
+        trailing: Text(
+          gap == null ? '—' : '${gap > 0 ? '+' : ''}${gap.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            color: gap == 0 ? AppTheme.green : AppTheme.orange,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _summary() {
+    var positive = 0, negative = 0, equal = 0;
+    double theoretical = 0, physical = 0;
+    for (final line in _lines) {
+      final t = _theoretical(line), p = _physical(line) ?? 0, gap = p - t;
+      theoretical += t;
+      physical += p;
+      if (gap > 0) {
+        positive++;
+      } else if (gap < 0) {
+        negative++;
+      } else {
+        equal++;
+      }
+    }
+    return Column(
+      children: [
+        _InventorySummaryLine('Date', '${widget.inventory['period_date']}'),
+        _InventorySummaryLine('Produits / lots', '${_lines.length}'),
+        _InventorySummaryLine(
+          'Stock théorique',
+          theoretical.toStringAsFixed(2),
+        ),
+        _InventorySummaryLine('Stock compté', physical.toStringAsFixed(2)),
+        _InventorySummaryLine('Écarts positifs', '$positive'),
+        _InventorySummaryLine('Écarts négatifs', '$negative'),
+        _InventorySummaryLine('Sans écart', '$equal'),
+      ],
+    );
+  }
+}
+
+class _InventorySummaryLine extends StatelessWidget {
+  const _InventorySummaryLine(this.label, this.value);
+  final String label, value;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(label, style: const TextStyle(color: AppTheme.muted)),
+        ),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+      ],
+    ),
+  );
 }
 
 class InventoryCreateForm extends StatefulWidget {

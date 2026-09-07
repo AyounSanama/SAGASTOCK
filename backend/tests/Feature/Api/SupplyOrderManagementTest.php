@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\HealthFacility;
+use App\Models\Inventory;
 use App\Models\Organization;
 use App\Models\Permission;
 use App\Models\Product;
@@ -28,6 +29,7 @@ class SupplyOrderManagementTest extends TestCase
         $role=Role::create(['code'=>'order_test','name'=>'Commandes']); $role->permissions()->attach($permissions);
         $user=User::factory()->create(['is_active'=>true,'organization_id'=>$organization->id]);
         $user->roles()->attach($role,['scope_type'=>'organization','scope_id'=>$organization->id]); Sanctum::actingAs($user);
+        Inventory::create(['organization_id'=>$organization->id,'site_id'=>$requesting->id,'reference'=>'INV-CLOSED','inventory_type'=>'monthly','period_date'=>today(),'status'=>'validated','created_by'=>$user->id,'validated_by'=>$user->id,'validated_at'=>now()]);
         return compact('organization','requesting','supplying','product','role','user');
     }
 
@@ -55,5 +57,15 @@ class SupplyOrderManagementTest extends TestCase
         $this->postJson("$url/{$order['id']}/decision",['decision'=>'reject','comment'=>'Quantité à justifier avec le responsable'])->assertOk()->assertJsonPath('order.status','rejected');
         $this->assertDatabaseHas('supply_orders',['id'=>$order['id'],'status'=>'rejected']);
         $this->assertDatabaseHas('supply_order_approvals',['supply_order_id'=>$order['id'],'decision'=>'reject']);
+    }
+
+    public function test_order_proposal_is_rejected_without_a_validated_inventory(): void
+    {
+        $c=$this->context();
+        Inventory::where('site_id',$c['requesting']->id)->delete();
+        $this->postJson("/api/v1/organizations/{$c['organization']->id}/orders",[
+            'reference'=>'CMD-NO-INV','requesting_site_id'=>$c['requesting']->id,'priority'=>'normal',
+            'required_approval_levels'=>1,'lines'=>[['product_id'=>$c['product']->id,'requested_quantity'=>4]],
+        ])->assertUnprocessable()->assertJsonPath('message','Un inventaire clôturé et validé est obligatoire avant de créer une proposition de commande.');
     }
 }

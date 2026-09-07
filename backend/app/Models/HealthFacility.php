@@ -15,8 +15,8 @@ class HealthFacility extends Model
 
     public $incrementing = false;
     protected $keyType = 'string';
-    protected $fillable = ['organization_id', 'mission_id', 'code', 'name', 'facility_type', 'care_level', 'email', 'phone', 'address', 'is_active'];
-    protected function casts(): array { return ['is_active' => 'boolean']; }
+    protected $fillable = ['organization_id', 'mission_id', 'code', 'name', 'facility_type', 'care_level', 'email', 'phone', 'address', 'region', 'district', 'locality', 'latitude', 'longitude', 'is_active'];
+    protected function casts(): array { return ['is_active' => 'boolean', 'latitude' => 'decimal:7', 'longitude' => 'decimal:7']; }
     public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }
     public function mission(): BelongsTo { return $this->belongsTo(Mission::class); }
     public function projects(): BelongsToMany { return $this->belongsToMany(Project::class)->withTimestamps(); }

@@ -110,7 +110,11 @@ class DispensationController extends Controller
     {
         $this->access($request, $organization, 'prescriptions.manage');
         if ($request->filled('client_reference') && ($existing = Prescription::where('client_reference', $request->input('client_reference'))->first())) {
-            abort_unless($existing->organization_id === $organization->id, 404);
+            abort_unless(
+                $existing->organization_id === $organization->id
+                    && $this->siteIds($request, $organization)->contains($existing->site_id),
+                404,
+            );
             return response()->json(['prescription' => $existing->load(['patient', 'site', 'items.product'])]);
         }
         $data = $request->validate([
@@ -137,7 +141,7 @@ class DispensationController extends Controller
                 $patient->update(['site_id' => $site->id, 'health_facility_id' => $site->health_facility_id]);
             }
             $model = Prescription::create([...collect($data)->except(['items', 'attachment'])->all(), 'attachment_path' => $attachment,
-                'attachment_original_name' => $attachmentFile?->getClientOriginalName(), 'attachment_mime_type' => $attachmentFile?->getMimeType(),
+                'attachment_original_name' => null, 'attachment_mime_type' => $attachmentFile?->getMimeType(),
                 'attachment_size' => $attachmentFile?->getSize(), 'attachment_captured_at' => $attachmentFile ? now() : null,
                 'organization_id' => $organization->id, 'patient_id' => $patient->id, 'site_id' => $site->id, 'created_by' => $request->user()->id]);
             foreach ($data['items'] as $row) $model->items()->create([...$row, 'substitution_authorized' => (bool) ($row['substitution_authorized'] ?? false)]);
@@ -200,7 +204,11 @@ class DispensationController extends Controller
     {
         $this->access($request, $organization, 'dispensations.manage');
         if ($request->filled('offline_uuid') && ($existing = Dispensation::where('offline_uuid', $request->input('offline_uuid'))->first())) {
-            abort_unless($existing->organization_id === $organization->id, 404);
+            abort_unless(
+                $existing->organization_id === $organization->id
+                    && $this->siteIds($request, $organization)->contains($existing->site_id),
+                404,
+            );
             return response()->json(['dispensation' => $existing->load(['patient', 'prescription', 'site', 'items.product', 'items.batch'])]);
         }
         $data = $request->validate([
@@ -221,7 +229,7 @@ class DispensationController extends Controller
         $attachmentPath = $attachmentFile?->storeAs('private/dispensations', Str::uuid().'.'.$attachmentFile->extension());
         $dispensation = DB::transaction(function () use ($data, $organization, $patient, $site, $prescription, $request, $allowPartial, $attachmentFile, $attachmentPath) {
             $model = Dispensation::create([...collect($data)->except(['items', 'allow_partial', 'attachment'])->all(), 'destination_type' => $data['destination_type'] ?? 'patient',
-                'prescription_attachment_path' => $attachmentPath, 'prescription_attachment_original_name' => $attachmentFile?->getClientOriginalName(),
+                'prescription_attachment_path' => $attachmentPath, 'prescription_attachment_original_name' => null,
                 'prescription_attachment_mime_type' => $attachmentFile?->getMimeType(), 'prescription_attachment_size' => $attachmentFile?->getSize(),
                 'prescription_attachment_captured_at' => $attachmentFile ? now() : null,
                 'organization_id' => $organization->id, 'patient_id' => $patient->id, 'site_id' => $site->id, 'prescription_id' => $prescription?->id, 'status' => 'validated', 'dispensed_by' => $request->user()->id]);

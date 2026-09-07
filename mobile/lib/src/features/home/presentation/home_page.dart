@@ -119,9 +119,10 @@ class _DashboardHeader extends StatelessWidget {
             ),
           ),
         ),
-        const _HeaderButton(
+        _HeaderButton(
           icon: Icons.notifications_none_rounded,
-          tooltip: 'Notifications bientôt disponibles',
+          onPressed: () => context.push('/notifications'),
+          tooltip: 'Notifications',
         ),
         const SizedBox(width: AppSpacing.xs),
         _HeaderButton(

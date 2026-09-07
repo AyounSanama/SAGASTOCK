@@ -41,9 +41,43 @@ class InventoryService {
     String id,
     String inventory,
     List<Map<String, dynamic>> lines,
-  ) => _send('put', '/organizations/$id/inventories/$inventory/count', {
-    'lines': lines,
-  });
+  ) async {
+    final online = await _send(
+      'put',
+      '/organizations/$id/inventories/$inventory/count',
+      {'lines': lines},
+    );
+    if (!online) {
+      final cached = await _repository.localList(
+        collection: 'offline_inventories_$id',
+        organizationId: id,
+      );
+      for (final item in cached.where((item) => '${item['id']}' == inventory)) {
+        final cachedLines = (item['lines'] as List? ?? [])
+            .whereType<Map>()
+            .map((line) => Map<String, dynamic>.from(line))
+            .toList();
+        for (final update in lines) {
+          final target = cachedLines
+              .where((line) => '${line['id']}' == '${update['id']}')
+              .firstOrNull;
+          if (target != null) {
+            target['physical_quantity'] = update['physical_quantity'];
+            target['justification'] = update['justification'];
+          }
+        }
+        item['lines'] = cachedLines;
+        item['_sync_status'] = 'pending';
+      }
+      await _repository.cacheList(
+        collection: 'offline_inventories_$id',
+        organizationId: id,
+        values: cached,
+      );
+    }
+    return online;
+  }
+
   Future<bool> submit(String id, String inventory) =>
       _send('post', '/organizations/$id/inventories/$inventory/submit', {});
   Future<int> pendingCount() =>
