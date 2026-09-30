@@ -167,7 +167,7 @@ class UserScopeService
         if ($role === GovernanceService::SITE_USER) {
             return $query->whereKey($actor->id);
         }
-        $organizations = in_array($role, [GovernanceService::COORDINATION_ADMIN, GovernanceService::PROJECT_ADMIN], true)
+        $organizations = in_array($role, [GovernanceService::COORDINATION_ADMIN, GovernanceService::PROJECT_ADMIN, GovernanceService::SITE_ADMIN], true)
             ? collect()
             : $this->organizationIds($actor);
         $projects = in_array($role, [GovernanceService::COORDINATION_ADMIN, GovernanceService::PROJECT_ADMIN], true)

@@ -12,6 +12,7 @@ class ApplicationNavigationService
     /** Manifeste unique : chaque entrée dépend exclusivement d'une permission. */
     private const ITEMS = [
         ['key' => 'dashboard', 'label' => 'Tableau de bord', 'route' => 'dashboard', 'path' => '/dashboard', 'icon' => 'dashboard', 'permission' => null],
+        ['key' => 'patients', 'label' => 'Bénéficiaires', 'route' => 'modules.dispensing', 'path' => '/dispensations#beneficiaries', 'icon' => 'patients', 'permission' => 'patients.view', 'webOnly' => true],
         ['key' => 'missions', 'label' => 'Missions', 'route' => 'modules.missions', 'path' => '/missions', 'icon' => 'missions', 'permission' => 'missions.view'],
         ['key' => 'projects', 'label' => 'Projet actuel', 'route' => 'modules.projects', 'path' => '/projects', 'icon' => 'projects', 'permission' => 'projects.view'],
         ['key' => 'configuration', 'label' => 'Configuration', 'route' => 'configuration.index', 'path' => '/configuration', 'icon' => 'configuration', 'permission' => 'configuration.view'],
@@ -80,6 +81,9 @@ class ApplicationNavigationService
                     $item['label'] = 'Équipe FOSA';
                 }
                 $item['url'] = $this->buildUrl($item['route']);
+                if ($item['key'] === 'patients' && $item['url'] !== null) {
+                    $item['url'] .= '#beneficiaries';
+                }
 
                 return $item;
             })->values()->all();
@@ -142,7 +146,7 @@ class ApplicationNavigationService
     {
         $sago = app(GovernanceService::class)->roleCode($user) === GovernanceService::SAGO_ADMIN;
 
-        return collect($this->items($user))->whereNotNull('path')
+        return collect($this->items($user))->whereNotNull('path')->reject(fn (array $item) => $item['webOnly'] ?? false)
             ->map(fn (array $item) => [
                 'key' => $item['key'],
                 'label' => $item['label'],
