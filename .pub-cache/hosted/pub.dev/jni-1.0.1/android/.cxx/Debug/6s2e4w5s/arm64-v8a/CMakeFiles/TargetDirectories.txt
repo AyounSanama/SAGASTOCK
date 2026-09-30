@@ -1,3 +1,0 @@
-D:/Mes projets/Application SAGO M/SAGASTOCK/.pub-cache/hosted/pub.dev/jni-1.0.1/android/.cxx/Debug/6s2e4w5s/arm64-v8a/CMakeFiles/jni.dir
-D:/Mes projets/Application SAGO M/SAGASTOCK/.pub-cache/hosted/pub.dev/jni-1.0.1/android/.cxx/Debug/6s2e4w5s/arm64-v8a/CMakeFiles/edit_cache.dir
-D:/Mes projets/Application SAGO M/SAGASTOCK/.pub-cache/hosted/pub.dev/jni-1.0.1/android/.cxx/Debug/6s2e4w5s/arm64-v8a/CMakeFiles/rebuild_cache.dir

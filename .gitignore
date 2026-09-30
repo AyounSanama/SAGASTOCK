@@ -35,3 +35,10 @@ Thumbs.db
 *.log
 *.tmp
 
+
+# Local caches (packages, Gradle, temporary builds)
+/.pub-cache/
+/.gradle-task-cache/
+/.tmp/
+/.tmp_flutter_sync_build/
+/.tmp_flutter_sync_tests/
