@@ -12,11 +12,11 @@ Mis à jour le 30/09/2026. Source principale :
 | AM-102 | P0 | UI | Commiter la refonte UI/Tailwind après non-régression | **Livrée** (30/09) | AM-101 |
 | AM-103 | P1 | QA | Recette visuelle Admin Site et Utilisateur Site | Proposée | AM-102 |
 | AM-104 | P1 | SYNC | Compléter la synchronisation : conflits, curseurs, historique | Proposée | AM-101 |
-| AM-110 | P1 | CONF | Enrichir la fiche projet (partenaire, codes, responsable, statut) | Proposée | AM-102 |
-| AM-111 | P1 | REF | Niveaux de soins hiérarchiques (Niveau → Catégorie → Programme) | Validée | AM-102 |
-| AM-112 | P1 | CONF | Configuration médicale du projet (niveaux, populations, pathologies) | Proposée | AM-111 |
-| AM-113 | P1 | REF | Génération de la liste standard à partir de la configuration projet | Proposée | AM-112 |
-| AM-114 | P1 | CONF | Paramètres d'approvisionnement obligatoires et historisés | Validée (DEC-06) | AM-110 |
+| AM-110 | P1 | CONF | Enrichir la fiche projet (partenaire, codes, responsable, statut) | **Livrée** (30/09) | AM-102 |
+| AM-111 | P1 | REF | Niveaux de soins hiérarchiques (Niveau → Catégorie → Programme) | **Livrée** (30/09) | AM-102 |
+| AM-112 | P1 | CONF | Configuration médicale du projet (niveaux, populations, pathologies) | **Livrée** (30/09) | AM-111 |
+| AM-113 | P1 | REF | Génération de la liste standard à partir de la configuration projet | **Livrée** (30/09) | AM-112 |
+| AM-114 | P1 | CONF | Paramètres d'approvisionnement obligatoires et historisés | **Livrée** (30/09) | AM-110 |
 | AM-120 | P2 | GOUV | Formulaire de compte en trois rubriques (Web et mobile) | Proposée | AM-102 |
 | AM-121 | P1 | GOUV | Formaliser les limitations de modification des comptes | Bloquée (DEC-03) | — |
 | AM-122 | P1 | GOUV | Contexte projet automatique pour l'Admin Projet | Proposée | — |

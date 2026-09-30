@@ -23,6 +23,7 @@ Les entrées suivantes seront ajoutées au fil des livraisons.
 | 8 | 07/09/2026 | `e2e9b56` | Espace utilisateur FOSA, offline, notifications | AM-045 → AM-052 |
 | 9 | 08–23/09/2026 | `c440807`, `7a3c584` | Refonte UI Web (Tailwind) et mobile | AM-053 → AM-056 |
 | 10 | 30/09/2026 | `bbbf9f1` → `d42c7ea` | Stabilisation : tests au vert, commit de la refonte | AM-101, AM-102 |
+| 11 | 30/09/2026 | `bce20dd`, `126aa74` | Configuration du projet (cahier des charges Mission / Projet) | AM-110 → AM-114 |
 
 ---
 
@@ -135,6 +136,29 @@ Les entrées suivantes seront ajoutées au fil des livraisons.
 | AM-102 | UI | Refonte UI Web/mobile commitée en lots thématiques ; `.pub-cache` (13 813 fichiers) et caches locaux retirés du suivi Git | `bbbf9f1`, `c440807`, `7a3c584`, `d42c7ea` · `npm run build` réussi |
 
 ---
+
+## Lot 11 — Configuration du projet · 30/09/2026
+
+Source : spécifications « Créer un projet » (analyse `01`, règles RG-PRJ, RG-POP,
+RG-PAT, RG-APP). Décisions appliquées : DEC-01 (3 niveaux), DEC-02 (programmes
+cliniques distincts des programmes de financement), DEC-06 (paramètres
+obligatoires pour un projet actif).
+
+| ID | Domaine | Amélioration | Tests |
+|---|---|---|---|
+| AM-110 | CONF | Fiche projet enrichie : organisation / programme de mise en œuvre, code bailleur, code programme MoH, responsable et contact, statut (Brouillon, Actif, Suspendu, Clôturé ; `is_active` dérivé). **Un seul Form Request `SaveProjectRequest` pour le Web et l'API** (corrige en partie M-01) ; premier Admin Projet facultatif partout. Formulaires Web et mobile, écran « Mon projet » | `ProjectIdentityDetailsTest` (5) |
+| AM-111 | REF | Niveaux de soins hiérarchiques Niveau → Catégorie → Programme (`parent_id`, `depth`) ; règles serveur : même type, organisation ou référentiel global, pas de cycle, 3 niveaux maximum, pas d'archivage d'un parent actif, pas de déplacement d'un nœud qui a des enfants. Référentiel global initial du cahier des charges (SSP / SSS → Programmes PEC VIH, Paludisme, Malnutrition, Tuberculose). Onglet Web « Référentiel médical » et API `/projects/medical-references` | `CareLevelHierarchyTest` (4) |
+| AM-112 | CONF | Configuration médicale du projet : niveaux de soins, populations cibles, pathologies associées à chaque population (tables relationnelles `project_care_levels`, `project_target_populations`, `project_pathology_populations`). Écriture Coordination uniquement ; lecture Admin Projet. Ajout de populations et pathologies au référentiel. Web + mobile (éditeur Coordination, section « Mon projet ») | `ProjectMedicalConfigurationTest` (4) |
+| AM-113 | REF | Génération de la liste standard préremplie depuis la configuration du projet ; héritage hiérarchique (parents et programmes) ; indicateur « Liste à régénérer » quand la configuration change après publication | `ProjectStandardListFromConfigurationTest` (3) + `ProjectStandardListTest` (non-régression) |
+| AM-114 | CONF | Périodicité, délai de livraison et stock de sécurité **obligatoires pour un projet actif** ; historique append-only `project_supply_settings_history` (valeurs, auteur, date d'effet), initialisé avec les valeurs existantes | `ProjectSupplySettingsTest` (2) ; 5 tests existants mis à jour pour fournir les paramètres |
+
+**Changements de comportement à connaître**
+
+- Créer ou activer un projet **Actif** sans les trois paramètres d'approvisionnement est refusé (utiliser le statut Brouillon en attendant).
+- La section « Admin Projet » du formulaire de création est désormais facultative sur le Web, comme sur le mobile.
+- L'écriture de la configuration médicale et du référentiel médical se fait en ligne uniquement ; la lecture est disponible hors ligne (cache local) sur mobile.
+
+**Reste à faire (hors lot)** : blocage des transactions de stock pour un projet Clôturé ; troisième chemin de création de projet via l'assistant de configuration (M-01, lot L6) ; remplacement progressif des colonnes JSON de `standard_list_versions`.
 
 ## Modèle d'entrée pour les prochaines livraisons
 
