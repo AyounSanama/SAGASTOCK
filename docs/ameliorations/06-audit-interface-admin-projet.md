@@ -74,13 +74,13 @@ Légende : ✅ existe · 🟡 partiel / différent · ❌ absent.
 
 | Lot | ID | Contenu |
 |---|---|---|
-| a | AM-120 | **Tokens** Web + Flutter : neutres, 4 couleurs d'état, 3 teintes d'orange, menu sombre. Suppression des couleurs codées en dur dans les composants partagés ; le badge « warning » n'est plus orange. |
-| b | AM-121 | **Structure** : menu Admin Projet à 4 entrées (Q-3). Les anciennes routes FOSA / Équipe restent accessibles et deviennent des onglets : **masquées, pas supprimées**. Encart Coordination, fil d'Ariane, indicateur de synchro, barre basse mobile à 4 onglets. |
-| c1 | AM-122 | **Backend FOSA** : catégorie, niveau (FK hiérarchie), populations et pathologies (limitées à la configuration du projet), paramètres d'approvisionnement et dates. `SaveHealthFacilityRequest` commun, endpoint d'aperçu de la liste, endpoint tableau de bord Admin Projet, export Excel. Migrations non destructives. |
-| c2 | AM-123 | **Écrans Web** 01–04. |
-| c3 | AM-124 | **Écrans mobiles** 05–08, avec mise en page tablette en 2 colonnes. |
-| d | AM-125 | **Hors ligne** : écran des opérations en échec (corriger / abandonner), détection de conflit (version de la FOSA envoyée → 409 + choix de l'utilisateur), pastille de synchro, compte rendu de synchro par appareil (FOSA, opérations en attente), chiffrement SQLCipher de la base locale, bandeau hors ligne Web + sauvegarde du brouillon de formulaire. |
-| e | AM-126 | **Tests** : Feature Laravel (permissions, refus d'écriture sur la Liste Standard, cloisonnement, idempotence, conflit), widgets Flutter, scénarios manuels. |
+| a | AM-160 | **Tokens** Web + Flutter : neutres, 4 couleurs d'état, 3 teintes d'orange, menu sombre. Suppression des couleurs codées en dur dans les composants partagés ; le badge « warning » n'est plus orange. |
+| b | AM-161 | **Structure** : menu Admin Projet à 4 entrées (Q-3). Les anciennes routes FOSA / Équipe restent accessibles et deviennent des onglets : **masquées, pas supprimées**. Encart Coordination, fil d'Ariane, indicateur de synchro, barre basse mobile à 4 onglets. |
+| c1 | AM-162 | **Backend FOSA** : catégorie, niveau (FK hiérarchie), populations et pathologies (limitées à la configuration du projet), paramètres d'approvisionnement et dates. `SaveHealthFacilityRequest` commun, endpoint d'aperçu de la liste, endpoint tableau de bord Admin Projet, export Excel. Migrations non destructives. |
+| c2 | AM-163 | **Écrans Web** 01–04. |
+| c3 | AM-164 | **Écrans mobiles** 05–08, avec mise en page tablette en 2 colonnes. |
+| d | AM-165 | **Hors ligne** : écran des opérations en échec (corriger / abandonner), détection de conflit (version de la FOSA envoyée → 409 + choix de l'utilisateur), pastille de synchro, compte rendu de synchro par appareil (FOSA, opérations en attente), chiffrement SQLCipher de la base locale, bandeau hors ligne Web + sauvegarde du brouillon de formulaire. |
+| e | AM-166 | **Tests** : Feature Laravel (permissions, refus d'écriture sur la Liste Standard, cloisonnement, idempotence, conflit), widgets Flutter, scénarios manuels. |
 
 ## 4. Décisions à prendre
 
@@ -88,6 +88,25 @@ Légende : ✅ existe · 🟡 partiel / différent · ❌ absent.
 - **DEC-09 — Statut de synchronisation d'une FOSA.** Proposition : c'est la synchro la plus récente des appareils des comptes de cette FOSA, et chaque appareil envoie son nombre d'opérations en attente à chaque synchro. Seuil d'alerte : 3 jours, réglable dans `config/pharmacare_v1.php`.
 - **DEC-10 — Chiffrement SQLCipher.** Il impose une **réinitialisation unique de la base locale** sur chaque appareil. Seules les opérations déjà synchronisées sont conservées : il faut synchroniser avant la mise à jour.
 - **DEC-11 — Création de FOSA par l'Admin Projet.** Oui, d'après les maquettes. Catégories = référentiel `facility_category`, avec les 5 valeurs du prompt ajoutées au référentiel global.
+
+### Décisions du porteur (30/09/2026)
+
+- **DEC-08 — Validée.** Les paramètres du projet préremplissent la FOSA **à sa création**, puis restent modifiables par FOSA (avec historique). Une modification ultérieure du projet **n'écrase jamais** les FOSA : action explicite « Appliquer à toutes les FOSA » avec confirmation.
+- **DEC-09 — Validée.**
+  - À jour : dernière synchro réussie dans le délai **et** 0 opération en attente.
+  - En attente : au moins 1 opération en attente.
+  - Échec : dernière tentative en échec, **ou** aucune synchro réussie depuis plus que le seuil (3 jours, réglable).
+- **DEC-10 — Refusée telle quelle.** Aucune perte de données n'est acceptable.
+  - Option 1, préférée : migration sur place vers une base chiffrée.
+  - Option 2, sinon : blocage tant que la file n'est pas vide, synchronisation forcée, réinitialisation seulement après confirmation du serveur.
+  - Étude de faisabilité à présenter avant tout code.
+- **DEC-11 — Validée.** L'Admin Projet crée des FOSA dans son projet et choisit la catégorie dans la liste commune (5 catégories), sans pouvoir la modifier.
+- **Plan** : lots a → b → c1 → c2/c3 → d → e validés, avec une validation du porteur à la fin de chaque lot.
+- **Lot a** :
+  - `#F57C00` reste la couleur de marque ;
+  - supprimer `#FF7A00` et `#FF9C2A`, et retirer l'orange du badge « avertissement » ;
+  - utiliser la même teinte foncée sur le Web et le mobile ;
+  - montrer une capture de cette teinte avant de la généraliser.
 
 ## 5. Risques
 

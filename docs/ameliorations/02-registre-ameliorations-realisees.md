@@ -24,6 +24,7 @@ Les entrées suivantes seront ajoutées au fil des livraisons.
 | 9 | 08–23/09/2026 | `c440807`, `7a3c584` | Refonte UI Web (Tailwind) et mobile | AM-053 → AM-056 |
 | 10 | 30/09/2026 | `bbbf9f1` → `d42c7ea` | Stabilisation : tests au vert, commit de la refonte | AM-101, AM-102 |
 | 11 | 30/09/2026 | `bce20dd`, `126aa74` | Configuration du projet (cahier des charges Mission / Projet) | AM-110 → AM-114 |
+| 12 | 30/09/2026 | `193a7bd` (en recette) | Charte couleurs et typographie (interface Admin Projet, lot a) | AM-160 |
 
 ---
 
@@ -159,6 +160,28 @@ obligatoires pour un projet actif).
 - L'écriture de la configuration médicale et du référentiel médical se fait en ligne uniquement ; la lecture est disponible hors ligne (cache local) sur mobile.
 
 **Reste à faire (hors lot)** : blocage des transactions de stock pour un projet Clôturé ; troisième chemin de création de projet via l'assistant de configuration (M-01, lot L6) ; remplacement progressif des colonnes JSON de `standard_list_versions`.
+
+## Lot 12 — Charte couleurs et typographie · 30/09/2026 · en recette
+
+Source : prompt « Nouvelle interface Admin Projet » (audit `06`, lot a). Teinte
+forte choisie par le porteur : **#B85D00** (option B de la planche de
+comparaison).
+
+| ID | Domaine | Amélioration | Tests |
+|---|---|---|---|
+| AM-160 | UI | Jetons uniques Web (`design-system.css`) et Flutter (`app_tokens.dart`) : marque `#F57C00` (indicateurs, soulignements, focus, sélection, texte actif du menu sombre), teinte forte `#B85D00` (boutons à texte blanc, bouton « + », tout texte orange sur fond clair), survol `#9C4F00` (plus foncé) ; neutres `#F5F5F3` / `#FFFFFF` / `#E3E3E0` / `#1C1F23` / `#5F6368` ; quatre couleurs d'état, jamais orange ; menu latéral sombre `#1E2329` (232 px). Oranges parasites supprimés (`#FF7A00`, `#FF9C2A`, `#B85C00`, `#C86500`, `#A65000`). Couleurs codées en dur des vues Blade remplacées par les jetons (733 occurrences, `welcome.blade.php` exclu). Police Inter embarquée dans l'application mobile (licence OFL) et appliquée à tous les styles de composants ; champs à 15 px | `theme_charter_test.dart` (11 : contrastes, rôles, pastilles, badges) ; suites complètes backend et Flutter |
+
+**Corrections découvertes pendant le lot**
+
+- Le sélecteur de langue et le bouton de thème de la barre supérieure recevaient le fond orange de la règle générique des boutons : ils sont neutres, la langue active est en teinte forte (l'ancien bleu `#4563F5` est retiré).
+- Le bouton « afficher le mot de passe » du formulaire de compte apparaissait comme un bouton d'action orange : icône neutre.
+- Les libellés des pastilles (`FilterChip`) mobiles s'affichaient en blanc (couleur non résolue) : couleur d'état explicite.
+- Les boutons et titres mobiles retombaient sur Roboto (styles de composants sans famille) : Inter partout.
+- Badges d'état « actif » rendus en gris par la règle globale : classes explicites (`active`, `inactive`, `off`…) raccordées aux couleurs d'état ; « inactif » n'est plus orange.
+
+**Numérotation** : le plan de l'audit `06` utilisait AM-120 → AM-126, déjà attribués ; il est renuméroté AM-160 → AM-166.
+
+**Restant (lots suivants)** : barre supérieure trop large sur téléphone (lot b) ; onglets du catalogue visibles sur la Liste Standard de l'Admin Projet (lot c2) ; couleurs de catégories des graphiques SAGO conservées (données, pas des états).
 
 ## Modèle d'entrée pour les prochaines livraisons
 
