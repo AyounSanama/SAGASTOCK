@@ -19,6 +19,11 @@ d'acceptation constituent sa traduction technique exécutable.
 - [Modules et phasage officiels](18-modules-et-phasage-officiels.md)
 - [Audit de conformité Phase 2](19-audit-conformite-phase2.md)
 
+## Suivi des améliorations
+
+- [Dossier des améliorations](ameliorations/README.md) : analyse du cahier des
+  charges, registre des réalisations et backlog priorisé.
+
 ## Principes non négociables
 
 - Flutter, Laravel, PostgreSQL, SQLite, REST et Offline-First.
