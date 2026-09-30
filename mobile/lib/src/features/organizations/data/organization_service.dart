@@ -100,6 +100,66 @@ class OrganizationService {
     query: {'project_id': projectId},
   );
 
+  /// AM-112 — Configuration médicale du projet (lecture disponible hors ligne).
+  Future<Map<String, dynamic>> medicalConfiguration({
+    required String projectId,
+    required String organizationId,
+  }) => _repository.document(
+    collection: 'project.medical-configuration',
+    endpoint: '/projects/$projectId/medical-configuration',
+    organizationId: organizationId,
+    query: {'project_id': projectId},
+  );
+
+  /// Écriture réservée à la Coordination, envoyée en ligne (même endpoint
+  /// et mêmes règles que le portail Web).
+  Future<Map<String, dynamic>> saveMedicalConfiguration({
+    required String projectId,
+    required List<String> careLevelIds,
+    required List<String> targetPopulationIds,
+    required List<Map<String, dynamic>> pathologies,
+  }) async {
+    final response = await _client.dio.put<Map<String, dynamic>>(
+      '/projects/$projectId/medical-configuration',
+      options: await _authorized(),
+      data: {
+        'care_level_ids': careLevelIds,
+        'target_population_ids': targetPopulationIds,
+        'pathologies': pathologies,
+      },
+    );
+    return response.data ?? const {};
+  }
+
+  /// AM-111 / AM-112 — Référentiel médical de la Coordination.
+  Future<Map<String, dynamic>> medicalReferences() async {
+    final response = await _client.dio.get<Map<String, dynamic>>(
+      '/projects/medical-references',
+      options: await _authorized(),
+    );
+    return response.data ?? const {};
+  }
+
+  /// [type] : `care_level`, `target_population` ou `pathology`.
+  Future<void> addMedicalReference({
+    required String type,
+    required String code,
+    required String name,
+    String? parentId,
+  }) async {
+    await _client.dio.post<void>(
+      type == 'care_level'
+          ? '/projects/medical-references/care-levels'
+          : '/projects/medical-references/$type',
+      options: await _authorized(),
+      data: {
+        'code': code,
+        'name': name,
+        if (parentId != null && parentId.isNotEmpty) 'parent_id': parentId,
+      },
+    );
+  }
+
   Future<List<Map<String, dynamic>>> organizationCountries(
     String organizationId,
   ) async {
@@ -380,15 +440,16 @@ class OrganizationService {
     DateTime? endsOn,
     required List<String> donorIds,
     required List<String> programIds,
-    required String adminFirstName,
-    required String adminLastName,
-    required String adminEmail,
+    String adminFirstName = '',
+    String adminLastName = '',
+    String adminEmail = '',
     String? adminPhone,
     String? adminUsername,
-    required String adminPassword,
+    String adminPassword = '',
     int? orderPeriodMonths,
     int? deliveryLeadTimeMonths,
     int? safetyStockMonths,
+    Map<String, dynamic> identity = const {},
   }) async {
     // Le mot de passe ne doit jamais être persisté dans l'outbox locale.
     // Cette opération atomique est donc envoyée uniquement en ligne.
@@ -402,21 +463,24 @@ class OrganizationService {
         if (description?.isNotEmpty == true) 'description': description,
         if (startsOn != null) 'starts_on': _date(startsOn),
         if (endsOn != null) 'ends_on': _date(endsOn),
-        'is_active': true,
+        'status': 'active',
+        ...identity,
         'donor_ids': donorIds,
         'program_ids': programIds,
         'order_period_months': ?orderPeriodMonths,
         'delivery_lead_time_months': ?deliveryLeadTimeMonths,
         'safety_stock_months': ?safetyStockMonths,
-        'admin': {
-          'first_name': adminFirstName,
-          'last_name': adminLastName,
-          'email': adminEmail,
-          if (adminPhone?.isNotEmpty == true) 'phone': adminPhone,
-          if (adminUsername?.isNotEmpty == true) 'username': adminUsername,
-          'password': adminPassword,
-          'password_confirmation': adminPassword,
-        },
+        // Premier Admin Projet facultatif, comme sur le portail Web.
+        if (adminEmail.isNotEmpty)
+          'admin': {
+            'first_name': adminFirstName,
+            'last_name': adminLastName,
+            'email': adminEmail,
+            if (adminPhone?.isNotEmpty == true) 'phone': adminPhone,
+            if (adminUsername?.isNotEmpty == true) 'username': adminUsername,
+            'password': adminPassword,
+            'password_confirmation': adminPassword,
+          },
       },
     );
   }
@@ -433,6 +497,7 @@ class OrganizationService {
     int? deliveryLeadTimeMonths,
     int? safetyStockMonths,
     bool isActive = true,
+    Map<String, dynamic> identity = const {},
   }) async {
     return _repository.mutate(
       collection: 'projects',
@@ -450,6 +515,7 @@ class OrganizationService {
         'delivery_lead_time_months': deliveryLeadTimeMonths,
         'safety_stock_months': safetyStockMonths,
         'is_active': isActive,
+        ...identity,
       },
     );
   }
@@ -471,6 +537,7 @@ class OrganizationService {
     List<Map<String, dynamic>> donorRecords = const [],
     List<Map<String, dynamic>> programRecords = const [],
     bool isActive = true,
+    Map<String, dynamic> identity = const {},
   }) {
     final payload = <String, dynamic>{
       'mission_id': missionId,
@@ -485,6 +552,7 @@ class OrganizationService {
       'donor_ids': donorIds,
       'program_ids': programIds,
       'is_active': isActive,
+      ...identity,
     };
     return _repository.mutate(
       collection: 'projects',

@@ -4,6 +4,7 @@ import '../../../core/access/session_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/data/auth_service.dart';
 import '../data/organization_service.dart';
+import 'project_medical_configuration.dart';
 
 class MyProjectPage extends StatefulWidget {
   const MyProjectPage({super.key});
@@ -17,6 +18,7 @@ class _MyProjectPageState extends State<MyProjectPage> {
   bool _loading = true;
   String? _error;
   Map<String, dynamic> _project = const {};
+  Map<String, dynamic>? _medical;
 
   @override
   void initState() {
@@ -44,7 +46,25 @@ class _MyProjectPageState extends State<MyProjectPage> {
       );
       final value = response['project'];
       if (value is! Map) throw StateError('missing project');
-      if (mounted) setState(() => _project = Map<String, dynamic>.from(value));
+      Map<String, dynamic>? medical;
+      try {
+        final result = await _service.medicalConfiguration(
+          projectId: projectId,
+          organizationId: organizationId,
+        );
+        if (result['configuration'] is Map) {
+          medical = Map<String, dynamic>.from(result['configuration'] as Map);
+        }
+      } catch (_) {
+        // La fiche projet reste affichée même si la configuration médicale
+        // n'a jamais été synchronisée sur cet appareil.
+      }
+      if (mounted) {
+        setState(() {
+          _project = Map<String, dynamic>.from(value);
+          _medical = medical;
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(
@@ -87,6 +107,10 @@ class _MyProjectPageState extends State<MyProjectPage> {
               values: _maps(_project['programs']),
             ),
             const SizedBox(height: 16),
+            if (_medical != null) ...[
+              MedicalConfigurationSection(configuration: _medical!),
+              const SizedBox(height: 16),
+            ],
             _SupplySection(project: _project),
           ],
         ],
@@ -131,7 +155,11 @@ class _ProjectHeader extends StatelessWidget {
               ],
             ),
           ),
-          Chip(label: Text(project['is_active'] == true ? 'Actif' : 'Inactif')),
+          Chip(
+            label: Text(
+              '${project['status_label'] ?? (project['is_active'] == true ? 'Actif' : 'Inactif')}',
+            ),
+          ),
         ],
       ),
     ),
@@ -150,10 +178,15 @@ class _InfoSection extends StatelessWidget {
       title: 'Informations générales',
       children: [
         _Line('Organisation', '${organization?['name'] ?? '—'}'),
+        _Line('Mise en œuvre', _orDash(project['implementing_partner'])),
         _Line('Coordination / Mission', '${mission?['name'] ?? '—'}'),
         _Line('Pays', '${country?['name'] ?? '—'}'),
         _Line('Date de début', '${project['starts_on'] ?? '—'}'),
         _Line('Date de fin', '${project['ends_on'] ?? '—'}'),
+        _Line('Responsable', _orDash(project['responsible_name'])),
+        _Line('Contact', _orDash(project['responsible_contact'])),
+        _Line('Code bailleur', _orDash(project['donor_reference_code'])),
+        _Line('Code programme MoH', _orDash(project['moh_program_code'])),
         if ('${project['description'] ?? ''}'.trim().isNotEmpty)
           _Line('Description', '${project['description']}'),
       ],
@@ -280,4 +313,9 @@ class _ErrorCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+String _orDash(Object? value) {
+  final text = '${value ?? ''}'.trim();
+  return text.isEmpty ? '—' : text;
 }

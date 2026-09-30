@@ -10,6 +10,7 @@ import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/widgets/app_form_sheet.dart';
 import '../../auth/data/auth_service.dart';
 import '../data/organization_service.dart';
+import 'project_medical_configuration.dart';
 
 class ScopedProjectsPage extends StatefulWidget {
   const ScopedProjectsPage({
@@ -135,6 +136,21 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
     final description = TextEditingController(
       text: '${project?['description'] ?? ''}',
     );
+    final partner = TextEditingController(
+      text: '${project?['implementing_partner'] ?? ''}',
+    );
+    final donorCode = TextEditingController(
+      text: '${project?['donor_reference_code'] ?? ''}',
+    );
+    final mohCode = TextEditingController(
+      text: '${project?['moh_program_code'] ?? ''}',
+    );
+    final responsibleName = TextEditingController(
+      text: '${project?['responsible_name'] ?? ''}',
+    );
+    final responsibleContact = TextEditingController(
+      text: '${project?['responsible_contact'] ?? ''}',
+    );
     final adminFirstName = TextEditingController();
     final adminLastName = TextEditingController();
     final adminEmail = TextEditingController();
@@ -157,7 +173,19 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
         '${project?['mission_id'] ?? (project?['mission'] as Map?)?['id'] ?? _missions.first['id']}';
     DateTime? startsOn = DateTime.tryParse('${project?['starts_on'] ?? ''}');
     DateTime? endsOn = DateTime.tryParse('${project?['ends_on'] ?? ''}');
-    bool active = project?['is_active'] != false, saving = false;
+    bool saving = false;
+    String status =
+        '${project?['status'] ?? (project?['is_active'] == false ? 'suspended' : 'active')}';
+    Map<String, dynamic> identity() => {
+      'implementing_partner': partner.text.trim(),
+      'donor_reference_code': donorCode.text.trim(),
+      'moh_program_code': mohCode.text.trim(),
+      'responsible_name': responsibleName.text.trim(),
+      'responsible_contact': responsibleContact.text.trim(),
+      'status': status,
+    };
+    String? adminRequired(String? value) =>
+        adminEmail.text.trim().isEmpty ? null : _required(value);
     int? orderPeriodMonths = project?['order_period_months'] as int?;
     int? deliveryLeadTimeMonths = project?['delivery_lead_time_months'] as int?;
     int? safetyStockMonths = project?['safety_stock_months'] as int?;
@@ -209,6 +237,50 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
+                  controller: partner,
+                  decoration: const InputDecoration(
+                    labelText: 'Organisation / programme de mise en œuvre',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: donorCode,
+                        decoration: const InputDecoration(
+                          labelText: 'Code bailleur',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                        controller: mohCode,
+                        decoration: const InputDecoration(
+                          labelText: 'Code programme MoH',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: responsibleName,
+                  decoration: const InputDecoration(
+                    labelText: 'Responsable du projet',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: responsibleContact,
+                  decoration: const InputDecoration(
+                    labelText: 'Contact du responsable',
+                    hintText: 'E-mail ou téléphone',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
                   controller: description,
                   decoration: const InputDecoration(labelText: 'Description'),
                   maxLines: 3,
@@ -236,13 +308,24 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                     ),
                   ],
                 ),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Projet actif'),
-                  value: active,
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  initialValue: _projectStatuses.containsKey(status)
+                      ? status
+                      : 'active',
+                  decoration: const InputDecoration(labelText: 'Statut *'),
+                  items: _projectStatuses.entries
+                      .map(
+                        (entry) => DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                      )
+                      .toList(),
                   onChanged: saving
                       ? null
-                      : (value) => setSheetState(() => active = value),
+                      : (value) =>
+                            setSheetState(() => status = value ?? status),
                 ),
                 if (editing) ...[
                   const Divider(height: 28),
@@ -263,6 +346,9 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                       labelText: 'Périodicité des commandes',
                     ),
                     items: _monthOptions,
+                    validator: (value) => status == 'active' && value == null
+                        ? 'Obligatoire pour un projet actif'
+                        : null,
                     onChanged: saving
                         ? null
                         : (value) => orderPeriodMonths = value,
@@ -274,6 +360,9 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                       labelText: 'Délai de livraison',
                     ),
                     items: _monthOptions,
+                    validator: (value) => status == 'active' && value == null
+                        ? 'Obligatoire pour un projet actif'
+                        : null,
                     onChanged: saving
                         ? null
                         : (value) => deliveryLeadTimeMonths = value,
@@ -285,6 +374,9 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                       labelText: 'Stock de sécurité',
                     ),
                     items: _monthOptions,
+                    validator: (value) => status == 'active' && value == null
+                        ? 'Obligatoire pour un projet actif'
+                        : null,
                     onChanged: saving
                         ? null
                         : (value) => safetyStockMonths = value,
@@ -309,6 +401,9 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                       labelText: 'Périodicité des commandes',
                     ),
                     items: _monthOptions,
+                    validator: (value) => status == 'active' && value == null
+                        ? 'Obligatoire pour un projet actif'
+                        : null,
                     onChanged: saving
                         ? null
                         : (value) => orderPeriodMonths = value,
@@ -320,6 +415,9 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                       labelText: 'Délai de livraison',
                     ),
                     items: _monthOptions,
+                    validator: (value) => status == 'active' && value == null
+                        ? 'Obligatoire pour un projet actif'
+                        : null,
                     onChanged: saving
                         ? null
                         : (value) => deliveryLeadTimeMonths = value,
@@ -331,6 +429,9 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                       labelText: 'Stock de sécurité',
                     ),
                     items: _monthOptions,
+                    validator: (value) => status == 'active' && value == null
+                        ? 'Obligatoire pour un projet actif'
+                        : null,
                     onChanged: saving
                         ? null
                         : (value) => safetyStockMonths = value,
@@ -397,7 +498,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Responsable du projet',
+                      'Premier Admin Projet (facultatif)',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
@@ -407,29 +508,28 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Le rôle Admin Projet sera attribué automatiquement.',
+                      'Renseignez l’e-mail pour créer le compte maintenant. Le rôle Admin Projet est automatique ; le mot de passe devra être changé à la première connexion.',
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: adminFirstName,
-                    decoration: const InputDecoration(labelText: 'Prénom *'),
-                    validator: _required,
+                    decoration: const InputDecoration(labelText: 'Prénom'),
+                    validator: adminRequired,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: adminLastName,
-                    decoration: const InputDecoration(labelText: 'Nom *'),
-                    validator: _required,
+                    decoration: const InputDecoration(labelText: 'Nom'),
+                    validator: adminRequired,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: adminEmail,
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
-                      labelText: 'Email de connexion *',
+                      labelText: 'Email de connexion',
                     ),
-                    validator: _required,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -447,10 +547,12 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                     controller: adminPassword,
                     obscureText: true,
                     decoration: const InputDecoration(
-                      labelText: 'Mot de passe *',
+                      labelText: 'Mot de passe',
                       helperText: PasswordPolicy.helperText,
                     ),
-                    validator: PasswordPolicy.validate,
+                    validator: (value) => adminEmail.text.trim().isEmpty
+                        ? null
+                        : PasswordPolicy.validate(value),
                   ),
                   const SizedBox(height: 14),
                   Card(
@@ -525,7 +627,8 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                                             ),
                                           )
                                           .toList(),
-                                      isActive: active,
+                                      isActive: status == 'active',
+                                      identity: identity(),
                                     );
                                   } else {
                                     await _service.createConfiguredProject(
@@ -549,6 +652,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                                       deliveryLeadTimeMonths:
                                           deliveryLeadTimeMonths,
                                       safetyStockMonths: safetyStockMonths,
+                                      identity: identity(),
                                     );
                                   }
                                   if (sheetContext.mounted) {
@@ -589,6 +693,11 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
     code.dispose();
     name.dispose();
     description.dispose();
+    partner.dispose();
+    donorCode.dispose();
+    mohCode.dispose();
+    responsibleName.dispose();
+    responsibleContact.dispose();
     adminFirstName.dispose();
     adminLastName.dispose();
     adminEmail.dispose();
@@ -613,6 +722,13 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
 
   String? _required(String? value) =>
       value?.trim().isEmpty == true ? 'Champ obligatoire' : null;
+
+  static const _projectStatuses = <String, String>{
+    'draft': 'Brouillon',
+    'active': 'Actif',
+    'suspended': 'Suspendu',
+    'closed': 'Clôturé',
+  };
 
   static const _monthOptions = <DropdownMenuItem<int>>[
     DropdownMenuItem(value: 1, child: Text('1 mois')),
@@ -687,6 +803,21 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
     }
   }
 
+  Future<void> _openMedicalConfiguration(Map<String, dynamic> project) async {
+    final saved = await showMedicalConfigurationEditor(
+      context,
+      service: _service,
+      projectId: '${project['id']}',
+      organizationId: _organizationId!,
+      projectName: '${project['name']}',
+    );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Configuration médicale enregistrée.')),
+      );
+    }
+  }
+
   Future<void> _showProject(Map<String, dynamic> project) => showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -707,7 +838,20 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
             'Pays : ${((project['mission'] as Map?)?['country'] as Map?)?['name'] ?? '\u2014'}',
           ),
           const SizedBox(height: 8),
-          Text('Statut : ${_archived ? 'Archiv\u00e9' : 'Actif'}'),
+          Text(
+            'Statut : ${_archived ? 'Archiv\u00e9' : (project['status_label'] ?? 'Actif')}',
+          ),
+          if ('${project['implementing_partner'] ?? ''}'.isNotEmpty)
+            Text('Mise en œuvre : ${project['implementing_partner']}'),
+          if ('${project['responsible_name'] ?? ''}'.isNotEmpty)
+            Text(
+              'Responsable : ${project['responsible_name']}'
+              '${'${project['responsible_contact'] ?? ''}'.isEmpty ? '' : ' · ${project['responsible_contact']}'}',
+            ),
+          if ('${project['donor_reference_code'] ?? ''}'.isNotEmpty)
+            Text('Code bailleur : ${project['donor_reference_code']}'),
+          if ('${project['moh_program_code'] ?? ''}'.isNotEmpty)
+            Text('Code programme MoH : ${project['moh_program_code']}'),
           const SizedBox(height: 8),
           Text('Bailleur(s) : ${_names(project['donors'])}'),
           Text('Programme(s) : ${_names(project['programs'])}'),
@@ -932,6 +1076,9 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                       onSelected: (action) {
                         if (action == 'view') _showProject(project);
                         if (action == 'edit') _openForm(project);
+                        if (action == 'medical') {
+                          _openMedicalConfiguration(project);
+                        }
                         if (action == 'archive') _changeArchiveState(project);
                       },
                       itemBuilder: (_) => [
@@ -940,6 +1087,11 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                           const PopupMenuItem(
                             value: 'edit',
                             child: Text('Modifier'),
+                          ),
+                        if (!_archived && _canManage)
+                          const PopupMenuItem(
+                            value: 'medical',
+                            child: Text('Configuration médicale'),
                           ),
                         if (_canManage)
                           PopupMenuItem(
@@ -1138,6 +1290,16 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                               color: AppActionColor.orange,
                               onPressed: () => _openForm(project),
                             ),
+                          if (!_archived && _canManage) ...[
+                            const SizedBox(width: 4),
+                            AppIconAction(
+                              icon: Icons.medical_services_outlined,
+                              tooltip: 'Configuration médicale',
+                              color: AppActionColor.green,
+                              onPressed: () =>
+                                  _openMedicalConfiguration(project),
+                            ),
+                          ],
                           const SizedBox(width: 4),
                           if (_canManage)
                             AppIconAction(
