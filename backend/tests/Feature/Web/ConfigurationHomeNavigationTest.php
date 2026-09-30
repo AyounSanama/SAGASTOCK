@@ -16,46 +16,30 @@ class ConfigurationHomeNavigationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_home_displays_only_the_three_configuration_sections(): void
+    public function test_home_displays_only_current_platform_configuration_sections(): void
     {
         [$owner] = $this->context();
-
-        $this->actingAs($owner)->get(route('configuration.index'))
-            ->assertOk()
-            ->assertSee('Organisations')
-            ->assertSee('Missions / Pays')
-            ->assertSee('Listes standards')
-            ->assertDontSee('Ajouter une organisation')
-            ->assertDontSee('Ajouter une mission')
-            ->assertDontSee('Entrer dans l’application')
-            ->assertDontSee('Projet actif')
-            ->assertDontSee('Modules actifs')
-            ->assertDontSee('Fonctionnalités');
+        $this->actingAs($owner)->get(route('configuration.index'))->assertOk()
+            ->assertSee('Organisations')->assertSee('Standards &amp; Référentiels', false)
+            ->assertSee(route('configuration.organization'), false)
+            ->assertSee(route('configuration.platform-standards.index'), false)
+            ->assertDontSee('Missions / Pays')->assertDontSee('Projet actif');
     }
 
-    public function test_organization_and_mission_actions_start_expected_workflows(): void
+    public function test_standalone_organization_form_replaces_legacy_workflow_actions(): void
     {
-        [$owner, $organization] = $this->context();
+        [$owner] = $this->context();
         $this->actingAs($owner);
-
-        $this->get(route('configuration.workflow.start', ConfigurationFlowType::NewOrganization->value))
-            ->assertRedirectContains('/configuration/organization')
-            ->assertRedirectContains('create=1');
-
-        $mission = $this->get(route('configuration.workflow.start', [
-            'flowType' => ConfigurationFlowType::NewMission->value,
-            'organization' => $organization->id,
-        ]));
-        $mission->assertRedirectContains('/configuration/mission');
-        parse_str(parse_url($mission->headers->get('Location'), PHP_URL_QUERY) ?: '', $query);
-
-        $this->get(route('configuration.mission', ['_flow' => $query['_flow']]))
-            ->assertOk()
-            ->assertSee('mission-create-sheet')
-            ->assertSee('Ajouter une mission');
+        foreach ([ConfigurationFlowType::NewOrganization, ConfigurationFlowType::NewMission] as $type) {
+            $this->get(route('configuration.workflow.start', $type->value))->assertForbidden();
+        }
+        $this->get(route('configuration.organization', ['create' => 1]))->assertOk()
+            ->assertSee('data-organization-mode="createOrganization"', false)
+            ->assertSee('name="name" value=""', false);
+        $this->assertDatabaseCount('missions', 0);
     }
 
-    public function test_return_link_preserves_workflow_progress(): void
+    public function test_forbidden_legacy_step_and_configuration_return_preserve_progress(): void
     {
         [$owner, $organization] = $this->context();
         $states = array_fill_keys(array_map('strval', range(1, 12)), 'not_started');
@@ -72,9 +56,7 @@ class ConfigurationHomeNavigationTest extends TestCase
 
         $this->actingAs($owner)
             ->get(route('configuration.mission', ['_flow' => $progress->workflow_id]))
-            ->assertOk()
-            ->assertSee('Retour à l’accueil Configuration')
-            ->assertSee(route('configuration.index', ['_flow' => $progress->workflow_id]), false);
+            ->assertForbidden();
 
         $this->get(route('configuration.index', ['_flow' => $progress->workflow_id]))->assertOk();
         $this->assertSame([1], $progress->fresh()->completed_steps);
@@ -83,7 +65,7 @@ class ConfigurationHomeNavigationTest extends TestCase
 
     private function context(): array
     {
-        Country::create(['iso2' => 'CM', 'name' => 'Cameroun', 'is_active' => true]);
+        Country::where('iso2', 'CM')->firstOrFail();
         $organization = Organization::create([
             'code' => 'ORG', 'name' => 'Organisation Test',
             'organization_type' => 'ngo', 'country_code' => 'CM',

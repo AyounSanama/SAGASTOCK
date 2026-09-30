@@ -15,179 +15,92 @@ use Tests\TestCase;
 class MissionConfigurationTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Support\OfficialConfigurationFixtures;
 
-    public function test_step_is_available_only_after_organization_validation(): void
+    public function test_manual_mission_step_stays_forbidden_after_automatic_provisioning(): void
     {
-        [$owner] = $this->context();
-
-        $this->actingAs($owner)
-            ->get(route('configuration.mission'))
-            ->assertForbidden();
-
-        SetupProgress::current()->update(['completed_steps' => [1]]);
-
-        $this->get(route('configuration.mission'))
-            ->assertOk()
-            ->assertSee('Étape 2')
-            ->assertSee('Mission')
-            ->assertSee('Enregistrer et continuer');
+        $owner = $this->sago();
+        $this->actingAs($owner)->get(route('configuration.mission'))->assertForbidden();
+        $organization = $this->createOfficialOrganization();
+        $this->assertSame(1, $organization->missions()->count());
+        // Provisioning is automatic; validating an organization never reopens the legacy wizard.
+        $this->get(route('configuration.mission'))->assertForbidden();
     }
 
-    public function test_valid_mission_is_persisted_and_unlocks_projects(): void
+    public function test_provisioned_mission_has_scoped_admin_who_can_open_projects(): void
     {
-        [$owner, $organization, $country] = $this->context([1]);
-
-        $response = $this->actingAs($owner)->post(route('configuration.mission.save'), [
-            'name' => 'Mission Santé Cameroun',
-            'code' => 'MSC-CM',
-            'country_id' => $country->id,
-            'starts_on' => '2026-01-01',
-            'ends_on' => '2028-12-31',
-            'status' => 'active',
-            'action' => 'continue',
-        ]);
-
-        $response->assertRedirect(route('configuration.step', 'projects'));
-        $mission = Mission::firstOrFail();
-        $this->assertSame($organization->id, $mission->organization_id);
-        $this->assertSame($country->id, $mission->country_id);
-        $this->assertSame('MSC-CM', $mission->code);
+        $this->actingAs($this->sago());
+        $organization = $this->createOfficialOrganization();
+        $mission = $organization->missions()->firstOrFail();
+        $this->assertSame(Country::where('iso2', 'CM')->value('id'), $mission->country_id);
         $this->assertTrue($mission->is_active);
-        $this->assertContains(2, SetupProgress::current()->completed_steps);
-
-        $this->get(route('configuration.step', 'projects'))
-            ->assertOk()
-            ->assertSee('Projet principal')
-            ->assertSee('Nom du projet');
+        $admin = User::where('email', 'coordination@stabilisation.example')->firstOrFail();
+        $this->assertDatabaseHas('role_user', ['user_id' => $admin->id, 'scope_type' => 'mission', 'scope_id' => $mission->id]);
+        $this->actingAs($admin)->get('/projects')->assertOk()->assertSee('project-create-sheet');
     }
 
-    public function test_validation_rejects_missing_fields_invalid_dates_and_inactive_country(): void
+    public function test_invalid_organization_country_rolls_back_coordination_provisioning(): void
     {
-        [$owner, , $country] = $this->context([1], false);
-
-        $this->actingAs($owner)
-            ->from(route('configuration.mission'))
-            ->post(route('configuration.mission.save'), [
-                'name' => '',
-                'code' => '',
-                'country_id' => $country->id,
-                'starts_on' => '2027-01-01',
-                'ends_on' => '2026-01-01',
-                'status' => 'active',
-                'action' => 'save',
-            ])
-            ->assertRedirect(route('configuration.mission'))
-            ->assertSessionHasErrors(['name', 'code', 'country_id', 'ends_on']);
-
+        $this->actingAs($this->sago());
+        // Countries are now selected on the organization form; no manual mission dates are submitted.
+        $this->post(route('configuration.organization.save'), $this->organizationPayload([
+            'name' => '', 'code' => '', 'country_ids' => ['11111111-2222-4333-8444-555555555555'],
+        ]))->assertSessionHasErrors(['name', 'code', 'country_ids.0']);
+        $this->assertDatabaseCount('organizations', 0);
         $this->assertDatabaseCount('missions', 0);
+        $this->assertDatabaseMissing('users', ['email' => 'coordination@stabilisation.example']);
     }
 
-    public function test_saving_again_updates_without_creating_a_duplicate(): void
+    public function test_repeated_organization_updates_do_not_duplicate_coordination(): void
     {
-        [$owner, $organization, $country] = $this->context([1, 2]);
-        $mission = $organization->missions()->create([
-            'country_id' => $country->id,
-            'code' => 'OLD',
-            'name' => 'Ancienne mission',
-            'is_active' => true,
-        ]);
-
-        $this->actingAs($owner)->post(route('configuration.mission.save'), [
-            'name' => 'Mission actualisée',
-            'code' => 'NEW',
-            'country_id' => $country->id,
-            'status' => 'active',
-            'action' => 'save',
-        ])->assertRedirect(route('configuration.mission'));
-
+        $this->actingAs($this->sago());
+        $organization = $this->createOfficialOrganization();
+        $mission = $organization->missions()->firstOrFail();
+        $payload = ['name' => 'Nom actualisé', 'code' => $organization->code, 'status' => 'active', 'geographic_access_type' => 'single_country', 'country_ids' => [$mission->country_id]];
+        $this->put(route('configuration.organization.update', $organization), $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->put(route('configuration.organization.update', $organization), $payload)->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('missions', 1);
-        $this->assertSame('Mission actualisée', $mission->fresh()->name);
-        $this->assertSame('NEW', $mission->fresh()->code);
+        $this->assertSame($mission->id, $organization->missions()->value('id'));
+        $this->assertSame('Nom actualisé', $organization->fresh()->name);
     }
 
-    public function test_inactive_mission_is_saved_as_draft_but_cannot_unlock_projects(): void
+    public function test_legacy_mission_draft_cannot_mutate_provisioned_coordination(): void
     {
-        [$owner, , $country] = $this->context([1]);
-        $payload = [
-            'name' => 'Mission en préparation',
-            'code' => 'DRAFT',
-            'country_id' => $country->id,
-            'status' => 'inactive',
-        ];
-
-        $this->actingAs($owner)->post(route('configuration.mission.save'), [
-            ...$payload,
-            'action' => 'save',
-        ])->assertRedirect(route('configuration.mission'));
-
-        $this->assertFalse(Mission::firstOrFail()->is_active);
-        $this->assertNotContains(2, SetupProgress::current()->completed_steps);
-
-        $this->from(route('configuration.mission'))
-            ->post(route('configuration.mission.save'), [
-                ...$payload,
-                'action' => 'continue',
-            ])
-            ->assertRedirect(route('configuration.mission'))
-            ->assertSessionHasErrors('status');
-
+        $this->actingAs($this->sago());
+        $organization = $this->createOfficialOrganization();
+        $mission = $organization->missions()->firstOrFail();
+        $before = $mission->getAttributes();
+        $this->post(route('configuration.mission.save'), ['name' => 'Brouillon interdit', 'code' => 'DRAFT', 'country_id' => $mission->country_id, 'status' => 'inactive', 'action' => 'continue'])->assertForbidden();
+        $this->assertSame($before, $mission->fresh()->getAttributes());
         $this->get(route('configuration.step', 'projects'))->assertForbidden();
     }
 
-    public function test_mission_can_be_archived_and_restored_without_data_loss(): void
+    public function test_official_roles_cannot_archive_or_restore_provisioned_mission_manually(): void
     {
-        [$owner, $organization, $country] = $this->context([1, 2]);
-        $mission = $organization->missions()->create([
-            'country_id' => $country->id,
-            'code' => 'ARCH',
-            'name' => 'Mission à archiver',
-            'is_active' => true,
-        ]);
-
-        $this->actingAs($owner)
-            ->delete(route('configuration.mission.archive', $mission))
-            ->assertRedirect(route('configuration.mission'));
-
-        $this->assertSoftDeleted('missions', ['id' => $mission->id]);
-        $this->assertNotContains(2, SetupProgress::current()->completed_steps);
-
-        $this->post(route('configuration.mission.restore', $mission->id))
-            ->assertRedirect(route('configuration.mission'));
-
-        $this->assertDatabaseHas('missions', [
-            'id' => $mission->id,
-            'name' => 'Mission à archiver',
-            'deleted_at' => null,
-            'is_active' => true,
-        ]);
+        $this->actingAs($this->sago());
+        $organization = $this->createOfficialOrganization();
+        $mission = $organization->missions()->firstOrFail();
+        $this->delete(route('configuration.mission.archive', $mission))->assertForbidden();
+        $this->post(route('configuration.mission.restore', $mission->id))->assertForbidden();
+        $this->assertDatabaseHas('missions', ['id' => $mission->id, 'deleted_at' => null, 'is_active' => true]);
+        $admin = User::where('email', 'coordination@stabilisation.example')->firstOrFail();
+        $this->actingAs($admin)->delete(route('organizations.missions.destroy', [$organization, $mission]))->assertForbidden();
+        $this->assertDatabaseHas('missions', ['id' => $mission->id, 'deleted_at' => null]);
     }
 
-    public function test_a_second_mission_can_be_added_without_overwriting_the_first(): void
+    public function test_adding_country_provisions_second_mission_without_overwriting_first(): void
     {
-        [$owner, $organization, $country] = $this->context([1, 2]);
-        $first = $organization->missions()->create([
-            'country_id' => $country->id,
-            'code' => 'FIRST',
-            'name' => 'Première mission',
-            'is_active' => true,
-        ]);
-
-        $this->actingAs($owner)->post(route('configuration.mission.save'), [
-            'create_new' => '1',
-            'name' => 'Deuxième mission',
-            'code' => 'SECOND',
-            'country_id' => $country->id,
-            'status' => 'active',
-            'action' => 'save',
-        ])->assertRedirect(route('configuration.mission'))->assertSessionHasNoErrors();
-
+        $this->actingAs($this->sago());
+        $organization = $this->createOfficialOrganization();
+        $first = $organization->missions()->firstOrFail();
+        $chad = Country::where('iso2', 'TD')->firstOrFail();
+        $this->put(route('configuration.organization.update', $organization), [
+            'name' => $organization->name, 'code' => $organization->code, 'status' => 'active',
+            'geographic_access_type' => 'multi_country', 'country_ids' => [$first->country_id, $chad->id],
+        ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('missions', 2);
-        $this->assertSame('Première mission', $first->fresh()->name);
-        $this->get(route('configuration.mission'))
-            ->assertOk()
-            ->assertSee('Première mission')
-            ->assertSee('Deuxième mission')
-            ->assertSee('Ajouter une mission');
+        $this->assertSame($first->name, $first->fresh()->name);
+        $this->assertDatabaseHas('missions', ['organization_id' => $organization->id, 'country_id' => $chad->id]);
     }
 
     public function test_user_without_mission_permission_is_forbidden(): void
@@ -199,50 +112,4 @@ class MissionConfigurationTest extends TestCase
             ->assertForbidden();
     }
 
-    private function context(array $completedSteps = [], bool $countryActive = true): array
-    {
-        $organizationPermission = Permission::create([
-            'code' => 'organizations.manage',
-            'name' => 'Gérer les organisations',
-        ]);
-        $configurationPermission = Permission::firstOrCreate([
-            'code' => 'configuration.view',
-        ], [
-            'name' => 'Accéder à la configuration',
-        ]);
-        $missionPermission = Permission::create([
-            'code' => 'missions.manage',
-            'name' => 'Gérer les missions',
-        ]);
-        $projectPermission = Permission::create([
-            'code' => 'projects.manage',
-            'name' => 'Gérer les projets',
-        ]);
-        $role = Role::create([
-            'code' => 'owner',
-            'name' => 'Propriétaire',
-            'is_system' => true,
-        ]);
-        $role->permissions()->attach([
-            $organizationPermission->id,
-            $missionPermission->id,
-            $projectPermission->id,
-            $configurationPermission->id,
-        ]);
-        $owner = User::factory()->create(['is_active' => true]);
-        $owner->roles()->attach($role, ['scope_type' => 'platform', 'scope_id' => null]);
-        $organization = Organization::create([
-            'code' => 'ONG-CM',
-            'name' => 'ONG Santé Cameroun',
-            'country_code' => 'CM',
-        ]);
-        $country = Country::create([
-            'iso2' => 'CM',
-            'name' => 'Cameroun',
-            'is_active' => $countryActive,
-        ]);
-        SetupProgress::current()->update(['completed_steps' => $completedSteps]);
-
-        return [$owner, $organization, $country];
-    }
 }

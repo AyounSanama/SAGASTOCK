@@ -14,27 +14,14 @@ class ConfigurationWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_authenticated_user_can_start_and_list_independent_workflows(): void
+    public function test_coordination_cannot_start_or_list_legacy_workflows(): void
     {
         $user = $this->configurationUser();
-
-        $created = $this->actingAs($user, 'sanctum')->postJson('/api/v1/configuration/workflows', [
+        $this->actingAs($user, 'sanctum')->postJson('/api/v1/configuration/workflows', [
             'flow_type' => ConfigurationFlowType::NewProject->value,
-        ]);
-
-        $created
-            ->assertCreated()
-            ->assertJsonPath('workflow.flow_type', 'new-project')
-            ->assertJsonPath('workflow.current_step', 3)
-            ->assertJsonPath('workflow.steps.0.state', 'valid')
-            ->assertJsonPath('workflow.steps.2.state', 'in_progress');
-
-        $workflowId = $created->json('workflow.id');
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/configuration/workflows')
-            ->assertOk()
-            ->assertJsonPath('active_workflow.id', $workflowId)
-            ->assertJsonCount(5, 'flow_types');
+        ])->assertForbidden();
+        $this->getJson('/api/v1/configuration/workflows')->assertForbidden();
+        $this->assertDatabaseCount('setup_progress', 0);
     }
 
     public function test_user_cannot_read_another_users_workflow(): void
@@ -52,29 +39,24 @@ class ConfigurationWorkflowTest extends TestCase
 
         $this->actingAs($other, 'sanctum')
             ->getJson("/api/v1/configuration/workflows/{$progress->workflow_id}")
-            ->assertNotFound();
+            ->assertForbidden();
     }
 
     public function test_draft_is_saved_without_sensitive_fields(): void
     {
         $user = $this->configurationUser();
-        $created = $this->actingAs($user, 'sanctum')->postJson('/api/v1/configuration/workflows', [
-            'flow_type' => ConfigurationFlowType::NewUser->value,
-        ]);
-
-        $workflowId = $created->json('workflow.id');
-        $this->actingAs($user, 'sanctum')
-            ->putJson("/api/v1/configuration/workflows/{$workflowId}/draft", [
-                'step' => 11,
-                'data' => [
-                    'first_name' => 'Serge',
-                    'password' => 'Secret-123!',
-                    'password_confirmation' => 'Secret-123!',
-                ],
-            ])
-            ->assertOk()
-            ->assertJsonPath('workflow.drafts.11.data.first_name', 'Serge')
-            ->assertJsonMissingPath('workflow.drafts.11.data.password');
+        $request = \Illuminate\Http\Request::create('/');
+        $request->setUserResolver(fn () => $user);
+        $service = app(\App\Services\ConfigurationWorkflowService::class);
+        $progress = $service->start($request, ConfigurationFlowType::NewUser);
+        // Draft sanitization is still a service contract. Official V1 roles cannot call the legacy API.
+        $service->saveDraft($progress, 11, ['first_name' => 'Serge', 'password' => 'Secret-123!', 'password_confirmation' => 'Secret-123!']);
+        $data = $progress->fresh()->drafts['11']['data'];
+        $this->assertSame('Serge', $data['first_name']);
+        $this->assertArrayNotHasKey('password', $data);
+        $this->assertArrayNotHasKey('password_confirmation', $data);
+        $this->actingAs($user, 'sanctum')->putJson("/api/v1/configuration/workflows/{$progress->workflow_id}/draft", ['step' => 11, 'data' => ['first_name' => 'Intrus']])->assertForbidden();
+        $this->assertSame($data, $progress->fresh()->drafts['11']['data']);
     }
 
     public function test_configuration_endpoints_require_authentication(): void

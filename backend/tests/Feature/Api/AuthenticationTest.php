@@ -152,7 +152,8 @@ class AuthenticationTest extends TestCase
             ->assertJsonFragment(['key' => 'missions'])
             ->assertJsonFragment(['key' => 'standard-lists'])
             ->assertJsonMissing(['key' => 'configuration'])
-            ->assertJsonFragment(['key' => 'users'])->json('token');
+            ->assertJsonFragment(['key' => 'projects'])
+            ->assertJsonMissing(['key' => 'users'])->json('token');
 
         $second = $this->postJson('/api/v1/auth/login', [
             'email' => $siteAdmin->email, 'password' => 'Secret@123', 'device_name' => 'Téléphone partagé',

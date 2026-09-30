@@ -28,7 +28,7 @@ class SecurityAdministrationTest extends TestCase
     public function test_authorized_admin_can_manage_custom_roles(): void
     {
         Sanctum::actingAs($this->admin());
-        $permission = Permission::create(['code' => 'stocks.view', 'name' => 'Voir stocks']);
+        $permission = Permission::firstOrCreate(['code' => 'stocks.view'], ['name' => 'Voir stocks']);
         $created = $this->postJson('/api/v1/security/roles', [
             'code' => 'stock_reader', 'name' => 'Lecteur stock', 'permission_ids' => [$permission->id],
         ])->assertCreated();
@@ -59,7 +59,7 @@ class SecurityAdministrationTest extends TestCase
     public function test_web_role_workspace_persists_profile_and_permissions(): void
     {
         $admin = $this->admin();
-        $permission = Permission::create(['code' => 'stocks.view', 'name' => 'Voir les stocks']);
+        $permission = Permission::firstOrCreate(['code' => 'stocks.view'], ['name' => 'Voir les stocks']);
         $this->actingAs($admin)->get('/security')
             ->assertOk()
             ->assertSee('Rôles et permissions')

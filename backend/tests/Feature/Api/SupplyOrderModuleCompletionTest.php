@@ -20,15 +20,20 @@ class SupplyOrderModuleCompletionTest extends TestCase
         $this->assertStringNotContainsString("defaults('module', 'orders')",$webRoutes);
         $this->assertStringContainsString('Commandes et approbations',$view);
         $this->assertStringContainsString('const OrdersPage()',$router);
-        $this->assertStringContainsString('offline_order_outbox',$service);
+        $this->assertStringContainsString('_operations.execute(',$service);
+        $this->assertStringContainsString("entityType: 'orders'",$service);
+        $this->assertStringContainsString("'offline_uuid'",$service);
     }
 
-    public function test_shared_layout_alignment_and_versioned_logo_are_present(): void
+    public function test_shared_layout_uses_vite_shell_styles_and_existing_logo(): void
     {
         $sidebar=file_get_contents(resource_path('views/components/app-sidebar.blade.php'));
         $css=file_get_contents(public_path('css/pharmacare-portal.css'));
-        $this->assertStringContainsString('body.portal-body .portal-workspace',$sidebar);
-        $this->assertStringContainsString("filemtime(public_path('images/pharmacare-logo.png'))",$sidebar);
+        $shell=file_get_contents(resource_path('css/shell-compat.css'));
+        $assets=file_get_contents(resource_path('views/components/assets.blade.php'));
+        $this->assertStringContainsString('body.pc-app.portal-body .portal-workspace',$shell);
+        $this->assertStringContainsString('@vite', $assets);
+        $this->assertStringContainsString('/images/pharmacare-logo.png',$sidebar);
         $this->assertStringContainsString('.configuration-wizard{width:100%;min-width:0',$css);
         $this->assertFileExists(public_path('images/pharmacare-logo.png'));
         $this->assertGreaterThan(1000,filesize(public_path('images/pharmacare-logo.png')));

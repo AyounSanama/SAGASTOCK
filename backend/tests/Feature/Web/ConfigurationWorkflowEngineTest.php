@@ -19,7 +19,7 @@ class ConfigurationWorkflowEngineTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_each_flow_type_creates_an_independent_progression(): void
+    public function test_workflow_service_creates_independent_progressions_while_legacy_route_is_forbidden(): void
     {
         $this->actingAs($this->owner());
         Organization::create(['code' => 'FLOW-ORG', 'name' => 'Organisation workflow']);
@@ -33,8 +33,10 @@ class ConfigurationWorkflowEngineTest extends TestCase
         ];
 
         foreach ($expectations as $type => $completed) {
-            $this->get(route('configuration.workflow.start', $type))
-                ->assertRedirect();
+            $this->get(route('configuration.workflow.start', $type))->assertForbidden();
+            $request = \Illuminate\Http\Request::create('/');
+            $request->setUserResolver(fn () => auth()->user());
+            app(ConfigurationWorkflowService::class)->start($request, ConfigurationFlowType::from($type));
 
             $progress = SetupProgress::query()->where('flow_type', $type)->latest('id')->firstOrFail();
             $this->assertSame($completed, $progress->completed_steps);
@@ -56,90 +58,36 @@ class ConfigurationWorkflowEngineTest extends TestCase
         );
     }
 
-    public function test_new_project_flow_creates_a_project_without_modifying_the_existing_one(): void
+    public function test_current_project_provisioning_preserves_existing_project(): void
     {
-        $owner = $this->owner();
-        $this->actingAs($owner);
-        $organization = Organization::create(['code' => 'ONG', 'name' => 'ONG Test']);
-        $country = Country::create(['iso2' => 'CM', 'name' => 'Cameroun']);
-        $mission = Mission::create([
-            'organization_id' => $organization->id,
-            'country_id' => $country->id,
-            'code' => 'MISSION',
-            'name' => 'Mission existante',
-            'is_active' => true,
-        ]);
-        $existing = Project::create([
-            'organization_id' => $organization->id,
-            'mission_id' => $mission->id,
-            'code' => 'OLD',
-            'name' => 'Projet existant',
-            'starts_on' => '2026-01-01',
-            'ends_on' => '2026-12-31',
-            'is_active' => true,
-        ]);
-
-        $response = $this->get(route(
-            'configuration.workflow.start',
-            ConfigurationFlowType::NewProject->value,
-        ));
-        parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
-
-        $this->post(route('configuration.step.save', [
-            'step' => 'projects',
-            '_flow' => $query['_flow'],
-        ]), [
-            'mission_id' => $mission->id,
-            'name' => 'Nouveau projet',
-            'code' => 'NEW',
-            'description' => 'Projet créé dans un workflow isolé',
-            'starts_on' => '2027-01-01',
-            'ends_on' => '2027-12-31',
-            'status' => 'active',
-        ])->assertRedirect();
-
+        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $organization = Organization::create(['code' => 'ONG', 'name' => 'Organisation']);
+        $mission = Mission::create(['organization_id' => $organization->id, 'country_id' => Country::where('iso2', 'CM')->value('id'), 'code' => 'CM', 'name' => 'Coordination']);
+        $existing = Project::create(['organization_id' => $organization->id, 'mission_id' => $mission->id, 'code' => 'OLD', 'name' => 'Projet existant']);
+        $actor = User::factory()->create(['organization_id' => $organization->id]);
+        $actor->roles()->attach(Role::where('code', 'coordination_admin')->firstOrFail(), ['scope_type' => 'mission', 'scope_id' => $mission->id]);
+        $this->actingAs($actor)->post(route('organizations.projects.store', $organization), [
+            'mission_id' => $mission->id, 'code' => 'NEW', 'name' => 'Nouveau projet',
+            'admin' => ['first_name' => 'Admin', 'last_name' => 'Projet', 'email' => 'new-project@example.test', 'password' => 'PharmaCare!2026', 'password_confirmation' => 'PharmaCare!2026'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('projects', 2);
-        $this->assertDatabaseHas('projects', [
-            'id' => $existing->id,
-            'name' => 'Projet existant',
-            'code' => 'OLD',
-        ]);
-        $this->assertDatabaseHas('projects', [
-            'name' => 'Nouveau projet',
-            'code' => 'NEW',
-        ]);
-
-        $progress = SetupProgress::where('workflow_id', $query['_flow'])->firstOrFail();
-        $this->assertSame([1, 2, 3], $progress->completed_steps);
-        $this->assertNotEmpty($progress->context['project_id']);
-        $this->assertSame('valid', $progress->step_states['3']);
-        $this->assertSame('in_progress', $progress->step_states['4']);
+        $this->assertSame('Projet existant', $existing->fresh()->name);
+        $new = Project::where('code', 'NEW')->firstOrFail();
+        $this->assertSame($mission->id, $new->mission_id);
+        $this->assertDatabaseHas('role_user', ['user_id' => User::where('email', 'new-project@example.test')->value('id'), 'scope_type' => 'project', 'scope_id' => $new->id]);
     }
 
     public function test_draft_is_persisted_without_password_and_marks_step_in_progress(): void
     {
-        $this->actingAs($this->owner());
-        Organization::create(['code' => 'DRAFT-ORG', 'name' => 'Organisation brouillon']);
-        $response = $this->get(route(
-            'configuration.workflow.start',
-            ConfigurationFlowType::NewProject->value,
-        ));
-        parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
-
-        $this->postJson(route('configuration.workflow.draft', $query['_flow']), [
-            'step' => 3,
-            'payload' => [
-                'name' => 'Projet brouillon',
-                'description' => 'À reprendre',
-                'password' => 'NeDoitJamaisEtreStocke',
-                'password_confirmation' => 'NeDoitJamaisEtreStocke',
-            ],
-        ])->assertOk()->assertJsonPath('saved', true);
-
-        $progress = SetupProgress::where('workflow_id', $query['_flow'])->firstOrFail();
+        $owner = $this->owner();
+        $request = \Illuminate\Http\Request::create('/');
+        $request->setUserResolver(fn () => $owner);
+        $service = app(ConfigurationWorkflowService::class);
+        $progress = $service->start($request, ConfigurationFlowType::NewProject);
+        $service->saveDraft($progress, 3, ['name' => 'Projet brouillon', 'password' => 'Secret', 'password_confirmation' => 'Secret', '_token' => 'csrf']);
+        $progress->refresh();
         $this->assertSame('Projet brouillon', $progress->drafts['3']['data']['name']);
-        $this->assertArrayNotHasKey('password', $progress->drafts['3']['data']);
-        $this->assertArrayNotHasKey('password_confirmation', $progress->drafts['3']['data']);
+        foreach (['password', 'password_confirmation', '_token'] as $key) $this->assertArrayNotHasKey($key, $progress->drafts['3']['data']);
         $this->assertSame('in_progress', $progress->step_states['3']);
     }
 
@@ -171,29 +119,21 @@ class ConfigurationWorkflowEngineTest extends TestCase
         $this->assertSame('not_started', $progress->step_states['5']);
     }
 
-    public function test_saved_draft_is_restored_when_the_step_is_reopened(): void
+    public function test_workflow_service_restores_draft_without_overwriting_current_input(): void
     {
-        $this->actingAs($this->owner());
-        $response = $this->get(route(
-            'configuration.workflow.start',
-            ConfigurationFlowType::InitialConfiguration->value,
-        ));
-        parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
-
-        $this->postJson(route('configuration.workflow.draft', $query['_flow']), [
-            'step' => 1,
-            'payload' => [
-                'name' => 'Organisation reprise automatiquement',
-                'code' => 'DRAFT-ORG',
-                'manager_name' => 'Responsable brouillon',
-            ],
-        ])->assertOk();
-
-        $this->get(route('configuration.organization', ['_flow' => $query['_flow']]))
-            ->assertOk()
-            ->assertSee('Organisation reprise automatiquement')
-            ->assertSee('DRAFT-ORG')
-            ->assertSee('Responsable brouillon');
+        $owner = $this->owner();
+        $request = \Illuminate\Http\Request::create('/');
+        $request->setUserResolver(fn () => $owner);
+        $request->setLaravelSession(app('session.store'));
+        $service = app(ConfigurationWorkflowService::class);
+        $progress = $service->start($request, ConfigurationFlowType::InitialConfiguration);
+        $service->saveDraft($progress, 1, ['name' => 'Organisation reprise', 'code' => 'DRAFT-ORG']);
+        $service->restoreDraft($request, $progress->fresh(), 1);
+        $this->assertSame('Organisation reprise', $request->old('name'));
+        $this->assertSame('DRAFT-ORG', $request->old('code'));
+        $request->session()->flashInput(['name' => 'Saisie prioritaire']);
+        $service->restoreDraft($request, $progress, 1);
+        $this->assertSame('Saisie prioritaire', $request->old('name'));
     }
 
     private function owner(): User

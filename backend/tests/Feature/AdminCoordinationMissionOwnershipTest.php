@@ -63,36 +63,22 @@ class AdminCoordinationMissionOwnershipTest extends TestCase
         $this->getJson("/api/v1/organizations/{$organization->id}/missions")->assertForbidden();
     }
 
-    public function test_mission_page_and_web_crud_use_only_authorized_countries(): void
+    public function test_coordination_reads_only_its_provisioned_country_and_cannot_create_missions(): void
     {
         $organization = $this->organization('MULTI');
         $cameroon = Country::where('iso2', 'CM')->firstOrFail();
         $chad = Country::where('iso2', 'TD')->firstOrFail();
-        $france = Country::where('iso2', 'FR')->firstOrFail();
         $organization->countries()->sync([$cameroon->id, $chad->id]);
+        $missions = app(\App\Services\CoordinationProvisioningService::class)->provision($organization, [$cameroon->id, $chad->id]);
         $coordination = $this->actor('coordination_admin', 'organization', $organization);
-
-        $this->actingAs($coordination)->get('/missions')
-            ->assertOk()
-            ->assertSee('Créer une mission')
-            ->assertSee('Cameroun')
-            ->assertSee('Tchad')
-            ->assertDontSee('France');
-
-        $this->post(route('organizations.missions.store', $organization), [
-            'country_id' => $cameroon->id,
-            'code' => 'CM_TEST',
-            'name' => 'Mission Cameroun',
-            'is_active' => '1',
-        ])->assertRedirect();
-        $this->assertDatabaseHas('missions', ['organization_id' => $organization->id, 'code' => 'CM_TEST']);
-
-        $this->from('/missions')->post(route('organizations.missions.store', $organization), [
-            'country_id' => $france->id,
-            'code' => 'FR_TEST',
-            'name' => 'Mission France',
-        ])->assertRedirect('/missions')->assertSessionHasErrors('country_id');
-        $this->assertDatabaseMissing('missions', ['organization_id' => $organization->id, 'code' => 'FR_TEST']);
+        $ownId = app(\App\Services\UserScopeService::class)->coordinationMissionIds($coordination)->first();
+        $this->actingAs($coordination)->get('/missions')->assertRedirect(route('organizations.missions.show', [$organization, $ownId]));
+        $this->get(route('organizations.missions.show', [$organization, $ownId]))->assertOk()->assertDontSee('Créer une mission');
+        foreach ($missions as $mission) {
+            if ($mission->id !== $ownId) $this->get(route('organizations.missions.show', [$organization, $mission]))->assertNotFound();
+        }
+        $this->post(route('organizations.missions.store', $organization), ['country_id' => $cameroon->id, 'code' => 'MANUAL', 'name' => 'Interdite'])->assertForbidden();
+        $this->assertDatabaseMissing('missions', ['code' => 'MANUAL']);
     }
 
     public function test_coordination_manages_projects_inside_its_mission(): void
@@ -113,8 +99,9 @@ class AdminCoordinationMissionOwnershipTest extends TestCase
             'code' => 'NUTRITION',
             'name' => 'Projet Nutrition',
             'description' => 'Prise en charge nutritionnelle',
+            'admin' => ['first_name' => 'Admin', 'last_name' => 'Projet', 'email' => 'nutrition@example.test', 'password' => 'PharmaCare!2026', 'password_confirmation' => 'PharmaCare!2026'],
             'is_active' => '1',
-        ])->assertRedirect();
+        ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('projects', [
             'organization_id' => $organization->id,
             'mission_id' => $mission->id,
@@ -130,47 +117,28 @@ class AdminCoordinationMissionOwnershipTest extends TestCase
         $this->actingAs($coordination)->get(route('organizations.missions.show', [$other, $otherMission]))->assertNotFound();
     }
 
-    public function test_coordination_creates_multiple_project_admin_users_and_cannot_cross_organizations(): void
+    public function test_coordination_creates_first_admin_with_each_project_and_cannot_cross_organizations(): void
     {
         $organization = $this->organization('ALIMA');
         $other = $this->organization('MSF');
         $country = Country::where('iso2', 'CM')->firstOrFail();
-        $mission = Mission::create(['organization_id' => $organization->id, 'country_id' => $country->id, 'code' => 'ALIMA_CM', 'name' => 'Mission Cameroun']);
-        $otherMission = Mission::create(['organization_id' => $other->id, 'country_id' => $country->id, 'code' => 'MSF_CM', 'name' => 'Mission MSF']);
-        $project = Project::create(['organization_id' => $organization->id, 'mission_id' => $mission->id, 'code' => 'NUTRITION', 'name' => 'Projet Nutrition']);
-        $otherProject = Project::create(['organization_id' => $other->id, 'mission_id' => $otherMission->id, 'code' => 'OTHER', 'name' => 'Projet MSF']);
-        $coordination = $this->actor('coordination_admin', 'organization', $organization);
-        $role = Role::where('code', 'project_admin')->firstOrFail();
-
-        foreach ([['Jean', 'Dupont', 'jean'], ['Marie', 'Martin', 'marie']] as [$first, $last, $login]) {
-            $this->actingAs($coordination)->post(route('users.store'), [
-                'form_context' => 'mission-project-admin',
-                'first_name' => $first,
-                'last_name' => $last,
-                'username' => $login,
-                'email' => "$login@example.test",
-                'role_id' => $role->id,
-                'organization_id' => $organization->id,
-                'mission_id' => $mission->id,
-                'project_id' => $project->id,
-                'is_active' => '1',
-            ])->assertRedirect(route('organizations.missions.show', [$organization, $mission]));
+        $mission = Mission::create(['organization_id' => $organization->id, 'country_id' => $country->id, 'code' => 'CM', 'name' => 'Coordination']);
+        $foreignMission = Mission::create(['organization_id' => $other->id, 'country_id' => $country->id, 'code' => 'CM', 'name' => 'Autre coordination']);
+        $actor = $this->actor('coordination_admin', 'mission', $organization);
+        $this->actingAs($actor);
+        foreach (['Jean', 'Marie'] as $name) {
+            $this->post(route('organizations.projects.store', $organization), [
+                'mission_id' => $mission->id, 'code' => strtoupper($name), 'name' => 'Projet '.$name,
+                'admin' => ['first_name' => $name, 'last_name' => 'Projet', 'email' => strtolower($name).'@example.test', 'password' => 'PharmaCare!2026', 'password_confirmation' => 'PharmaCare!2026'],
+            ])->assertRedirect()->assertSessionHasNoErrors();
+            $project = Project::where('code', strtoupper($name))->firstOrFail();
+            $this->assertDatabaseHas('role_user', ['user_id' => User::where('email', strtolower($name).'@example.test')->value('id'), 'scope_type' => 'project', 'scope_id' => $project->id]);
         }
-
-        $this->assertSame(2, User::whereHas('roles', fn ($query) => $query
-            ->where('roles.code', 'project_admin')->where('role_user.scope_type', 'project')
-            ->where('role_user.scope_id', $project->id))->count());
-        $this->actingAs($coordination)->get(route('organizations.missions.show', [$organization, $mission]))
-            ->assertOk()->assertSee('Jean Dupont')->assertSee('Marie Martin')->assertSee('ADMIN_PROJECT');
-
-        $this->actingAs($coordination)->post(route('users.store'), [
-            'form_context' => 'mission-project-admin',
-            'first_name' => 'Paul', 'last_name' => 'Intrus', 'username' => 'paul',
-            'email' => 'paul@example.test', 'role_id' => $role->id,
-            'organization_id' => $other->id, 'mission_id' => $otherMission->id,
-            'project_id' => $otherProject->id,
-        ])->assertNotFound();
-        $this->assertDatabaseMissing('users', ['email' => 'paul@example.test']);
+        $this->get(route('organizations.missions.show', [$organization, $mission]))->assertOk()->assertSee('Jean Projet')->assertSee('Marie Projet');
+        $this->post(route('organizations.projects.store', $other), ['mission_id' => $foreignMission->id, 'code' => 'INTRUS', 'name' => 'Interdit'])->assertNotFound();
+        $this->post(route('users.store'), ['email' => 'intrus@example.test'])->assertForbidden();
+        $this->assertDatabaseMissing('projects', ['code' => 'INTRUS']);
+        $this->assertDatabaseMissing('users', ['email' => 'intrus@example.test']);
     }
 
     private function organization(string $code): Organization
@@ -181,7 +149,12 @@ class AdminCoordinationMissionOwnershipTest extends TestCase
     private function actor(string $code, string $scope, ?Organization $organization = null): User
     {
         $user = User::factory()->create(['is_active' => true, 'organization_id' => $organization?->id]);
-        $user->roles()->attach(Role::where('code', $code)->firstOrFail(), ['scope_type' => $scope, 'scope_id' => $organization?->id]);
+        $scopeId = $organization?->id;
+        if ($code === 'coordination_admin' && $organization?->missions()->exists()) {
+            $scope = 'mission';
+            $scopeId = $organization->missions()->value('id');
+        }
+        $user->roles()->attach(Role::where('code', $code)->firstOrFail(), ['scope_type' => $scope, 'scope_id' => $scopeId]);
         return $user;
     }
 }

@@ -60,7 +60,7 @@ class AuthSessionTest extends TestCase
             ->assertSee('Tableau de bord')
             ->assertSee('href="'.route('dashboard').'"', false)
             ->assertSee('Vue d’ensemble opérationnelle')
-            ->assertSee('Alertes de stock')
+            ->assertDontSee('Alertes de stock')
             ->assertDontSee('<button class="topbar-back"', false);
     }
 }

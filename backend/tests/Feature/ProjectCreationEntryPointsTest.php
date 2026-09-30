@@ -29,7 +29,8 @@ class ProjectCreationEntryPointsTest extends TestCase
         $this->actingAs($actor)->get('/projects')
             ->assertOk()
             ->assertSee('Créer un projet')
-            ->assertSee('data-project-sheet-open', false)
+            ->assertSee('data-sheet-open="project-create-sheet"', false)
+            ->assertSee('aria-labelledby="project-create-sheet-title"', false)
             ->assertSee('name="admin[email]"', false)
             ->assertSee('funding-picker', false)
             ->assertSee('Aucun bailleur disponible');
@@ -80,7 +81,7 @@ class ProjectCreationEntryPointsTest extends TestCase
         $this->actingAs($actor)->get('/projects')
             ->assertOk()
             ->assertSee($organization->name)
-            ->assertSee('data-project-sheet-open', false);
+            ->assertSee('data-sheet-open="project-create-sheet"', false);
     }
 
     /** @return array{User, Organization, Mission} */

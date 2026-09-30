@@ -49,13 +49,29 @@ class LanguagePreferenceTest extends TestCase
         $this->assertSame('fr', $second->fresh()->preferred_locale);
     }
 
-    public function test_unsupported_untranslated_locale_is_rejected(): void
+    public function test_english_locale_is_accepted_for_an_authenticated_user(): void
     {
         $user = User::factory()->create(['preferred_locale' => 'fr']);
         Sanctum::actingAs($user);
 
         $this->putJson('/api/v1/auth/locale', ['preferred_locale' => 'en'])
-            ->assertUnprocessable();
-        $this->assertSame('fr', $user->fresh()->preferred_locale);
+            ->assertOk()
+            ->assertJsonPath('user.preferred_locale', 'en');
+        $this->assertSame('en', $user->fresh()->preferred_locale);
+    }
+
+    public function test_web_language_choice_persists_across_page_requests(): void
+    {
+        $user = User::factory()->create(['preferred_locale' => 'fr']);
+
+        $this->actingAs($user)
+            ->from(route('profile.show'))
+            ->post(route('profile.locale'), ['locale' => 'en'])
+            ->assertRedirect(route('profile.show'));
+
+        $this->assertSame('en', $user->fresh()->preferred_locale);
+        $this->get(route('profile.show'))
+            ->assertOk()
+            ->assertSee('<html lang="en">', false);
     }
 }

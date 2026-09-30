@@ -38,7 +38,7 @@ class StructureManagementTest extends TestCase
 
         $facility = $this->postJson("/api/v1/organizations/{$organization->id}/facilities", [
             'code' => 'FOSA_01', 'name' => 'Hôpital central', 'facility_type' => 'hospital',
-            'care_level' => 'District', 'is_active' => true,
+            'care_level' => 'secondary', 'is_active' => true,
         ])->assertCreated()->assertJsonPath('facility.name', 'Hôpital central')->json('facility');
 
         $department = $this->postJson("/api/v1/organizations/{$organization->id}/facilities/{$facility['id']}/departments", [
@@ -223,7 +223,7 @@ class StructureManagementTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_coordination_admin_never_sees_facilities_of_another_organization(): void
+    public function test_coordination_cannot_open_legacy_facility_workspace_even_with_old_permissions(): void
     {
         $assigned = Organization::create(['code' => 'COORD-A', 'name' => 'Organisation assignée']);
         $created = Organization::create(['code' => 'COORD-B', 'name' => 'Nouvelle organisation']);
@@ -250,8 +250,8 @@ class StructureManagementTest extends TestCase
         ]);
 
         $this->actingAs($user)->get('/dispensing-sites')
-            ->assertOk()->assertSee($assignedFacility->name);
+            ->assertForbidden();
         $this->actingAs($user)->get('/dispensing-sites?organization_id='.$created->id)
-            ->assertNotFound();
+            ->assertForbidden();
     }
 }

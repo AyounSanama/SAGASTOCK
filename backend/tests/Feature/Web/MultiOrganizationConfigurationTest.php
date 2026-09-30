@@ -54,7 +54,7 @@ class MultiOrganizationConfigurationTest extends TestCase
         $this->get(route('organizations.missions.index', $organizationB))->assertForbidden();
     }
 
-    public function test_coordination_admin_only_sees_the_assigned_organization(): void
+    public function test_coordination_configuration_is_forbidden_and_organization_scope_is_isolated(): void
     {
         [, , $viewPermission] = $this->context();
         $organizationA = $this->organization('ORG-A', 'Organisation A');
@@ -72,10 +72,9 @@ class MultiOrganizationConfigurationTest extends TestCase
         ]);
 
         $this->actingAs($admin)->get(route('configuration.organization'))
-            ->assertOk()
-            ->assertSee('Organisation A')
-            ->assertDontSee('Organisation B')
-            ->assertDontSee('Ajouter une organisation');
+            ->assertForbidden();
+        // V1 keeps coordination out of platform configuration; its organization scope remains isolated.
+        $this->assertSame([$organizationA->id], app(\App\Services\UserScopeService::class)->organizations($admin)->pluck('id')->all());
     }
 
     public function test_sago_uses_empty_standalone_organization_form_not_legacy_workflow(): void
