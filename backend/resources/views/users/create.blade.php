@@ -17,12 +17,13 @@
         @media(max-width:700px){.grid{grid-template-columns:1fr}.intro,.actions{flex-direction:column}.actions .button,.actions button{width:100%;text-align:center}}
     </style>
 </head>
-<body>
+<body class="pc-app ">
 @include('components.app-sidebar')
 <header><img class="brand-logo" src="{{ asset('images/pharmacare-logo.png') }}" alt="Logo PharmaCare"><a href="{{ route('users.index') }}">← Retour</a><strong>PharmaCare · Administration</strong></header>
 <main><section class="card">
 <div class="intro"><div><h1>Création d’un utilisateur</h1><div class="muted">Créez un compte personnel et attribuez-lui le niveau d’accès approprié.</div></div></div>
-<form method="post" action="{{ route('users.store') }}" novalidate>@csrf
+<button type="button" class="secondary" data-sheet-open="administrative-form">Ouvrir le formulaire</button>
+<x-form-sheet id="administrative-form" title="Créer un utilisateur" :auto-open="true"><form method="post" action="{{ route('users.store') }}" novalidate>@csrf
 <div class="section"><h2>Informations personnelles</h2><div class="grid">
 <label>Prénom *<input class="@error('first_name') invalid @enderror" name="first_name" value="{{ old('first_name') }}" autocomplete="given-name" required>@error('first_name')<span class="error">{{ $message }}</span>@enderror</label>
 <label>Nom *<input class="@error('last_name') invalid @enderror" name="last_name" value="{{ old('last_name') }}" autocomplete="family-name" required>@error('last_name')<span class="error">{{ $message }}</span>@enderror</label>
@@ -40,7 +41,7 @@
 <label>Périmètre d’accès *<select class="@error('scope') invalid @enderror" name="scope" required><option value="">Sélectionner le périmètre</option>@if($expectedScope==='mission')<optgroup label="Coordinations pays">@foreach($missions as $mission)<option value="mission:{{ $mission->id }}" @selected(old('scope')==="mission:$mission->id")>{{ $mission->name }}</option>@endforeach</optgroup>@elseif($expectedScope==='organization')<optgroup label="Organisations">@foreach($organizations as $organization)<option value="organization:{{ $organization->id }}" @selected(old('scope')==="organization:$organization->id")>{{ $organization->name }}</option>@endforeach</optgroup>@elseif($expectedScope==='project')<optgroup label="Projets">@foreach($projects as $project)<option value="project:{{ $project->id }}" @selected(old('scope')==="project:$project->id")>{{ $project->name }} ({{ $project->organization->name }})</option>@endforeach</optgroup>@elseif($expectedScope==='site')<optgroup label="Sites">@foreach($sites as $site)<option value="site:{{ $site->id }}" @selected(old('scope')==="site:$site->id")>{{ $site->name }} ({{ $site->healthFacility->name }})</option>@endforeach</optgroup>@endif</select>@error('scope')<span class="error">{{ $message }}</span>@enderror</label>
 </div></div>
 @if($delegablePermissions->isNotEmpty())<div class="section"><h2>Autorisations opérationnelles du site</h2><p class="notice">Ces droits restent limités au site sélectionné. La gestion des utilisateurs et des rôles ne peut pas être déléguée.</p><div class="grid">@foreach($delegablePermissions as $permission)<label><input style="display:inline;width:auto;margin-right:7px" type="checkbox" name="permission_ids[]" value="{{ $permission->id }}" @checked(in_array($permission->id,old('permission_ids',[])))> {{ $permission->name }}</label>@endforeach</div></div>@endif
-<div class="actions"><a class="button secondary" href="{{ route('users.index') }}">Retour à la liste</a><button>Créer l’utilisateur</button></div>
-</form></section></main>
+<div class="sheet-actions"><a class="button secondary" href="{{ route('users.index') }}">Retour à la liste</a><button>Créer l’utilisateur</button></div>
+</form></x-form-sheet></section></main>
 <script>document.querySelectorAll('[data-toggle]').forEach(button=>button.addEventListener('click',()=>{const field=document.getElementById(button.dataset.toggle);const visible=field.type==='text';field.type=visible?'password':'text';button.textContent=visible?'👁':'🙈';button.title=visible?'Afficher le mot de passe':'Masquer le mot de passe';field.focus()}));</script>
 </body></html>

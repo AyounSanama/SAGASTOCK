@@ -26,7 +26,7 @@
         @media(max-width:1000px){.roles-grid{grid-template-columns:repeat(2,1fr)}.tools{grid-template-columns:1fr 1fr}.bulk{grid-column:1/-1}}@media(max-width:680px){main{padding:24px 14px 45px}.topnav{display:none}.page-head,.permissions-title{flex-direction:column}.page-head .btn{width:100%}.roles-grid{grid-template-columns:1fr}.tools{grid-template-columns:1fr}.bulk{grid-column:auto;display:grid;grid-template-columns:1fr 1fr}.permissions-card{padding:16px}.total-pill{align-self:flex-start}.permission-row{padding:15px}.permission-desc{display:none}.code{display:block;margin:5px 0 0;width:max-content}.savebar{align-items:stretch;flex-direction:column}.savebar .btn{width:100%}.sheet-grid{grid-template-columns:1fr}.field.full{grid-column:auto}}
     </style>
 </head>
-<body>
+<body class="pc-app ">
 @include('components.app-sidebar')
 <header class="topbar">
     <a class="brand" href="{{ route('dashboard') }}"><img src="{{ asset('images/pharmacare-logo.png') }}" alt="Logo PharmaCare"><span>PharmaCare</span></a>

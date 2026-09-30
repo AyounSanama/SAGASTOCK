@@ -18,6 +18,17 @@ class ProfileController extends Controller
 {
     public function __construct(private AuditService $audit) {}
 
+    public function setLocale(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'locale' => ['required', 'string', Rule::in(config('pharmacare_languages.translated_locales', ['fr']))],
+        ]);
+
+        $request->user()->forceFill(['preferred_locale' => $data['locale']])->save();
+
+        return back();
+    }
+
     public function show(Request $request): View
     {
         return view('profile.show', [

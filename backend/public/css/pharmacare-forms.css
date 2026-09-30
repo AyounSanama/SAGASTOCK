@@ -1,0 +1,22 @@
+/* Canonical centered form window. No breakpoint changes its direction. */
+.form-sheet{border:0;padding:0;background:transparent;max-width:none;max-height:none;width:100%;height:100%;height:100dvh;margin:0;overflow:hidden;color:var(--pc-color-text)}
+.form-sheet[open]{display:grid;place-items:center}
+.form-sheet::backdrop{background:rgba(36,50,74,.4)}
+.form-sheet-panel{position:relative;display:flex;flex-direction:column;width:min(var(--sheet-width,720px),calc(100% - 32px));max-height:88vh;max-height:88dvh;min-height:0;background:var(--pc-color-surface,#fff);border:1px solid var(--pc-color-border);border-radius:20px;box-shadow:var(--pc-shadow-overlay);overflow:hidden;animation:pc-sheet-in 180ms ease-out}
+.form-sheet-header{display:flex!important;flex-direction:row!important;position:static!important;flex:none;align-items:flex-start!important;justify-content:space-between!important;gap:16px;padding:24px!important;background:#fff!important;border-bottom:1px solid var(--pc-color-border)!important}
+.form-sheet-header h2{margin:0!important;font-size:20px;color:var(--pc-color-text)!important}
+.form-sheet-header p{margin:4px 0 0!important;color:var(--pc-color-text-muted)!important;font-size:13px}
+.form-sheet-close{flex:0 0 44px;width:44px!important;height:44px!important;min-height:44px!important;padding:0!important;background:#fff!important;color:var(--pc-color-text)!important;border:1px solid var(--pc-color-border)!important;border-radius:12px!important;box-shadow:none!important}
+.form-sheet-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:24px;scroll-padding:24px}
+.form-sheet-footer{flex:none;padding:16px 24px;border-top:1px solid var(--pc-color-border);background:#fff}
+.form-sheet-footer .sheet-actions,.form-sheet-footer .form-sheet-actions{position:static!important;display:flex!important;flex-wrap:wrap;justify-content:flex-end!important;gap:12px!important;margin:0!important;padding:0!important;border:0!important;background:#fff!important}
+.form-sheet :focus-visible{outline:2px solid var(--pc-color-primary-dark);outline-offset:3px}
+.form-sheet [hidden]{display:none!important}
+.form-stepper{display:flex;gap:8px;overflow:auto;margin:0 0 24px;padding:0 0 8px;list-style:none}
+.form-stepper button{white-space:nowrap;min-height:44px;border:1px solid var(--pc-color-border);border-radius:12px;background:#fff!important;color:var(--pc-color-text)!important;padding:8px 12px}
+.form-stepper button[aria-current="step"]{background:var(--pc-color-primary-soft)!important;color:var(--pc-color-primary-dark)!important;border-color:var(--pc-color-primary)}
+.form-summary{display:grid;grid-template-columns:minmax(100px,1fr) 2fr;gap:12px;margin:0}
+.form-summary dt{color:var(--pc-color-text-muted)}.form-summary dd{margin:0;overflow-wrap:anywhere}
+@keyframes pc-sheet-in{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:scale(1)}}
+@media(max-width:600px){.form-sheet-panel{width:calc(100% - 24px);max-height:90dvh}.form-sheet-header{padding:16px!important}.form-sheet-body{padding:16px}.form-sheet-footer{padding:12px 16px}.form-sheet-header h2{font-size:18px}.form-sheet-footer button{min-height:44px}}
+@media(prefers-reduced-motion:reduce){.form-sheet-panel{animation:none}}

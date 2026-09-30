@@ -22,7 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(AddSecurityHeaders::class);
         $middleware->append(EnforceSagoPlatformBoundary::class);
         $middleware->append(EnforceV1ModuleAvailability::class);
-        $middleware->append(ApplyUserLocale::class);
+        $middleware->web(append: [ApplyUserLocale::class]);
         $middleware->alias([
             'permission' => EnsurePermission::class,
             'role' => EnsureRole::class,

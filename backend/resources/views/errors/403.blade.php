@@ -7,6 +7,7 @@
     <title>Accès refusé · PharmaCare</title>
     <style>
         body {
+            box-sizing: border-box;
             margin: 0;
             font-family: Inter, system-ui, sans-serif;
             background: #F7F9FC;
@@ -28,7 +29,8 @@
 
         h1 {
             margin: 0 0 10px;
-            font-size: 28px
+            font-size: 22px;
+            font-weight: 600
         }
 
         p {

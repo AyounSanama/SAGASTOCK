@@ -1,4 +1,9 @@
 @import 'tailwindcss';
+@import '../../public/css/pharmacare-portal.css';
+@import './shell-compat.css';
+@import '../../public/css/pharmacare-forms.css';
+@import './dashboard.css';
+@import './design-system.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -6,6 +11,8 @@
 @source '../**/*.js';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --color-pharmacare: #F57C00;
+    --color-pharmacare-dark: #A65000;
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }

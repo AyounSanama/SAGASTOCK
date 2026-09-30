@@ -11,5 +11,5 @@ return [
         'it' => 'Italiano',
         'nl' => 'Nederlands',
     ],
-    'translated_locales' => ['fr'],
+    'translated_locales' => ['fr', 'en'],
 ];

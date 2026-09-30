@@ -12,7 +12,7 @@
         @media(max-width:700px){.setup-head{display:block}.setup-progress{margin-top:18px}.setup-step{grid-template-columns:42px 1fr}.setup-actions{grid-column:1/-1}.setup-actions>*{flex:1}}
     </style>
 </head>
-<body>
+<body class="pc-app ">
 @include('components.app-sidebar')
 <main>
     @php($completed = collect($progress->completed_steps ?? [])->map(fn($value)=>(int)$value))

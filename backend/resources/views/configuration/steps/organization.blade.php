@@ -143,11 +143,6 @@
 document.addEventListener('DOMContentLoaded',()=>{
     const openSheet=id=>{const sheet=document.getElementById(id);if(sheet&&!sheet.open)sheet.showModal()};
     document.querySelectorAll('[data-sheet-open]').forEach(button=>button.addEventListener('click',()=>openSheet(button.dataset.sheetOpen)));
-    document.querySelectorAll('[data-sheet-close]').forEach(button=>button.addEventListener('click',()=>document.getElementById(button.dataset.sheetClose)?.close()));
-    document.querySelectorAll('.form-sheet').forEach(sheet=>{
-        sheet.addEventListener('cancel',event=>{event.preventDefault();sheet.close()});
-        sheet.addEventListener('click',event=>{if(event.target===sheet)sheet.close()});
-    });
     @if(request()->boolean('create') || old('_form_mode') === 'createOrganization') openSheet('create-organization-sheet'); @endif
     @if($editingOrganization || old('_form_mode') === 'editOrganization') openSheet('edit-organization-sheet'); @endif
     document.querySelectorAll('[data-geographic-form]').forEach(form=>{

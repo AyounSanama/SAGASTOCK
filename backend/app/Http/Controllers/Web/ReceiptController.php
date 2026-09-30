@@ -7,6 +7,7 @@ use App\Models\Batch;
 use App\Models\Organization;
 use App\Models\Receipt;
 use App\Models\Site;
+use App\Notifications\OperationalNotification;
 use App\Services\AuditService;
 use App\Services\ModuleActivationService;
 use App\Services\StockLedgerService;
@@ -26,6 +27,16 @@ class ReceiptController extends Controller
         private ModuleActivationService $modules,
         private AuditService $audit,
     ) {}
+
+    public function home(Request $request): View
+    {
+        $organization = $this->scopes->organizations($request->user())
+            ->where('is_active', true)
+            ->when($request->filled('organization_id'), fn ($query) => $query->whereKey($request->input('organization_id')))
+            ->orderBy('name')->firstOrFail();
+
+        return $this->index($request, $organization);
+    }
 
     public function index(Request $request, Organization $organization): View
     {
@@ -180,6 +191,12 @@ class ReceiptController extends Controller
             ]);
         });
         $this->audit->record($request, 'receipt.validated', $receipt);
+        $request->user()->notify(new OperationalNotification([
+            'title' => 'Réception validée',
+            'message' => "La réception {$receipt->reference} a crédité le stock.",
+            'category' => 'receipt',
+            'action_path' => '/receipts',
+        ]));
 
         return back()->with('status', 'Réception validée : les quantités acceptées ont été ajoutées au stock.');
     }

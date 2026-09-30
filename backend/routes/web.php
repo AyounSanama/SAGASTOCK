@@ -41,6 +41,9 @@ Route::middleware('guest')->group(function () {
     Route::post('/reset-password', [PasswordResetController::class, 'reset'])->name('password.update');
 });
 Route::middleware('auth')->group(function () {
+    Route::get('/profile/notifications', [\App\Http\Controllers\Web\NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/profile/notifications/read-all', [\App\Http\Controllers\Web\NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::post('/profile/notifications/{notification}/read', [\App\Http\Controllers\Web\NotificationController::class, 'read'])->name('notifications.read');
     Route::redirect('/setup', '/configuration/organization')->name('setup.index');
     Route::get('/configuration', [ControlCenterController::class, 'show'])
         ->middleware('permission:configuration.view')->name('configuration.index');
@@ -93,7 +96,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/standard-lists', [CatalogController::class, 'home'])->defaults('section', 'lists')->middleware('permission:standard_lists.view')->name('modules.standard-lists');
     Route::get('/products', [CatalogController::class, 'home'])->defaults('section', 'products')->middleware('permission:products.view')->name('modules.products');
     Route::get('/stocks', [StockController::class, 'home'])->middleware('permission:stocks.view')->name('modules.stocks');
-    Route::get('/receipts', [ModulePlaceholderController::class, 'show'])->defaults('module', 'receipts')->middleware('permission:receipts.view')->name('modules.receipts');
+    Route::get('/receipts', [ReceiptController::class, 'home'])->middleware('permission:receipts.view')->name('modules.receipts');
     Route::get('/dispensations', [DispensationController::class, 'index'])->middleware('permission:dispensing.view')->name('modules.dispensing');
     Route::get('/inventories', [InventoryController::class, 'index'])->middleware('permission:inventories.view')->name('modules.inventories');
     Route::get('/orders', [SupplyOrderController::class, 'index'])->middleware('permission:orders.view')->name('modules.orders');
@@ -109,6 +112,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/security/roles/{role}', [SecurityController::class, 'update'])->middleware('permission:roles.manage')->name('security.roles.update');
     Route::delete('/security/roles/{role}', [SecurityController::class, 'destroy'])->middleware('permission:roles.manage')->name('security.roles.destroy');
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::post('/profile/locale', [ProfileController::class, 'setLocale'])->name('profile.locale');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
     Route::delete('/profile/devices/{device}', [ProfileController::class, 'revoke'])->name('profile.devices.revoke');

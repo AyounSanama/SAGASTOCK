@@ -4,6 +4,8 @@
   --pc-color-primary-dark:#C86500;
   --pc-color-primary-soft:#FFF3E8;
   --pc-color-success:#22A447;
+  --pc-color-warning:#9A6700;
+  --pc-color-info:#2563EB;
   --pc-color-danger:#E53935;
   --pc-color-text:#24324A;
   --pc-color-text-muted:#6B778C;
@@ -38,7 +40,7 @@
   --pc-space-12:48px;
 
   --pc-radius-sm:8px;
-  --pc-radius-md:10px;
+  --pc-radius-md:12px;
   --pc-radius-lg:14px;
   --pc-radius-pill:999px;
 
@@ -50,12 +52,12 @@
   --pc-layout-sidebar-open:260px;
   --pc-layout-sidebar-collapsed:78px;
   --pc-layout-topbar:64px;
-  --pc-layout-page-padding-desktop:28px;
-  --pc-layout-page-padding-tablet:22px;
+  --pc-layout-page-padding-desktop:32px;
+  --pc-layout-page-padding-tablet:24px;
   --pc-layout-page-padding-mobile:16px;
   --pc-layout-content-max:1680px;
   --pc-layout-form-sheet-min:480px;
-  --pc-layout-form-sheet-max:620px;
+  --pc-layout-form-sheet-max:720px;
 
   --pc-shadow-card:0 10px 28px rgba(36,50,74,.07);
   --pc-shadow-overlay:0 18px 48px rgba(20,39,74,.16);

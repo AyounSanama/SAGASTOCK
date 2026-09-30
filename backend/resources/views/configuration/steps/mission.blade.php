@@ -61,10 +61,10 @@
         </div>
     @endif
     @if($creatingMission)
-        <dialog id="mission-create-sheet" class="configuration-form-sheet" aria-labelledby="mission-create-sheet-title">
-            <section class="configuration-form-sheet-panel">
-                <header><div><h2 id="mission-create-sheet-title">Ajouter une mission</h2><p>Créez une mission rattachée uniquement à {{ $organization->name }}.</p></div><button type="button" data-mission-sheet-close aria-label="Fermer">×</button></header>
-                <div class="configuration-form-sheet-body">
+        <dialog id="mission-create-sheet" class="form-sheet" aria-labelledby="mission-create-sheet-title">
+            <section class="form-sheet-panel">
+                <header class="form-sheet-header"><div><h2 id="mission-create-sheet-title">Ajouter une mission</h2><p>Créez une mission rattachée uniquement à {{ $organization->name }}.</p></div><button type="button" data-sheet-close="mission-create-sheet" aria-label="Fermer">×</button></header>
+                <div class="form-sheet-body">
     @endif
     <form class="organization-form" id="mission-form" method="post"
           action="{{ route('configuration.mission.save', ['_flow'=>$workflow->workflow_id]) }}"
@@ -158,8 +158,6 @@
         document.addEventListener('DOMContentLoaded',()=>{
             const sheet=document.getElementById('mission-create-sheet');
             if(sheet&&!sheet.open)sheet.showModal();
-            document.querySelector('[data-mission-sheet-close]')?.addEventListener('click',()=>sheet?.close());
-            sheet?.addEventListener('cancel',event=>{event.preventDefault();sheet.close()});
         });
         </script>
         @endpush

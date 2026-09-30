@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mot de passe oublié · PharmaCare</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0,0"><link rel="stylesheet" href="/css/pharmacare-portal.css?v={{ filemtime(public_path('css/pharmacare-portal.css')) }}">@include('components.auth-styles')</head>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mot de passe oublié · PharmaCare</title>@include('components.auth-styles')@include('components.assets')
+</head>
 <body class="auth-page"><main class="auth-card" aria-labelledby="forgot-title">
  <header class="auth-brand"><img class="auth-logo" src="{{ asset('images/pharmacare-logo.png') }}" alt="Logo PharmaCare"><h1 id="forgot-title" class="auth-wordmark"><span>Pharma</span><strong>Care</strong></h1><p>Récupérez l’accès à votre compte en toute sécurité.</p></header>
  @if(session('status'))<div class="auth-alert auth-alert--success" role="status"><span class="material-symbols-outlined">check_circle</span><span>{{ session('status') }}</span></div>@endif

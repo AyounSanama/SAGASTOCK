@@ -2,113 +2,7 @@
 @section('title', 'Tableau de bord · PharmaCare')
 @section('page-title', 'Tableau de bord')
 @section('hide-breadcrumb', '1')
-@push('styles')
-    <style>
-        :root{
-            --dash-blue:#2563EB;
-            --dash-cyan:#14B8A6;
-            --dash-orange:#FF7A00;
-            --dash-red:#EF4444;
-            --dash-green:#16A34A;
-            --dash-purple:#7C3AED;
-            --dash-ink:#152033;
-            --dash-muted:#667085;
-            --dash-border:#E4E9F0;
-        }
-        .dashboard-main{display:grid;gap:24px}
-        .dashboard-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
-        .dashboard-hero h1{margin:0 0 7px!important;font-size:32px!important}
-        .dashboard-hero p{margin:0;color:var(--dash-muted);font-size:14px}
-        .dashboard-date{display:inline-flex;align-items:center;gap:9px;min-height:44px;padding:10px 14px;background:#fff;border:1px solid var(--dash-border);border-radius:12px;color:var(--dash-muted);font-size:13px;font-weight:700;white-space:nowrap}
-        .dashboard-date svg{width:18px;height:18px;color:var(--dash-blue)}
 
-        .dashboard-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
-        .legacy-dashboard-metrics{display:none!important}
-        .metric-icon.material-symbols-outlined{font-size:25px;color:inherit}
-        .dashboard-metric{position:relative;min-height:172px;padding:21px;border-radius:18px;color:#fff;overflow:hidden;box-shadow:0 16px 28px rgba(21,32,51,.14)}
-        .dashboard-metric::after{content:"";position:absolute;width:150px;height:150px;right:-52px;bottom:-72px;border:24px solid rgba(255,255,255,.10);border-radius:50%}
-        .dashboard-metric.blue{background:linear-gradient(135deg,#43A5F7,var(--dash-blue))}
-        .dashboard-metric.cyan{background:linear-gradient(135deg,#31C9C5,var(--dash-cyan))}
-        .dashboard-metric.orange{background:linear-gradient(135deg,#FFA126,var(--dash-orange))}
-        .dashboard-metric.red{background:linear-gradient(135deg,#F46D73,var(--dash-red))}
-        .metric-head{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px}
-        .metric-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.28)}
-        .metric-icon svg{width:24px;height:24px}
-        .metric-label{font-size:13px;font-weight:700;color:rgba(255,255,255,.88)}
-        .dashboard-metric strong{position:relative;z-index:1;display:block;margin-top:17px;font-size:31px;line-height:1;font-weight:900;letter-spacing:-.03em}
-        .metric-link{position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;margin-top:14px;color:#fff;font-size:11px;font-weight:750;opacity:.88}
-
-        .dashboard-workspace{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(310px,.75fr);gap:18px;align-items:start}
-        .dashboard-column{display:grid;gap:18px;min-width:0}
-        .dashboard-card{background:#fff;border:1px solid var(--dash-border);border-radius:18px;box-shadow:0 12px 30px rgba(20,39,74,.07);overflow:hidden}
-        .dashboard-card-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 20px 15px}
-        .dashboard-card-title{display:flex;align-items:center;gap:12px;min-width:0}
-        .dashboard-card-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:rgba(37,99,235,.09);color:var(--dash-blue);flex:0 0 auto}
-        .dashboard-card-icon.orange{background:rgba(255,122,0,.10);color:var(--dash-orange)}
-        .dashboard-card-icon.green{background:rgba(22,163,74,.10);color:var(--dash-green)}
-        .dashboard-card-icon svg{width:21px;height:21px}
-        .dashboard-card h2{margin:0!important;font-size:17px!important}
-        .dashboard-card-head p{margin:3px 0 0;color:var(--dash-muted);font-size:11px}
-        .dashboard-card-action{color:var(--dash-blue);font-size:12px;font-weight:800;white-space:nowrap}
-        .dashboard-card-body{padding:0 20px 20px}
-
-        .dashboard-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-        .dashboard-shortcut{display:flex;align-items:center;gap:13px;min-height:82px;padding:14px;border:1px solid var(--dash-border);border-radius:14px;color:var(--dash-ink);background:#fff;transition:transform .16s,border-color .16s,box-shadow .16s}
-        .dashboard-shortcut:hover{transform:translateY(-2px);border-color:rgba(37,99,235,.42);box-shadow:0 9px 20px rgba(37,99,235,.08)}
-        .dashboard-shortcut-icon{width:46px;height:46px;display:grid;place-items:center;border-radius:13px;flex:0 0 auto}
-        .dashboard-shortcut-icon svg{width:22px;height:22px}
-        .dashboard-shortcut-icon.orange{background:rgba(255,122,0,.10);color:var(--dash-orange)}
-        .dashboard-shortcut-icon.blue{background:rgba(37,99,235,.09);color:var(--dash-blue)}
-        .dashboard-shortcut-icon.green{background:rgba(22,163,74,.10);color:var(--dash-green)}
-        .dashboard-shortcut-icon.purple{background:rgba(124,58,237,.09);color:var(--dash-purple)}
-        .dashboard-shortcut b{display:block;font-size:13px}
-        .dashboard-shortcut small{display:block;margin-top:4px;color:var(--dash-muted);font-size:10.5px}
-
-        .dashboard-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-        .summary-item{padding:14px;border:1px solid var(--dash-border);border-radius:13px;background:#FAFBFD}
-        .summary-item strong{display:block;color:var(--dash-ink);font-size:21px;font-weight:900}
-        .summary-item span{display:block;margin-top:4px;color:var(--dash-muted);font-size:10px;line-height:1.35}
-
-        .dashboard-table-wrap{overflow:auto;border:1px solid var(--dash-border);border-radius:13px}
-        .dashboard-table{min-width:620px}
-        .dashboard-table th{background:#F1F5FA!important;color:#536079!important}
-        .dashboard-empty{display:flex;align-items:center;gap:12px;min-height:76px;padding:15px;border:1px dashed #CED6E2;border-radius:13px;color:var(--dash-muted);font-size:12px}
-        .dashboard-empty-icon{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:rgba(22,163,74,.10);color:var(--dash-green);font-size:20px}
-        .positive{color:var(--dash-green)!important;font-weight:800}
-        .negative{color:var(--dash-red)!important;font-weight:800}
-
-        .activity-list{max-height:410px;overflow:auto;padding-right:3px}
-        .dashboard-activity{position:relative;display:grid;grid-template-columns:38px minmax(0,1fr);gap:11px;padding:12px 0}
-        .dashboard-activity:not(:last-child){border-bottom:1px solid #EDF0F4}
-        .activity-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:rgba(255,122,0,.10);color:var(--dash-orange)}
-        .activity-icon svg{width:18px;height:18px}
-        .dashboard-activity p{margin:0;color:var(--dash-ink);font-size:12px;line-height:1.45}
-        .dashboard-activity strong{font-weight:800}
-        .dashboard-activity small{display:block;margin-top:3px;color:var(--dash-muted);font-size:10px}
-        .organization-list{display:grid;gap:9px}
-        .organization-row{display:flex;align-items:center;gap:11px;padding:11px;border:1px solid var(--dash-border);border-radius:12px}
-        .organization-avatar{width:36px;height:36px;display:grid;place-items:center;border-radius:10px;background:rgba(124,58,237,.09);color:var(--dash-purple);font-weight:900}
-        .organization-row strong,.organization-row small{display:block}
-        .organization-row strong{font-size:12px}.organization-row small{margin-top:2px;color:var(--dash-muted);font-size:10px}
-
-        @media(max-width:1280px){
-            .dashboard-workspace{grid-template-columns:1fr}
-            .activity-list{max-height:330px}
-        }
-        @media(max-width:1050px){.dashboard-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media(max-width:680px){
-            .dashboard-hero{display:block}.dashboard-date{margin-top:15px}
-            .dashboard-metrics{gap:10px}.dashboard-metric{min-height:150px;padding:16px}.dashboard-metric strong{font-size:25px}
-            .dashboard-shortcuts{grid-template-columns:1fr}.dashboard-summary{grid-template-columns:1fr}
-        }
-        .dashboard-metrics{grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
-        .dashboard-metric{min-height:128px!important;padding:16px!important;background:#fff!important;color:var(--dash-ink)!important;border:1px solid var(--dash-border)!important;border-radius:14px!important;box-shadow:0 8px 22px rgba(20,39,74,.06)!important}
-        .dashboard-metric:after{display:none!important}.dashboard-metric .metric-head{justify-content:flex-start}.dashboard-metric .metric-icon{width:42px;height:42px;border:0;background:#fff3e8!important;color:var(--dash-orange)!important}.dashboard-metric .metric-label{color:var(--dash-muted)!important;font-size:11px}.dashboard-metric strong{margin-top:12px!important;color:var(--dash-ink)!important;font-size:25px!important}.dashboard-metric .metric-link{margin-top:7px;color:var(--dash-green)!important;font-size:10px}
-        .dashboard-analytics{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.7fr) minmax(260px,.65fr);gap:16px}.analytics-card{min-width:0;padding:18px;background:#fff;border:1px solid var(--dash-border);border-radius:16px;box-shadow:0 8px 24px rgba(20,39,74,.06)}.analytics-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.analytics-head h2{margin:0!important;font-size:16px!important}.analytics-head span{color:var(--dash-muted);font-size:11px}.bar-chart{height:210px;display:flex;align-items:flex-end;gap:12px;padding:18px 8px 0;border-bottom:1px solid var(--dash-border);background:repeating-linear-gradient(to top,transparent 0,transparent 48px,#eef2f7 49px)}.bar-item{height:100%;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;min-width:34px}.bar{width:min(42px,78%);min-height:5px;border-radius:8px 8px 2px 2px;background:linear-gradient(180deg,#ff9b35,var(--dash-orange))}.bar-item small{max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dash-muted);font-size:9px}.donut-wrap{display:grid;place-items:center;min-height:210px}.donut{width:150px;height:150px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--dash-green) 0 62%,var(--dash-orange) 62% 84%,var(--dash-red) 84% 96%,var(--dash-purple) 96%);position:relative}.donut:after{content:"";width:88px;height:88px;border-radius:50%;background:#fff}.donut-label{position:absolute;z-index:1;text-align:center}.donut-label strong,.donut-label small{display:block}.donut-label strong{font-size:23px}.donut-label small{font-size:10px;color:var(--dash-muted)}.alert-summary{display:grid;gap:10px}.alert-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px;border:1px solid var(--dash-border);border-radius:12px}.alert-row span{display:flex;align-items:center;gap:8px;font-size:12px}.alert-row .material-symbols-outlined{font-size:20px;color:var(--dash-orange)}.alert-row strong{font-size:18px}.alert-row.danger .material-symbols-outlined,.alert-row.danger strong{color:var(--dash-red)}
-        @media(max-width:1350px){.dashboard-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-analytics{grid-template-columns:1fr 1fr}.dashboard-analytics .analytics-card:first-child{grid-column:1/-1}}
-        @media(max-width:760px){.dashboard-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-analytics{grid-template-columns:1fr}.dashboard-analytics .analytics-card:first-child{grid-column:auto}}
-    </style>
-@endpush
 @section('content')
 @php
     $dashboardLabel = 'Tableau de bord';
@@ -123,88 +17,25 @@
         </div>
         <div class="dashboard-date">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-            {{ now()->locale('fr')->translatedFormat('l d F Y') }}
+            {{ now()->locale(app()->getLocale())->translatedFormat('l d F Y') }}
         </div>
     </section>
 
+    <h2>Vue d’ensemble opérationnelle</h2>
     <section class="app-kpi-grid dashboard-metrics-dynamic" aria-label="Indicateurs adaptés à votre périmètre">
         @foreach($widgets as $widget)
-            @php
-                $tone = match ($widget['color']) {
-                    'red' => 'red',
-                    'cyan' => 'green',
-                    'blue' => 'blue',
-                    default => 'orange',
-                };
-            @endphp
             <x-app-kpi-card
                 :label="$widget['label']"
                 :value="number_format((float) $widget['value'], $widget['key']==='stock_quantity' ? 2 : 0, ',', ' ')"
                 :icon="config('pharmacare_ui.module_icons.'.$widget['icon'], 'dashboard')"
                 :caption="$widget['caption']"
                 :href="$widget['route']"
-                :tone="$tone"
             />
         @endforeach
     </section>
 
-    @php
-        $maximumWidgetValue = max(1, collect($widgets)->max(fn($widget) => (float) $widget['value']) ?? 1);
-    @endphp
-    <section class="dashboard-analytics" aria-label="Analyse opérationnelle">
-        <article class="analytics-card">
-            <header class="analytics-head"><div><h2>Vue d’ensemble opérationnelle</h2><span>Comparaison des indicateurs de votre périmètre</span></div><span>Valeurs actuelles</span></header>
-            <div class="bar-chart">
-                @forelse(collect($widgets)->take(7) as $widget)
-                    <div class="bar-item" title="{{ $widget['label'] }} : {{ $widget['value'] }}"><div class="bar" style="height:{{ max(5,round(((float)$widget['value']/$maximumWidgetValue)*165)) }}px"></div><small>{{ $widget['label'] }}</small></div>
-                @empty
-                    <div class="dashboard-empty">Aucun indicateur disponible pour ce périmètre.</div>
-                @endforelse
-            </div>
-        </article>
-        @unless($isV1CoordinationOrProject)
-        <article class="analytics-card">
-            <header class="analytics-head"><div><h2>État du catalogue</h2><span>Produits actifs visibles</span></div></header>
-            <div class="donut-wrap"><div class="donut"><div class="donut-label"><strong>{{ number_format($stats['products']) }}</strong><small>Produits</small></div></div></div>
-        </article>
-        <article class="analytics-card">
-            <header class="analytics-head"><div><h2>Alertes de stock</h2><span>Points nécessitant une attention</span></div></header>
-            <div class="alert-summary"><div class="alert-row danger"><span><i class="material-symbols-outlined">warning</i>Ruptures</span><strong>{{ number_format($stats['stockouts']) }}</strong></div><div class="alert-row"><span><i class="material-symbols-outlined">event_busy</i>Péremptions proches</span><strong>{{ number_format($stats['expiring_batches']) }}</strong></div><div class="alert-row"><span><i class="material-symbols-outlined">inventory_2</i>Lignes de stock</span><strong>{{ number_format($stats['stock_lines']) }}</strong></div></div>
-        </article>
-        @endunless
-    </section>
-
-    <section class="dashboard-metrics legacy-dashboard-metrics" aria-hidden="true">
-        @if(auth()->user()->hasPermission('stocks.view'))
-        <article class="dashboard-metric blue">
-            <div class="metric-head"><span class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16v13H4zM8 7V4h8v3M8 12h8M12 9v6"/></svg></span><span class="metric-label">Stock disponible</span></div>
-            <strong>{{ number_format((float)$stats['stock_quantity'],2,',',' ') }}</strong>
-            <span class="metric-link">Unités de médicaments</span>
-        </article>
-        <article class="dashboard-metric cyan">
-            <div class="metric-head"><span class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4zM8 9h8M8 13h5"/></svg></span><span class="metric-label">Inventaire</span></div>
-            <strong>{{ number_format($stats['stock_lines']) }}</strong>
-            <span class="metric-link">Lignes de stock visibles</span>
-        </article>
-        @endif
-        @if(auth()->user()->hasPermission('organizations.view'))
-        <article class="dashboard-metric orange">
-            <div class="metric-head"><span class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h2M13 10h2M9 14h2M13 14h2"/></svg></span><span class="metric-label">Organisations</span></div>
-            <strong>{{ number_format($stats['organizations']) }}</strong>
-            <span class="metric-link">Structures accessibles</span>
-        </article>
-        @endif
-        @if(auth()->user()->hasPermission('users.view'))
-        <article class="dashboard-metric red">
-            <div class="metric-head"><span class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="metric-label">Utilisateurs actifs</span></div>
-            <strong>{{ number_format($stats['users_active']) }}</strong>
-            <span class="metric-link">Comptes actuellement actifs</span>
-        </article>
-        @endif
-    </section>
-
-    <section class="dashboard-workspace">
-        <div class="dashboard-column">
+    <section class="pc-dashboard-grid">
+        <div class="dashboard-column pc-dashboard-main">
             <article class="dashboard-card">
                 <header class="dashboard-card-head">
                     <div class="dashboard-card-title">
@@ -214,6 +45,18 @@
                 </header>
                 <div class="dashboard-card-body">
                     <div class="dashboard-shortcuts">
+                        @if($dashboardRole === \App\Services\GovernanceService::COORDINATION_ADMIN && auth()->user()->hasPermission('funding.view'))
+                        <a class="dashboard-shortcut" href="{{ route('modules.funding') }}"><span class="dashboard-shortcut-icon orange material-symbols-outlined" aria-hidden="true">volunteer_activism</span><span><b>Bailleurs et programmes</b><small>Financements de votre coordination</small></span></a>
+                        @endif
+                        @if(auth()->user()->hasPermission('standard_lists.view'))
+                        <a class="dashboard-shortcut" href="{{ route('modules.standard-lists') }}"><span class="dashboard-shortcut-icon orange material-symbols-outlined" aria-hidden="true">format_list_bulleted</span><span><b>Liste standard</b><small>Référentiel autorisé de votre projet</small></span></a>
+                        @endif
+                        @if($dashboardRole === \App\Services\GovernanceService::PROJECT_ADMIN && auth()->user()->hasPermission('health_facilities.view'))
+                        <a class="dashboard-shortcut" href="{{ route('modules.health-facilities') }}"><span class="dashboard-shortcut-icon orange material-symbols-outlined" aria-hidden="true">local_hospital</span><span><b>Formations sanitaires</b><small>Établissements de votre projet</small></span></a>
+                        @endif
+                        @if($dashboardRole === \App\Services\GovernanceService::PROJECT_ADMIN && auth()->user()->hasPermission('users.view'))
+                        <a class="dashboard-shortcut" href="{{ route('users.index') }}"><span class="dashboard-shortcut-icon orange material-symbols-outlined" aria-hidden="true">group</span><span><b>Équipe FOSA</b><small>Utilisateurs de votre périmètre</small></span></a>
+                        @endif
                         @if($dashboardRole === \App\Services\GovernanceService::COORDINATION_ADMIN && auth()->user()->hasPermission('projects.manage'))
                         <a class="dashboard-shortcut" href="{{ route('modules.projects',['create'=>1]) }}"><span class="dashboard-shortcut-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14M4 4h16v16H4z"/></svg></span><span><b>Créer un projet</b><small>Projet, bailleurs et premier Admin Projet</small></span></a>
                         @elseif(auth()->user()->hasPermission('users.manage') && !$isV1CoordinationOrProject)
@@ -233,7 +76,7 @@
                 </div>
             </article>
 
-            @unless($isV1CoordinationOrProject)
+            @if(!$isV1CoordinationOrProject && auth()->user()->hasPermission('stocks.view'))
             <article class="dashboard-card">
                 <header class="dashboard-card-head">
                     <div class="dashboard-card-title">
@@ -253,11 +96,11 @@
                     @endif
                 </div>
             </article>
-            @endunless
+            @endif
         </div>
 
-        <aside class="dashboard-column">
-            @unless($isV1CoordinationOrProject)
+        <aside class="dashboard-column pc-dashboard-aside">
+            @if(!$isV1CoordinationOrProject && auth()->user()->hasPermission('users.view'))
             <article class="dashboard-card">
                 <header class="dashboard-card-head">
                     <div class="dashboard-card-title">
@@ -271,7 +114,7 @@
                     <div class="summary-item"><strong>{{ number_format($stats['users_archived']) }}</strong><span>Comptes archivés</span></div>
                 </div>
             </article>
-            @endunless
+            @endif
 
             <article class="dashboard-card">
                 <header class="dashboard-card-head">
@@ -298,7 +141,7 @@
                 </div>
             </article>
 
-            @unless($dashboardRole === \App\Services\GovernanceService::PROJECT_ADMIN)
+            @if($dashboardRole !== \App\Services\GovernanceService::PROJECT_ADMIN && auth()->user()->hasPermission('organizations.view'))
             <article class="dashboard-card">
                 <header class="dashboard-card-head">
                     <div class="dashboard-card-title">
@@ -314,7 +157,7 @@
                     @endforelse
                 </div>
             </article>
-            @endunless
+            @endif
         </aside>
     </section>
 </main>

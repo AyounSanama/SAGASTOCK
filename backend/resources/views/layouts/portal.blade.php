@@ -1,18 +1,29 @@
 <!doctype html>
-<html lang="fr">
+<html lang="{{ app()->getLocale() }}">
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'PharmaCare')</title>
-    <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0,0">
-    <link rel="stylesheet" href="/css/pharmacare-portal.css?v={{ filemtime(public_path('css/pharmacare-portal.css')) }}">
+
+    <script>
+        (() => {
+            try {
+                if (localStorage.getItem('pc-theme') === 'dark') document.documentElement.dataset.theme = 'dark';
+            } catch (_) {}
+        })();
+        window.PC_I18N = {
+            locale: @json(app()->getLocale()),
+            texts: @json(app()->getLocale() === 'en' ? __('ui.texts') : [])
+        };
+    </script>
+
     @stack('styles')
+@include('components.assets')
 </head>
 
-<body class="portal-body">
+<body class="pc-app portal-body">
     <div class="portal-shell">
         @include('components.navigation.sidebar')
         <div class="portal-workspace">
@@ -26,7 +37,7 @@
             </main>
         </div>
     </div>
-    <script src="/js/pharmacare-portal.js?v={{ filemtime(public_path('js/pharmacare-portal.js')) }}"></script>
+
     @stack('scripts')
 </body>
 

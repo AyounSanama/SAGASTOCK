@@ -229,7 +229,7 @@
     </style>
 </head>
 
-<body>
+<body class="pc-app ">
     @include('components.app-sidebar')
     <header><strong class="brand-lockup"><img src="{{ asset('images/pharmacare-logo.png') }}"
                 alt="">PharmaCare</strong><a href="{{ route('organizations.index') }}">Organisations</a><a
