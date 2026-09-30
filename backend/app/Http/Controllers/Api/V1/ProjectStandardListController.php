@@ -19,7 +19,8 @@ class ProjectStandardListController extends Controller {
  public function show(Request $request,Project $project): JsonResponse {
   $this->project($request,$project);
   $list=StandardList::where('scope_type','project')->where('scope_id',$project->id)->with(['versions'=>fn($q)=>$q->with(['products.baseUnit','products.dosageForm','products.category'])->latest('version_number')])->first();
-  return response()->json(['project'=>$project->load('mission.country'),'list'=>$list,'options'=>$this->generator->options($project->organization)]);
+  $published=$list?->versions->firstWhere('status','published');
+  return response()->json(['project'=>$project->load('mission.country'),'list'=>$list,'options'=>$this->generator->options($project->organization),'project_context'=>$this->generator->withProjectDefaults($project,[]),'needs_regeneration'=>$this->generator->needsRegeneration($project,$published)]);
  }
  public function generate(Request $request,Project $project): JsonResponse {
   $this->manage($request,$project); $context=$this->context($request,$project);
@@ -52,7 +53,9 @@ class ProjectStandardListController extends Controller {
   return response()->json(['mappings'=>ProductStandardMapping::where('product_id',$product->id)->get()]);
  }
  private function context(Request $request,Project $project): array {
-  $data=$request->validate(['care_level_id'=>['required','uuid'],'facility_category_id'=>['required','uuid'],'target_population_ids'=>['required','array','min:1'],'target_population_ids.*'=>['uuid','distinct'],'pathology_ids'=>['nullable','array'],'pathology_ids.*'=>['uuid','distinct'],'laboratory_exam_ids'=>['nullable','array'],'laboratory_exam_ids.*'=>['uuid','distinct']]);
+  $data=$this->generator->withProjectDefaults($project,$request->validate(['care_level_id'=>['nullable','uuid'],'facility_category_id'=>['required','uuid'],'target_population_ids'=>['nullable','array'],'target_population_ids.*'=>['uuid','distinct'],'pathology_ids'=>['nullable','array'],'pathology_ids.*'=>['uuid','distinct'],'laboratory_exam_ids'=>['nullable','array'],'laboratory_exam_ids.*'=>['uuid','distinct']]));
+  abort_if(empty($data['care_level_id']),422,'Sélectionnez un niveau de soins ou configurez la configuration médicale du projet.');
+  abort_if(empty($data['target_population_ids']),422,'Sélectionnez une population cible ou configurez la configuration médicale du projet.');
   $types=['care_level_id'=>'care_level','facility_category_id'=>'facility_category']; foreach($types as $field=>$type)$this->references($project,[$data[$field]],$type);
   $this->references($project,$data['target_population_ids'],'target_population'); $this->references($project,$data['pathology_ids']??[],'pathology'); $this->references($project,$data['laboratory_exam_ids']??[],'laboratory_exam');
   abort_if(empty($data['pathology_ids'])&&empty($data['laboratory_exam_ids']),422,'Sélectionnez une pathologie ou un examen de laboratoire.'); return $data;

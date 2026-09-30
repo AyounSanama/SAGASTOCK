@@ -14,7 +14,31 @@ class Project extends Model
 
     public $incrementing = false;
     protected $keyType = 'string';
-    protected $fillable = ['organization_id', 'mission_id', 'code', 'name', 'description', 'starts_on', 'ends_on', 'order_period_months', 'delivery_lead_time_months', 'safety_stock_months', 'is_active'];
+    public const STATUSES = ['draft' => 'Brouillon', 'active' => 'Actif', 'suspended' => 'Suspendu', 'closed' => 'Clôturé'];
+
+    protected $fillable = ['organization_id', 'mission_id', 'code', 'name', 'implementing_partner', 'donor_reference_code', 'moh_program_code', 'responsible_name', 'responsible_contact', 'description', 'starts_on', 'ends_on', 'order_period_months', 'delivery_lead_time_months', 'safety_stock_months', 'status', 'is_active'];
+
+    protected $appends = ['status_label'];
+
+    protected static function booted(): void
+    {
+        // Le statut pilote le cycle de vie ; is_active reste dérivé pour les
+        // clients et filtres existants.
+        static::saving(function (Project $project): void {
+            if ($project->isDirty('status')) {
+                $project->is_active = $project->status === 'active';
+            } elseif ($project->isDirty('is_active')) {
+                $project->status = $project->is_active
+                    ? 'active'
+                    : (in_array($project->status, ['draft', 'closed'], true) ? $project->status : 'suspended');
+            }
+        });
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return self::STATUSES[$this->status ?? 'active'] ?? (string) $this->status;
+    }
 
     protected function casts(): array
     {

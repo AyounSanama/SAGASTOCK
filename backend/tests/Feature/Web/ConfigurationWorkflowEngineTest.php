@@ -66,7 +66,7 @@ class ConfigurationWorkflowEngineTest extends TestCase
         $existing = Project::create(['organization_id' => $organization->id, 'mission_id' => $mission->id, 'code' => 'OLD', 'name' => 'Projet existant']);
         $actor = User::factory()->create(['organization_id' => $organization->id]);
         $actor->roles()->attach(Role::where('code', 'coordination_admin')->firstOrFail(), ['scope_type' => 'mission', 'scope_id' => $mission->id]);
-        $this->actingAs($actor)->post(route('organizations.projects.store', $organization), [
+        $this->actingAs($actor)->post(route('organizations.projects.store', $organization), ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
             'mission_id' => $mission->id, 'code' => 'NEW', 'name' => 'Nouveau projet',
             'admin' => ['first_name' => 'Admin', 'last_name' => 'Projet', 'email' => 'new-project@example.test', 'password' => 'PharmaCare!2026', 'password_confirmation' => 'PharmaCare!2026'],
         ])->assertRedirect()->assertSessionHasNoErrors();

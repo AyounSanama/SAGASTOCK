@@ -94,7 +94,7 @@ class AdminCoordinationMissionOwnershipTest extends TestCase
             ->assertOk()->assertSee('Projets de la mission')->assertSee('Ajouter un projet')
             ->assertSee('name="mission_id" value="'.$mission->id.'"', false);
 
-        $this->post(route('organizations.projects.store', $organization), [
+        $this->post(route('organizations.projects.store', $organization), ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
             'mission_id' => $mission->id,
             'code' => 'NUTRITION',
             'name' => 'Projet Nutrition',
@@ -108,7 +108,7 @@ class AdminCoordinationMissionOwnershipTest extends TestCase
             'code' => 'NUTRITION',
         ]);
 
-        $this->post(route('organizations.projects.store', $organization), [
+        $this->post(route('organizations.projects.store', $organization), ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
             'mission_id' => $otherMission->id,
             'code' => 'INTRUSION',
             'name' => 'Projet étranger',
@@ -127,7 +127,7 @@ class AdminCoordinationMissionOwnershipTest extends TestCase
         $actor = $this->actor('coordination_admin', 'mission', $organization);
         $this->actingAs($actor);
         foreach (['Jean', 'Marie'] as $name) {
-            $this->post(route('organizations.projects.store', $organization), [
+            $this->post(route('organizations.projects.store', $organization), ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
                 'mission_id' => $mission->id, 'code' => strtoupper($name), 'name' => 'Projet '.$name,
                 'admin' => ['first_name' => $name, 'last_name' => 'Projet', 'email' => strtolower($name).'@example.test', 'password' => 'PharmaCare!2026', 'password_confirmation' => 'PharmaCare!2026'],
             ])->assertRedirect()->assertSessionHasNoErrors();
@@ -135,7 +135,7 @@ class AdminCoordinationMissionOwnershipTest extends TestCase
             $this->assertDatabaseHas('role_user', ['user_id' => User::where('email', strtolower($name).'@example.test')->value('id'), 'scope_type' => 'project', 'scope_id' => $project->id]);
         }
         $this->get(route('organizations.missions.show', [$organization, $mission]))->assertOk()->assertSee('Jean Projet')->assertSee('Marie Projet');
-        $this->post(route('organizations.projects.store', $other), ['mission_id' => $foreignMission->id, 'code' => 'INTRUS', 'name' => 'Interdit'])->assertNotFound();
+        $this->post(route('organizations.projects.store', $other), ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 'mission_id' => $foreignMission->id, 'code' => 'INTRUS', 'name' => 'Interdit'])->assertNotFound();
         $this->post(route('users.store'), ['email' => 'intrus@example.test'])->assertForbidden();
         $this->assertDatabaseMissing('projects', ['code' => 'INTRUS']);
         $this->assertDatabaseMissing('users', ['email' => 'intrus@example.test']);

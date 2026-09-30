@@ -48,6 +48,12 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'read']);
         Route::get('/organizations/{organization}/operational-report', [OperationalReportController::class, 'index']);
+        Route::get('/projects/medical-references', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'show'])->middleware('permission:standard_lists.view');
+        Route::post('/projects/medical-references/care-levels', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'storeCareLevel'])->middleware('permission:standard_lists.manage');
+        Route::delete('/projects/medical-references/care-levels/{reference}', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'archiveCareLevel'])->middleware('permission:standard_lists.manage');
+        Route::post('/projects/medical-references/{type}', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'storeReference'])->whereIn('type', ['target_population', 'pathology'])->middleware('permission:standard_lists.manage');
+        Route::get('/projects/{project}/medical-configuration', [\App\Http\Controllers\Api\V1\ProjectMedicalConfigurationController::class, 'show'])->middleware('permission:projects.view');
+        Route::put('/projects/{project}/medical-configuration', [\App\Http\Controllers\Api\V1\ProjectMedicalConfigurationController::class, 'update'])->middleware('permission:standard_lists.manage');
         Route::get('/projects/{project}', [ProjectController::class, 'show'])->middleware('permission:projects.view');
         Route::middleware(['role:sago_admin', 'permission:platform_standards.view'])->prefix('platform-configuration')->group(function (): void {
             Route::get('/', [PlatformConfigurationController::class, 'home']);
@@ -197,6 +203,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/organizations/{organization}/facilities/{facility}/sites/archived/{site}/restore', [StructureController::class, 'restoreSite'])->middleware('permission:structures.manage|dispensing_sites.manage');
         Route::put('/organizations/{organization}/module-activations', [StructureController::class, 'activation'])->middleware('permission:modules.manage');
         Route::get('/organizations/{organization}/catalog/references', [CatalogController::class, 'references'])->middleware('permission:catalog.view');
+        Route::get('/organizations/{organization}/catalog/references/care-level-tree', [CatalogController::class, 'careLevelTree'])->middleware('permission:catalog.view|standard_lists.view');
         Route::post('/organizations/{organization}/catalog/references', [CatalogController::class, 'storeReference'])->middleware('permission:catalog.manage');
         Route::put('/organizations/{organization}/catalog/references/{reference}', [CatalogController::class, 'updateReference'])->middleware('permission:catalog.manage');
         Route::delete('/organizations/{organization}/catalog/references/{reference}', [CatalogController::class, 'archiveReference'])->middleware('permission:catalog.manage');

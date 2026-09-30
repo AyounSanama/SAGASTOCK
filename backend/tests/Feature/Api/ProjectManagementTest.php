@@ -36,7 +36,7 @@ class ProjectManagementTest extends TestCase
         $other = Organization::create(['code' => 'OTHER', 'name' => 'Autre']);
         $mission = Mission::create(['organization_id' => $organization->id, 'country_id' => $country->id, 'code' => 'MISSION', 'name' => 'Mission']);
 
-        $created = $this->postJson("/api/v1/organizations/{$organization->id}/projects", [
+        $created = $this->postJson("/api/v1/organizations/{$organization->id}/projects", ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
             'mission_id' => $mission->id, 'code' => 'PROJET_1', 'name' => 'Projet santé', 'is_active' => true,
         ])->assertCreated()->assertJsonPath('project.mission.country.iso2', 'CM');
         $id = $created->json('project.id');
@@ -63,7 +63,7 @@ class ProjectManagementTest extends TestCase
         $organization = Organization::create(['code' => 'ONG', 'name' => 'ONG']);
         $other = Organization::create(['code' => 'OTHER', 'name' => 'Autre']);
         $mission = Mission::create(['organization_id' => $other->id, 'country_id' => $country->id, 'code' => 'OTHER', 'name' => 'Autre mission']);
-        $this->postJson("/api/v1/organizations/{$organization->id}/projects", [
+        $this->postJson("/api/v1/organizations/{$organization->id}/projects", ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
             'mission_id' => $mission->id, 'code' => 'BAD', 'name' => 'Projet invalide',
         ])->assertUnprocessable();
     }

@@ -84,6 +84,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/sago/dashboard', [DashboardController::class, 'index'])->middleware('role:sago_admin')->name('sago.dashboard');
     Route::get('/projects', [ProjectController::class, 'home'])->middleware('permission:projects.view')->name('modules.projects');
+    Route::get('/projects/medical-references', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'show'])->middleware('permission:standard_lists.view')->name('projects.medical-references');
+    Route::post('/projects/medical-references/care-levels', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'storeCareLevel'])->middleware('permission:standard_lists.manage')->name('projects.medical-references.care-levels.store');
+    Route::delete('/projects/medical-references/care-levels/{reference}', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'archiveCareLevel'])->middleware('permission:standard_lists.manage')->name('projects.medical-references.care-levels.archive');
+    Route::post('/projects/medical-references/{type}', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'storeReference'])->whereIn('type', ['target_population', 'pathology'])->middleware('permission:standard_lists.manage')->name('projects.medical-references.store');
+    Route::get('/projects/{project}/medical-configuration', [\App\Http\Controllers\Web\ProjectMedicalConfigurationController::class, 'show'])->middleware('permission:projects.view')->name('projects.medical-configuration');
+    Route::put('/projects/{project}/medical-configuration', [\App\Http\Controllers\Web\ProjectMedicalConfigurationController::class, 'update'])->middleware('permission:standard_lists.manage')->name('projects.medical-configuration.update');
     Route::get('/projects/{project}/standard-list', [ProjectStandardListController::class, 'show'])->middleware('permission:standard_lists.view')->name('projects.standard-list.show');
     Route::post('/projects/{project}/standard-list/generate', [ProjectStandardListController::class, 'generate'])->middleware('permission:standard_lists.manage')->name('projects.standard-list.generate');
     Route::post('/projects/{project}/standard-list', [ProjectStandardListController::class, 'save'])->middleware('permission:standard_lists.manage')->name('projects.standard-list.save');

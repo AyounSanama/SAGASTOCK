@@ -43,14 +43,14 @@ class CoordinationCountryScopeTest extends TestCase
         [$user, $organization, $mission, $otherMission] = $this->context();
         Sanctum::actingAs($user);
 
-        $this->postJson("/api/v1/organizations/{$organization->id}/projects", [
+        $this->postJson("/api/v1/organizations/{$organization->id}/projects", ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
             'mission_id' => $mission->id,
             'code' => 'OWN-PROJECT',
             'name' => 'Projet autorisé',
             'is_active' => true,
         ])->assertCreated();
 
-        $this->postJson("/api/v1/organizations/{$organization->id}/projects", [
+        $this->postJson("/api/v1/organizations/{$organization->id}/projects", ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
             'mission_id' => $otherMission->id,
             'code' => 'CROSS-PROJECT',
             'name' => 'Projet hors périmètre',

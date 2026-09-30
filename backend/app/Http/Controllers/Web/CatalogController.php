@@ -12,6 +12,7 @@ use App\Models\StandardList;
 use App\Models\StandardListVersion;
 use App\Models\Supplier;
 use App\Services\AuditService;
+use App\Services\CareLevelHierarchyService;
 use App\Services\ModuleActivationService;
 use App\Services\UserScopeService;
 use Illuminate\Database\Eloquent\Model;
@@ -111,6 +112,9 @@ class CatalogController extends Controller
 
     public function archiveReference(Request $r, Organization $o, CatalogReference $m): RedirectResponse
     {
+        $this->manageOwned($r, $o, $m);
+        app(CareLevelHierarchyService::class)->guardArchive($m);
+
         return $this->archive($r, $o, $m, 'reference.archived', 'Référence archivée.');
     }
 
@@ -436,10 +440,11 @@ class CatalogController extends Controller
 
     private function referenceData(Request $r, Organization $o, ?CatalogReference $m = null): array
     {
-        $d = $r->validate(['reference_type' => ['required', Rule::in(array_keys(self::TYPES))], 'code' => ['required', 'alpha_dash', 'max:60', Rule::unique('catalog_references')->where(fn ($q) => $q->where('organization_id', $o->id)->where('reference_type', $r->input('reference_type')))->ignore($m?->id)], 'name' => ['required', 'string', 'max:180'], 'description' => ['nullable', 'string', 'max:2000'], 'is_active' => ['nullable', 'boolean']]);
+        $d = $r->validate(['reference_type' => ['required', Rule::in(array_keys(self::TYPES))], 'code' => ['required', 'alpha_dash', 'max:60', Rule::unique('catalog_references')->where(fn ($q) => $q->where('organization_id', $o->id)->where('reference_type', $r->input('reference_type')))->ignore($m?->id)], 'name' => ['required', 'string', 'max:180'], 'description' => ['nullable', 'string', 'max:2000'], 'is_active' => ['nullable', 'boolean'], 'parent_id' => ['nullable', 'uuid']]);
         $d['is_active'] = $r->boolean('is_active', true);
+        unset($d['parent_id']);
 
-        return $d;
+        return app(CareLevelHierarchyService::class)->apply($o, $d, $r->input('parent_id'), $m);
     }
 
     private function supplierData(Request $r, Organization $o, ?Supplier $m = null): array

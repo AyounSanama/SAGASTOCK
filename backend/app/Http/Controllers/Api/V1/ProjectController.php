@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Mission;
 use App\Models\Organization;
 use App\Models\Project;
+use App\Http\Requests\SaveProjectRequest;
 use App\Services\AuditService;
 use App\Services\GovernanceService;
 use App\Services\ProjectProvisioningService;
@@ -18,6 +19,8 @@ use App\Support\PasswordPolicy;
 
 class ProjectController extends Controller
 {
+    private const AUDITED = ['mission_id', 'code', 'name', 'implementing_partner', 'donor_reference_code', 'moh_program_code', 'responsible_name', 'responsible_contact', 'description', 'starts_on', 'ends_on', 'order_period_months', 'delivery_lead_time_months', 'safety_stock_months', 'status', 'is_active'];
+
     public function __construct(
         private AuditService $audit,
         private UserScopeService $scopes,
@@ -90,23 +93,23 @@ class ProjectController extends Controller
         return response()->json($projects);
     }
 
-    public function store(Request $request, Organization $organization): JsonResponse
+    public function store(SaveProjectRequest $request, Organization $organization): JsonResponse
     {
         $this->accessible($request, $organization);
-        $result = $this->provisioning->create($organization, $this->createData($request, $organization));
+        $result = $this->provisioning->create($organization, $request->projectData(), $request->user()->id);
         $project = $result['project'];
-        $this->audit->record($request, 'project.created', $project, [], $project->only(['organization_id', 'mission_id', 'code', 'name', 'is_active']));
+        $this->audit->record($request, 'project.created', $project, [], $project->only(['organization_id', 'mission_id', 'code', 'name', 'status', 'is_active']));
 
         return response()->json(['project' => $project, 'admin_project' => $result['admin']], 201);
     }
 
-    public function update(Request $request, Organization $organization, Project $project): JsonResponse
+    public function update(SaveProjectRequest $request, Organization $organization, Project $project): JsonResponse
     {
         $this->accessible($request, $organization);
         abort_unless($project->organization_id === $organization->id, 404);
         abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
-        $old = $project->only(['mission_id', 'code', 'name', 'description', 'starts_on', 'ends_on', 'is_active']);
-        $project = $this->provisioning->update($project, $this->updateData($request, $organization, $project));
+        $old = $project->only(self::AUDITED);
+        $project = $this->provisioning->update($project, $request->projectData(), $request->user()->id);
         $this->audit->record($request, 'project.updated', $project, $old, $project->only(array_keys($old)));
 
         return response()->json(['project' => $project]);
@@ -137,61 +140,6 @@ class ProjectController extends Controller
         return response()->json(['project' => $model->load('mission.country')]);
     }
 
-    private function validated(Request $request, Organization $organization, ?Project $project = null): array
-    {
-        $data = $request->validate([
-            'mission_id' => ['required', 'uuid', 'exists:missions,id'],
-            'code' => ['required', 'alpha_dash', 'max:50', Rule::unique('projects')->where('organization_id', $organization->id)->ignore($project?->id)],
-            'name' => ['required', 'string', 'max:180'],
-            'description' => ['nullable', 'string', 'max:3000'],
-            'starts_on' => ['nullable', 'date'],
-            'ends_on' => ['nullable', 'date', 'after_or_equal:starts_on'],
-            'order_period_months' => ['nullable', 'integer', 'min:1', 'max:24'],
-            'delivery_lead_time_months' => ['nullable', 'integer', 'min:1', 'max:24'],
-            'safety_stock_months' => ['nullable', 'integer', 'min:1', 'max:24'],
-            'is_active' => ['sometimes', 'boolean'],
-        ]);
-        $mission = Mission::findOrFail($data['mission_id']);
-        abort_unless($mission->organization_id === $organization->id, 422, 'La mission ne dépend pas de cette organisation.');
-        if (app(GovernanceService::class)->roleCode(request()->user()) === GovernanceService::COORDINATION_ADMIN) {
-            abort_unless($this->scopes->coordinationMissionIds(request()->user())->contains($mission->id), 403);
-        }
-
-        return $data;
-    }
-
-    private function createData(Request $request, Organization $organization): array
-    {
-        $data = $this->validated($request, $organization);
-        $extra = $request->validate([
-            'donor_ids' => ['nullable', 'array'],
-            'donor_ids.*' => ['uuid', Rule::exists('donors', 'id')->where('organization_id', $organization->id)],
-            'program_ids' => ['nullable', 'array'],
-            'program_ids.*' => ['uuid', Rule::exists('programs', 'id')->where('organization_id', $organization->id)],
-            'admin' => ['nullable', 'array'],
-            'admin.first_name' => ['required_with:admin', 'string', 'max:80'],
-            'admin.last_name' => ['required_with:admin', 'string', 'max:80'],
-            'admin.email' => ['required_with:admin', 'email', 'max:190', 'unique:users,email'],
-            'admin.phone' => ['nullable', 'string', 'max:40'],
-            'admin.username' => ['nullable', 'alpha_dash', 'max:80', 'unique:users,username'],
-            'admin.password' => ['required_with:admin', 'confirmed', PasswordPolicy::rule()],
-        ]);
-
-        return [...$data, ...$extra];
-    }
-
-    private function updateData(Request $request, Organization $organization, Project $project): array
-    {
-        return [
-            ...$this->validated($request, $organization, $project),
-            ...$request->validate([
-                'donor_ids' => ['nullable', 'array'],
-                'donor_ids.*' => ['uuid', Rule::exists('donors', 'id')->where('organization_id', $organization->id)],
-                'program_ids' => ['nullable', 'array'],
-                'program_ids.*' => ['uuid', Rule::exists('programs', 'id')->where('organization_id', $organization->id)],
-            ]),
-        ];
-    }
 
     private function accessible(Request $request, Organization $organization): void
     {

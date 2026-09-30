@@ -12,6 +12,7 @@ use App\Models\StandardList;
 use App\Models\StandardListVersion;
 use App\Models\Supplier;
 use App\Services\AuditService;
+use App\Services\CareLevelHierarchyService;
 use App\Services\ModuleActivationService;
 use App\Services\UserScopeService;
 use Illuminate\Database\Eloquent\Model;
@@ -39,6 +40,17 @@ class CatalogController extends Controller
             ->orderBy('reference_type')->orderBy('name')->paginate(50));
     }
 
+    /** AM-111 — Arbre Niveau → Catégorie → Programme des niveaux de soins. */
+    public function careLevelTree(Request $request, Organization $organization): JsonResponse
+    {
+        $this->access($request, $organization);
+
+        return response()->json([
+            'levels' => CareLevelHierarchyService::DEPTH_LABELS,
+            'tree' => app(CareLevelHierarchyService::class)->tree($organization),
+        ]);
+    }
+
     public function storeReference(Request $request, Organization $organization): JsonResponse
     {
         $this->access($request, $organization);
@@ -60,6 +72,9 @@ class CatalogController extends Controller
 
     public function archiveReference(Request $request, Organization $organization, CatalogReference $reference): JsonResponse
     {
+        $this->owned($request, $organization, $reference);
+        app(CareLevelHierarchyService::class)->guardArchive($reference);
+
         return $this->archive($request, $organization, $reference, 'reference.archived');
     }
 
@@ -332,7 +347,10 @@ class CatalogController extends Controller
 
     private function referenceData(Request $r, Organization $o, ?CatalogReference $m = null): array
     {
-        return $r->validate(['reference_type' => ['required', Rule::in(self::TYPES)], 'code' => ['required', 'alpha_dash', 'max:60', Rule::unique('catalog_references')->where(fn ($q) => $q->where('organization_id', $o->id)->where('reference_type', $r->input('reference_type')))->ignore($m?->id)], 'name' => ['required', 'string', 'max:180'], 'description' => ['nullable', 'string', 'max:2000'], 'metadata' => ['nullable', 'array'], 'is_active' => ['sometimes', 'boolean']]);
+        $data = $r->validate(['reference_type' => ['required', Rule::in(self::TYPES)], 'code' => ['required', 'alpha_dash', 'max:60', Rule::unique('catalog_references')->where(fn ($q) => $q->where('organization_id', $o->id)->where('reference_type', $r->input('reference_type')))->ignore($m?->id)], 'name' => ['required', 'string', 'max:180'], 'description' => ['nullable', 'string', 'max:2000'], 'metadata' => ['nullable', 'array'], 'is_active' => ['sometimes', 'boolean'], 'parent_id' => ['nullable', 'uuid']]);
+        unset($data['parent_id']);
+
+        return app(CareLevelHierarchyService::class)->apply($o, $data, $r->input('parent_id'), $m);
     }
 
     private function supplierData(Request $r, Organization $o, ?Supplier $m = null): array

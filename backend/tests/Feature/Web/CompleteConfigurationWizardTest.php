@@ -37,7 +37,7 @@ class CompleteConfigurationWizardTest extends TestCase
         $mission = $organization->missions()->firstOrFail();
         $coordination = User::where('email', 'coordination@stabilisation.example')->firstOrFail();
         $this->assertSame($organization->id, $coordination->organization_id);
-        $this->actingAs($coordination)->post(route('organizations.projects.store', $organization), [
+        $this->actingAs($coordination)->post(route('organizations.projects.store', $organization), ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
             'mission_id' => $mission->id, 'code' => 'HEALTH', 'name' => 'Projet Santé',
             'admin' => ['first_name' => 'Admin', 'last_name' => 'Projet', 'email' => 'health@example.test', 'password' => 'PharmaCare!2026', 'password_confirmation' => 'PharmaCare!2026'],
         ])->assertRedirect()->assertSessionHasNoErrors();
