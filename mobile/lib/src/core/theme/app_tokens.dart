@@ -4,22 +4,59 @@ import 'package:flutter/material.dart';
 ///
 /// Les composants et écrans seront raccordés progressivement à ces valeurs
 /// pendant les phases de migration, sans modifier la logique métier.
+///
+/// Charte AM-160 (identique au Web, `resources/css/design-system.css`) :
+/// - [primary] #F57C00 : marque. Indicateurs, soulignements, bordures de
+///   focus et de sélection, texte actif sur le menu sombre. Jamais pour du
+///   texte sur fond clair (2,7:1).
+/// - [primaryStrong] #B85D00 : fond des boutons à texte blanc (4,56:1) et
+///   tout texte orange sur fond clair. Ne jamais l'éclaircir.
+/// - [primaryStrongPressed] : survol / appui, toujours plus foncé.
+/// - Les états n'utilisent jamais l'orange et sont toujours libellés.
 abstract final class AppColors {
+  // Marque.
   static const primary = Color(0xFFF57C00);
-  static const primaryDark = Color(0xFFC86500);
+  static const primaryStrong = Color(0xFFB85D00);
+  static const primaryStrongPressed = Color(0xFF9C4F00);
   static const primarySoft = Color(0xFFFFF3E8);
-  static const warning = Color(0xFF9A6700);
-  static const info = Color(0xFF2563EB);
-  static const backdrop = Color(0x6624324A);
-  static const success = Color(0xFF22A447);
-  static const danger = Color(0xFFE53935);
-  static const text = Color(0xFF24324A);
-  static const textMuted = Color(0xFF6B778C);
-  static const border = Color(0xFFE8EDF3);
-  static const background = Color(0xFFF7F9FC);
+
+  /// Alias historique : même valeur que [primaryStrong].
+  static const primaryDark = primaryStrong;
+
+  // Neutres.
+  static const background = Color(0xFFF5F5F3);
   static const surface = Color(0xFFFFFFFF);
-  static const link = Color(0xFF2563EB);
-  static const purple = Color(0xFF6B778C);
+  static const surfaceSubtle = Color(0xFFFAFAF8);
+  static const border = Color(0xFFE3E3E0);
+  static const controlBorder = Color(0xFF8E9196);
+  static const text = Color(0xFF1C1F23);
+  static const textMuted = Color(0xFF5F6368);
+  static const disabledSurface = Color(0xFFECEEEA);
+  static const disabledText = Color(0xFF8E9196);
+  static const backdrop = Color(0x661C1F23);
+
+  // Menu latéral sombre.
+  static const sidebar = Color(0xFF1E2329);
+  static const sidebarText = Color(0xFFD5D8DC);
+  static const sidebarActiveText = primary;
+
+  // États (texte / fond).
+  static const successText = Color(0xFF1E6B3A);
+  static const successSurface = Color(0xFFE6F2E9);
+  static const infoText = Color(0xFF1F4E79);
+  static const infoSurface = Color(0xFFEEF3F8);
+  static const dangerText = Color(0xFFA61B1B);
+  static const dangerSurface = Color(0xFFFBE9E7);
+  static const neutralText = Color(0xFF4A544F);
+  static const neutralSurface = Color(0xFFECEEEA);
+
+  // Alias historiques raccordés aux états (aucun orange).
+  static const success = successText;
+  static const danger = dangerText;
+  static const info = infoText;
+  static const warning = infoText;
+  static const link = primaryStrong;
+  static const purple = neutralText;
 }
 
 abstract final class AppSpacing {
@@ -59,27 +96,51 @@ abstract final class AppSizes {
 }
 
 abstract final class AppTypography {
+  /// Police de la charte, embarquée (assets/fonts).
+  static const family = 'Inter';
+
   static const pageTitle = TextStyle(
+    fontFamily: family,
     fontSize: 26,
     fontWeight: FontWeight.w700,
     height: 1.2,
   );
   static const sectionTitle = TextStyle(
+    fontFamily: family,
     fontSize: 21,
     fontWeight: FontWeight.w700,
     height: 1.25,
   );
   static const title = TextStyle(
+    fontFamily: family,
     fontSize: 18,
     fontWeight: FontWeight.w600,
     height: 1.3,
   );
-  static const body = TextStyle(fontSize: 14, height: 1.5);
-  static const secondary = TextStyle(fontSize: 13, height: 1.4);
-  static const caption = TextStyle(fontSize: 12, height: 1.35);
-  static const button = TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
-  static const input = TextStyle(fontSize: 14);
-  static const label = TextStyle(fontSize: 13, fontWeight: FontWeight.w600);
+  static const body = TextStyle(fontFamily: family, fontSize: 14, height: 1.5);
+  static const secondary = TextStyle(
+    fontFamily: family,
+    fontSize: 13,
+    height: 1.4,
+  );
+  static const caption = TextStyle(
+    fontFamily: family,
+    fontSize: 12,
+    height: 1.35,
+  );
+  static const button = TextStyle(
+    fontFamily: family,
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+  );
+
+  /// 15 px : évite le zoom automatique des champs (iOS).
+  static const input = TextStyle(fontFamily: family, fontSize: 15);
+  static const label = TextStyle(
+    fontFamily: family,
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+  );
 }
 
 abstract final class AppDurations {

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
@@ -573,7 +574,7 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
           gap == null ? '—' : '${gap > 0 ? '+' : ''}${gap.toStringAsFixed(2)}',
           style: TextStyle(
             fontWeight: FontWeight.w900,
-            color: gap == 0 ? AppTheme.green : AppTheme.orange,
+            color: gap == 0 ? AppColors.successText : AppColors.dangerText,
           ),
         ),
       ),

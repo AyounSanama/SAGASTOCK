@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_tokens.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/app_button.dart';
@@ -403,7 +405,7 @@ class _MissionsPageState extends State<MissionsPage> {
                           const Text(
                             'En attente de synchronisation',
                             style: TextStyle(
-                              color: Color(0xFFF57C00),
+                              color: AppColors.infoText,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),

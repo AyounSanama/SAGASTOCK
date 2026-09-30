@@ -44,7 +44,7 @@
   <h3 class="med-title">{{ $title }}</h3>
   <p class="med-muted">Référentiel configurable, jamais codé en dur. Les éléments retenus pour chaque projet se choisissent dans sa configuration médicale.</p>
   @if($items->isEmpty())<p class="med-muted">Aucun élément pour le moment.</p>@else
-  <div class="med-chips">@foreach($items as $item)<span class="med-chip {{ $item->is_active ? '' : 'inactive' }}" title="{{ $item->code }}">{{ $item->name }}@if($item->organization_id === null) <small>global</small>@endif</span>@endforeach</div>
+  <div class="med-chips">@foreach($items as $item)<span class="med-chip {{ $item->is_active ? 'active' : 'inactive' }}" title="{{ $item->code }}">{{ $item->name }}@if($item->organization_id === null) <small>global</small>@endif</span>@endforeach</div>
   @endif
   @if($canManage)
   <form method="post" action="{{ route('projects.medical-references.store', $type) }}" class="med-inline">@csrf
@@ -58,11 +58,11 @@
 @endsection
 
 @push('styles')<style>
-.med-alert{margin:0 0 16px;padding:12px 14px;border-radius:12px;border:1px solid;font-size:13px}.med-alert.success{background:#edf9f1;border-color:#bfe8cd;color:#167337}.med-alert.error{background:#fff1f0;border-color:#ffc9c5;color:#b42318}.med-alert ul{margin:0;padding-left:18px}
+.med-alert{margin:0 0 16px;padding:12px 14px;border-radius:12px;border:1px solid;font-size:13px}.med-alert.success{background:var(--pc-status-success-bg);border-color:var(--pc-status-success-bg);color:var(--pc-status-success-text)}.med-alert.error{background:var(--pc-status-danger-bg);border-color:var(--pc-status-danger-bg);color:var(--pc-status-danger-text)}.med-alert ul{margin:0;padding-left:18px}
 .med-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:16px;align-items:start}
 .med-title{margin:0 0 6px;font-size:15px}.med-muted{margin:0 0 12px;color:var(--pc-color-text-muted);font-size:12px}
 .med-tree,.med-tree ul{list-style:none;margin:0;padding:0}.med-tree ul{margin-left:18px;border-left:1px dashed var(--pc-color-border);padding-left:12px}
-.med-node{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:7px 8px;border-radius:9px;font-size:13px}.med-node:hover{background:#f8fafc}
+.med-node{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:7px 8px;border-radius:9px;font-size:13px}.med-node:hover{background:var(--pc-color-background)}
 .med-node strong{font-weight:700}.med-node small{color:var(--pc-color-text-muted);font-size:11px;margin-left:6px}.med-node .tags{display:flex;gap:6px;align-items:center}.med-node form{margin:0}
 .med-node .inactive{opacity:.55}
 .med-form{display:grid;gap:10px}.med-form label{display:grid;gap:5px;font-size:12px;font-weight:700}.med-form small{font-weight:400;color:var(--pc-color-text-muted)}

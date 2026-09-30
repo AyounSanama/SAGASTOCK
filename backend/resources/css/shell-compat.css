@@ -203,12 +203,12 @@
         outline-offset: 2px
     }
 
-    body.pc-app button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not(.nav-group-toggle):not(.oa-configure):not([class*="btn-"]),
+    body.pc-app button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not(.nav-group-toggle):not(.oa-configure):not(.topbar-locale-option):not(.topbar-theme-toggle):not([data-toggle="password"]):not([data-password-toggle]):not([class*="btn-"]),
     body.pc-app .button:not(.secondary):not(.danger):not(.success):not([class*="btn-"]),
     body.pc-app .btn-primary {
-        background: var(--pc-orange) !important;
+        background: var(--pc-color-primary-strong) !important;
         color: #fff !important;
-        box-shadow: 0 7px 16px rgba(255, 122, 0, .2) !important;
+        box-shadow: none !important;
     }
 
     body.pc-app .secondary,
@@ -288,24 +288,24 @@
 
     body.pc-app .badge.active,
     body.pc-app .badge.success {
-        background: rgba(22, 163, 74, .1) !important;
-        color: var(--pc-green) !important
+        background: var(--pc-status-success-bg) !important;
+        color: var(--pc-status-success-text) !important
     }
 
     body.pc-app .notice,
     body.pc-app .message {
         border-radius: 12px !important;
         padding: 13px 15px !important;
-        background: rgba(22, 163, 74, .1) !important;
-        color: var(--pc-green) !important;
+        background: var(--pc-status-success-bg) !important;
+        color: var(--pc-status-success-text) !important;
         border: 1px solid rgba(22, 163, 74, .18)
     }
 
     body.pc-app .notice.error,
     body.pc-app .message.error {
-        background: rgba(239, 68, 68, .09) !important;
-        color: #C52E2E !important;
-        border-color: rgba(239, 68, 68, .18)
+        background: var(--pc-status-danger-bg) !important;
+        color: var(--pc-status-danger-text) !important;
+        border-color: var(--pc-status-danger-bg)
     }
 
     body.pc-app .table-wrap {
@@ -393,19 +393,19 @@
     }
 
     body.pc-app .metrics .metric:nth-child(4n+1) {
-        background: linear-gradient(135deg, #FF9C2A, var(--pc-orange)) !important
+        background: var(--pc-color-primary-strong) !important
     }
 
     body.pc-app .metrics .metric:nth-child(4n+2) {
-        background: linear-gradient(135deg, #4A84F5, var(--pc-blue)) !important
+        background: var(--pc-color-text) !important
     }
 
     body.pc-app .metrics .metric:nth-child(4n+3) {
-        background: linear-gradient(135deg, #38BE6C, var(--pc-green)) !important
+        background: var(--pc-status-success-text) !important
     }
 
     body.pc-app .metrics .metric:nth-child(4n+4) {
-        background: linear-gradient(135deg, #9867F3, var(--pc-purple)) !important
+        background: var(--pc-status-info-text) !important
     }
 
     body.pc-app .metrics .metric:nth-child(n+5) {
@@ -466,7 +466,7 @@
     }
 
     body.pc-app .shortcut:nth-child(3n+3) span {
-        background: #FFF3E8;
+        background: var(--pc-color-primary-soft);
         color: var(--pc-orange) !important
     }
 
@@ -482,14 +482,14 @@
     }
 
     body.pc-app .dashboard-metric:after {
-        background: #FFF3E8 !important;
-        border-color: #FFF3E8 !important
+        background: var(--pc-color-primary-soft) !important;
+        border-color: var(--pc-color-primary-soft) !important
     }
 
     body.pc-app .dashboard-metric .metric-icon {
-        background: #FFF3E8 !important;
+        background: var(--pc-color-primary-soft) !important;
         color: var(--pc-orange) !important;
-        border-color: #FFE1C2 !important
+        border-color: var(--pc-color-primary-soft) !important
     }
 
     body.pc-app .dashboard-metric .metric-label,
@@ -502,14 +502,14 @@
     body.pc-app .dashboard-shortcut-icon.blue,
     body.pc-app .dashboard-shortcut-icon.green,
     body.pc-app .dashboard-shortcut-icon.purple {
-        background: #FFF3E8 !important;
+        background: var(--pc-color-primary-soft) !important;
         color: var(--pc-orange) !important
     }
 
     body.pc-app .control-card-icon.blue,
     body.pc-app .control-card-icon.purple,
     body.pc-app .control-card-icon.cyan {
-        background: #FFF3E8 !important;
+        background: var(--pc-color-primary-soft) !important;
         color: var(--pc-orange) !important
     }
 
@@ -518,9 +518,9 @@
         inset: 0 auto 0 0;
         width: var(--pc-sidebar);
         z-index: 1100;
-        background: #fff;
-        color: var(--pc-ink);
-        border-right: 1px solid var(--pc-border);
+        background: var(--pc-color-sidebar);
+        color: var(--pc-color-sidebar-text);
+        border-right: 1px solid var(--pc-color-sidebar);
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -534,8 +534,8 @@
         align-items: center;
         gap: 12px;
         padding: 12px 18px;
-        color: var(--pc-ink);
-        border-bottom: 1px solid var(--pc-border)
+        color: var(--pc-color-sidebar-text);
+        border-bottom: 1px solid var(--pc-color-sidebar-hover)
     }
 
     .app-brand img {
@@ -559,11 +559,11 @@
     }
 
     .brand-pharma {
-        color: var(--pc-orange)
+        color: var(--pc-color-primary)
     }
 
     .brand-care {
-        color: var(--pc-green)
+        color: #FFFFFF
     }
 
     .app-brand small {
@@ -595,7 +595,7 @@
 
     .app-nav-label {
         padding: 12px 12px 7px;
-        color: #89A6CB;
+        color: var(--pc-color-sidebar-text);
         font-size: 10px;
         font-weight: 800;
         letter-spacing: .12em;
@@ -617,7 +617,7 @@
         gap: 10px;
         padding: 10px 12px;
         border-radius: 9px;
-        color: var(--pc-ink);
+        color: var(--pc-color-sidebar-text);
         font-size: 13px;
         font-weight: 680;
         white-space: nowrap;
@@ -625,13 +625,13 @@
     }
 
     .app-sidebar nav a:hover {
-        background: #F4F6F9;
-        color: var(--pc-ink)
+        background: var(--pc-color-sidebar-hover);
+        color: #FFFFFF
     }
 
     .app-sidebar nav a.active {
-        background: #FFF3E8;
-        color: var(--pc-orange);
+        background: var(--pc-color-sidebar-active);
+        color: var(--pc-color-sidebar-active-text);
         box-shadow: none
     }
 
@@ -641,7 +641,7 @@
         left: -12px;
         inset-block: 0;
         width: 3px;
-        background: var(--pc-orange)
+        background: var(--pc-color-primary)
     }
 
     .app-sidebar nav a[aria-disabled="true"],
@@ -664,7 +664,7 @@
         min-height: 38px !important;
         padding: 8px 10px !important;
         font-size: 12px !important;
-        color: #BFD0E8 !important
+        color: var(--pc-color-sidebar-text) !important
     }
 
     .nav-group {
@@ -679,7 +679,7 @@
         border: 0 !important;
         border-radius: 11px !important;
         background: transparent !important;
-        color: var(--pc-ink) !important;
+        color: var(--pc-color-sidebar-text) !important;
         box-shadow: none !important;
         display: flex !important;
         align-items: center !important;
@@ -691,14 +691,14 @@
     }
 
     .nav-group-toggle:hover {
-        background: #F4F6F9 !important;
-        color: var(--pc-ink) !important
+        background: var(--pc-color-sidebar-hover) !important;
+        color: #FFFFFF !important
     }
 
     .nav-group.open>.nav-group-toggle,
     .nav-group-toggle.active {
-        background: #FFF3E8 !important;
-        color: var(--pc-orange) !important
+        background: var(--pc-color-sidebar-active) !important;
+        color: var(--pc-color-sidebar-active-text) !important
     }
 
     .nav-group-chevron {
@@ -715,7 +715,7 @@
         display: none;
         margin: 2px 0 5px 12px;
         padding-left: 8px;
-        border-left: 1px solid #E8EDF3
+        border-left: 1px solid var(--pc-color-sidebar-hover)
     }
 
     .nav-group.open>.nav-group-items {
@@ -727,12 +727,12 @@
         min-height: 38px !important;
         padding: 8px 10px !important;
         font-size: 12px !important;
-        color: var(--pc-ink) !important
+        color: var(--pc-color-sidebar-text) !important
     }
 
     .nav-group-items a.active {
-        background: #FFF8F1 !important;
-        color: var(--pc-orange) !important
+        background: var(--pc-color-sidebar-active) !important;
+        color: var(--pc-color-sidebar-active-text) !important
     }
 
     .nav-group-items .nav-group {

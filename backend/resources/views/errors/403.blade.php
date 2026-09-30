@@ -10,8 +10,8 @@
             box-sizing: border-box;
             margin: 0;
             font-family: Inter, system-ui, sans-serif;
-            background: #F7F9FC;
-            color: #24324A;
+            background: var(--pc-color-background);
+            color: var(--pc-color-text);
             display: grid;
             place-items: center;
             min-height: 100vh;
@@ -21,7 +21,7 @@
         .card {
             max-width: 520px;
             background: #fff;
-            border: 1px solid #E8EDF3;
+            border: 1px solid var(--pc-color-border);
             border-radius: 20px;
             padding: 32px;
             box-shadow: 0 16px 40px rgba(20, 39, 74, .08)
@@ -36,7 +36,7 @@
         p {
             margin: 0 0 16px;
             line-height: 1.6;
-            color: #5C6F91
+            color: var(--pc-color-text-muted)
         }
 
         a {
@@ -45,7 +45,7 @@
             justify-content: center;
             padding: 11px 16px;
             border-radius: 12px;
-            background: #F57C00;
+            background: var(--pc-color-primary-strong);
             color: #fff;
             text-decoration: none;
             font-weight: 700

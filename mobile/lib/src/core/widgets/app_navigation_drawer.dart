@@ -155,7 +155,7 @@ class _NavigationTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border(
           left: BorderSide(
-            color: selected ? AppTheme.orange : Colors.transparent,
+            color: selected ? AppTheme.primary : Colors.transparent,
             width: 3,
           ),
         ),

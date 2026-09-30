@@ -7,9 +7,9 @@
     <title>Utilisateurs · PharmaCare</title>
     <style>
         :root {
-            --o: #f47a20;
-            --d: #382319;
-            --s: #fff7f0
+            --o: var(--pc-color-primary-strong);
+            --d: var(--pc-color-text);
+            --s: var(--pc-color-primary-soft)
         }
 
         * {
@@ -85,7 +85,7 @@
         select {
             width: 100%;
             padding: 11px;
-            border: 1px solid #dbcabd;
+            border: 1px solid var(--pc-color-border);
             border-radius: 9px;
             font: inherit
         }
@@ -108,19 +108,19 @@
         }
 
         .secondary {
-            background: #fff0e5;
-            color: #9a4300
+            background: var(--pc-color-primary-soft);
+            color: var(--pc-color-primary-strong)
         }
 
         .success {
-            background: #eaf8ef;
-            color: #176b3a;
+            background: var(--pc-status-success-bg);
+            color: var(--pc-status-success-text);
             padding: 13px;
             border-radius: 9px
         }
 
         .secret {
-            background: #2f241e;
+            background: var(--pc-color-text);
             color: white;
             padding: 14px;
             border-radius: 9px;
@@ -134,7 +134,7 @@
         }
 
         .muted {
-            color: #78665a;
+            color: var(--pc-color-text-muted);
             font-size: 14px
         }
 
@@ -149,7 +149,7 @@
             width: 42px;
             padding: 8px;
             background: transparent;
-            color: #705b4c
+            color: var(--pc-color-text-muted)
         }
 
         .filters {
@@ -168,25 +168,25 @@
         td {
             text-align: left;
             padding: 13px 10px;
-            border-bottom: 1px solid #f1e1d5
+            border-bottom: 1px solid var(--pc-color-border)
         }
 
         th {
             font-size: 13px;
-            color: #78665a
+            color: var(--pc-color-text-muted)
         }
 
         .badge {
             padding: 5px 9px;
             border-radius: 999px;
-            background: #fff0e5;
-            color: #9a4300;
+            background: var(--pc-color-primary-soft);
+            color: var(--pc-color-primary-strong);
             font-size: 13px
         }
 
         .badge.active {
-            background: #eaf8ef;
-            color: #176b3a
+            background: var(--pc-status-success-bg);
+            color: var(--pc-status-success-text)
         }
 
         .actions {
@@ -199,7 +199,7 @@
         }
 
         .danger {
-            background: #b42318
+            background: var(--pc-status-danger-text)
         }
 
         @media(max-width:850px) {
@@ -329,7 +329,7 @@
                 .user-form-section {
                     padding: 4px 0 22px;
                     margin-bottom: 20px;
-                    border-bottom: 1px solid #eaded7
+                    border-bottom: 1px solid var(--pc-color-border)
                 }
 
                 .user-form-section:last-of-type {
@@ -358,7 +358,7 @@
                     width: 100%;
                     margin-top: 6px;
                     padding: 12px;
-                    border: 1px solid #d8c6bb;
+                    border: 1px solid var(--pc-color-border);
                     border-radius: 10px;
                     background: #fff;
                     font: inherit
@@ -380,12 +380,12 @@
                     height: 39px;
                     padding: 0 !important;
                     background: transparent !important;
-                    color: #59493f !important
+                    color: var(--pc-color-text) !important
                 }
 
                 .field-hint {
                     font-size: 12px;
-                    color: #78675d;
+                    color: var(--pc-color-text-muted);
                     margin-top: 5px
                 }
 

@@ -1,12 +1,46 @@
-/* PharmaCare shared tokens. Historical selectors remain during the migration. */
+/* PharmaCare shared tokens. Historical selectors remain during the migration.
+ *
+ * Charte AM-160 (identique à mobile/lib/src/core/theme/app_tokens.dart) :
+ * - --pc-color-primary #F57C00 : marque. Indicateur de l'élément actif,
+ *   soulignement de l'onglet actif, bordure des champs au focus et des
+ *   pastilles sélectionnées, texte actif du menu sombre. Jamais pour du
+ *   texte sur fond clair (2,7:1).
+ * - --pc-color-primary-strong #B85D00 : fond des boutons à texte blanc et
+ *   tout texte orange sur fond clair (4,56:1). Ne jamais l'éclaircir.
+ * - --pc-color-primary-strong-hover : survol / appui, toujours plus foncé.
+ * - États : jamais orange, toujours accompagnés d'un libellé.
+ */
 :root {
-    --pc-color-primary:#F57C00; --pc-color-primary-dark:#A65000;
-    --pc-color-background:#F8FAFC; --pc-color-text:#202939;
-    --pc-color-text-muted:#667085; --pc-color-border:#E4E7EC;
+    --pc-color-primary:#F57C00;
+    --pc-color-primary-strong:#B85D00; --pc-color-primary-strong-hover:#9C4F00;
+    --pc-color-primary-dark:var(--pc-color-primary-strong);
+    --pc-color-primary-soft:#FFF3E8;
+    --pc-color-background:#F5F5F3; --pc-color-surface:#FFFFFF; --pc-color-surface-subtle:#FAFAF8;
+    --pc-color-text:#1C1F23; --pc-color-text-muted:#5F6368;
+    --pc-color-border:#E3E3E0; --pc-color-control-border:#8E9196;
+    --pc-color-link:var(--pc-color-primary-strong);
+    --pc-color-sidebar:#1E2329; --pc-color-sidebar-text:#D5D8DC;
+    --pc-color-sidebar-hover:#2A3038; --pc-color-sidebar-active:#2E2A25;
+    --pc-color-sidebar-active-text:var(--pc-color-primary);
+    --pc-status-success-text:#1E6B3A; --pc-status-success-bg:#E6F2E9;
+    --pc-status-info-text:#1F4E79; --pc-status-info-bg:#EEF3F8;
+    --pc-status-danger-text:#A61B1B; --pc-status-danger-bg:#FBE9E7;
+    --pc-status-neutral-text:#4A544F; --pc-status-neutral-bg:#ECEEEA;
+    --pc-color-success:var(--pc-status-success-text); --pc-color-danger:var(--pc-status-danger-text);
+    --pc-color-info:var(--pc-status-info-text); --pc-color-warning:var(--pc-status-info-text);
+    --pc-color-purple:var(--pc-status-neutral-text);
+    --pc-focus-ring:0 0 0 3px rgba(245,124,0,.22);
+    /* Alias historiques « orange » : texte ou fond sous texte blanc. */
+    --orange:var(--pc-color-primary-strong); --pc-orange:var(--pc-color-primary-strong);
+    --pc-orange-dark:var(--pc-color-primary-strong-hover);
+    --dash-orange:var(--pc-color-primary-strong);
+    --dash-ink:var(--pc-color-text); --dash-muted:var(--pc-color-text-muted); --dash-border:var(--pc-color-border);
+    --dash-green:var(--pc-status-success-text); --dash-red:var(--pc-status-danger-text);
+    --dash-blue:var(--pc-status-info-text); --dash-purple:var(--pc-status-neutral-text); --dash-cyan:var(--pc-status-info-text);
     --pc-font-size-h1:22px; --pc-font-size-h2:18px; --pc-font-size-h3:16px;
     --pc-font-weight-medium:500; --pc-font-weight-semibold:600; --pc-font-weight-bold:600;
     --pc-size-button:38px; --pc-size-input-desktop:40px; --pc-size-input-mobile:44px;
-    --pc-layout-sidebar-open:248px; --pc-layout-page-padding-desktop:24px;
+    --pc-layout-sidebar-open:232px; --pc-layout-page-padding-desktop:24px;
     --pc-shadow-card:0 1px 3px rgb(16 24 40 / 4%);
 }
 [hidden] { display:none !important; }
@@ -101,7 +135,7 @@ body.pc-app .form-sheet-header h2 { font-size:18px !important; }
 .topbar-tools { display:flex; align-items:center; gap:12px; flex:none; }
 .topbar-locale-switch { display:inline-flex; align-items:center; gap:0; height:26px; margin:0; padding:2px; border:1px solid var(--pc-color-border); border-radius:7px; background:#F2F4F7; }
 .topbar-locale-option { min-width:27px; min-height:20px; padding:3px 5px; border:0; border-radius:5px; background:transparent; color:var(--pc-color-text-muted); font-size:10px!important; font-weight:500!important; line-height:1; cursor:pointer; }
-.topbar-locale-option.is-active { background:#4563F5; color:#fff; box-shadow:0 1px 2px rgb(16 24 40 / 14%); }
+.topbar-locale-option.is-active { background:var(--pc-color-surface); color:var(--pc-color-primary-strong); box-shadow:0 1px 2px rgb(16 24 40 / 14%); }
 .topbar-theme-toggle { width:38px; height:38px; display:grid; place-items:center; padding:0; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--pc-color-text-muted); cursor:pointer; }
 .topbar-theme-toggle:hover { border-color:var(--pc-color-border); background:var(--pc-color-background); color:var(--pc-color-text); }
 .topbar-theme-toggle .material-symbols-outlined { font-size:20px; }
@@ -144,7 +178,7 @@ body.pc-app[data-theme="dark"], :root[data-theme="dark"] body.pc-app {
 :root[data-theme="dark"] body.pc-app a { color:var(--pc-color-link)!important; }
 :root[data-theme="dark"] body.pc-app :is(.app-badge,.badge) { background:#263243!important; color:var(--pc-color-text)!important; }
 :root[data-theme="dark"] body.pc-app :is(.app-badge--success,.status-badge.success,.alert.success,.profile-alert--success,.control-status.success,.control-tags.green span) { background:#183627!important; color:#A6E3B5!important; border-color:#2D6542!important; }
-:root[data-theme="dark"] body.pc-app :is(.app-badge--warning,.status-badge.warning) { background:#3B2C1C!important; color:#FFD09B!important; border-color:#72502A!important; }
+:root[data-theme="dark"] body.pc-app :is(.app-badge--warning,.status-badge.warning) { background:#1D3045!important; color:#AFD0FF!important; border-color:#35577A!important; }
 :root[data-theme="dark"] body.pc-app :is(.app-badge--danger,.status-badge.error,.alert.error,.profile-alert--error,.configuration-step.needs-correction) { background:#3B2426!important; color:#FFB4AE!important; border-color:#704044!important; }
 :root[data-theme="dark"] body.pc-app :is(.app-badge--info,.status-badge.info) { background:#1D3045!important; color:#AFD0FF!important; border-color:#35577A!important; }
 :root[data-theme="dark"] body.pc-app .notification-item[data-unread="true"] { background:#202C3B!important; }
@@ -173,3 +207,30 @@ body.pc-app[data-theme="dark"], :root[data-theme="dark"] body.pc-app {
     .topbar-tools { gap:4px; }
     .topbar-locale-option { min-width:27px; padding-inline:5px; }
 }
+
+/* AM-160 — Survol / appui des boutons principaux : toujours plus foncé que #B85D00. */
+body.pc-app :is(.btn-primary,.button.primary,.app-button--primary):is(:hover,:active),
+body.pc-app button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not(.nav-group-toggle):not(.oa-configure):not(.topbar-locale-option):not(.topbar-theme-toggle):not([data-toggle="password"]):not([data-password-toggle]):not([class*="btn-"]):not([class*="app-"]):is(:hover,:active) {
+    background:var(--pc-color-primary-strong-hover)!important;
+}
+/* Menu latéral sombre : compte et déconnexion. */
+body.pc-app .app-sidebar :is(.app-account,.app-account a,.app-account button,.logout-button) { color:var(--pc-color-sidebar-text)!important; border-color:var(--pc-color-sidebar-hover)!important; background:transparent!important; }
+body.pc-app .app-sidebar :is(.app-account a,.logout-button):hover { background:var(--pc-color-sidebar-hover)!important; color:#FFFFFF!important; }
+body.pc-app .app-sidebar .app-account-profile.active { background:var(--pc-color-sidebar-active)!important; color:var(--pc-color-sidebar-active-text)!important; }
+body.pc-app .app-brand small { color:var(--pc-color-sidebar-text)!important; }
+/* AM-160 — États : quatre couleurs, jamais orange, toujours libellés. */
+body.pc-app :is(.badge,.status-badge,.app-badge):is(.active,.success,.validated,.completed,.dispensed,.received,.synced) { background:var(--pc-status-success-bg)!important; color:var(--pc-status-success-text)!important; }
+body.pc-app :is(.badge,.status-badge,.app-badge):is(.pending,.submitted,.draft,.in_progress,.partial,.warning,.info) { background:var(--pc-status-info-bg)!important; color:var(--pc-status-info-text)!important; }
+body.pc-app :is(.badge,.status-badge,.app-badge):is(.error,.failed,.rejected,.cancelled,.danger) { background:var(--pc-status-danger-bg)!important; color:var(--pc-status-danger-text)!important; }
+body.pc-app :is(.badge,.status-badge,.app-badge):is(.inactive,.off,.muted,.archived,.closed) { background:var(--pc-status-neutral-bg)!important; color:var(--pc-status-neutral-text)!important; }
+/* Barre supérieure : sélecteur de langue et thème neutres (pas des boutons d'action). */
+body.pc-app .topbar-locale-switch { background:var(--pc-color-background)!important; border-color:var(--pc-color-border)!important; }
+body.pc-app .topbar-locale-option { background:transparent!important; color:var(--pc-color-text-muted)!important; box-shadow:none!important; }
+body.pc-app .topbar-locale-option.is-active { background:var(--pc-color-surface)!important; color:var(--pc-color-primary-strong)!important; font-weight:600!important; box-shadow:0 1px 2px rgb(28 31 35 / 14%)!important; }
+body.pc-app .topbar-theme-toggle { background:transparent!important; color:var(--pc-color-text-muted)!important; box-shadow:none!important; }
+body.pc-app .topbar-theme-toggle:hover { background:var(--pc-color-background)!important; color:var(--pc-color-text)!important; }
+/* Bouton « afficher le mot de passe » : icône neutre, pas une action principale. */
+body.pc-app :is([data-toggle="password"],[data-password-toggle]) { background:transparent!important; color:var(--pc-color-text-muted)!important; border:0!important; box-shadow:none!important; }
+body.pc-app :is([data-toggle="password"],[data-password-toggle]):hover { background:var(--pc-color-background)!important; color:var(--pc-color-text)!important; }
+/* Encarts d’aide dans un formulaire : information. Les confirmations (.notice hors formulaire) restent en succès. */
+body.pc-app form :is(.notice,.message):not(.error):not(.success) { background:var(--pc-status-info-bg)!important; color:var(--pc-status-info-text)!important; border-color:var(--pc-status-info-bg)!important; }

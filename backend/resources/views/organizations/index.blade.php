@@ -11,14 +11,14 @@
 @push('styles')
     <style>
         :root {
-            --primary: #f5660a;
-            --primary-dark: #c9570d;
-            --ink: #172033;
-            --muted: #667085;
-            --line: #e3e7ee;
-            --surface: #f7f9fc;
-            --success: #168447;
-            --danger: #c7352b;
+            --primary: var(--pc-color-primary-strong);
+            --primary-dark: var(--pc-color-primary-strong);
+            --ink: var(--pc-color-text);
+            --muted: var(--pc-color-text-muted);
+            --line: var(--pc-color-border);
+            --surface: var(--pc-color-background);
+            --success: var(--pc-status-success-text);
+            --danger: var(--pc-status-danger-text);
         }
 
         .page-head {
@@ -66,7 +66,7 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary), #ff8a24);
+            background: linear-gradient(135deg, var(--primary), var(--pc-color-primary-strong));
             color: #fff;
             box-shadow: 0 8px 20px #f5660a2c;
         }
@@ -78,8 +78,8 @@
         }
 
         .btn-danger {
-            background: #fff0ef;
-            border-color: #f5ceca;
+            background: var(--pc-status-danger-bg);
+            border-color: var(--pc-status-danger-bg);
             color: var(--danger);
         }
 
@@ -93,13 +93,13 @@
             padding: 13px 16px;
             border-radius: 12px;
             margin-bottom: 18px;
-            background: #edf9f1;
-            color: #126d38;
+            background: var(--pc-status-success-bg);
+            color: var(--pc-status-success-text);
             font-weight: 700;
         }
 
         .notice.error {
-            background: #fff0ee;
+            background: var(--pc-status-danger-bg);
             color: var(--danger);
         }
 
@@ -118,7 +118,7 @@
             position: absolute;
             left: 15px;
             top: 13px;
-            color: #8a94a7;
+            color: var(--pc-color-text-muted);
         }
 
         .control {
@@ -167,7 +167,7 @@
             border-radius: 13px;
             display: grid;
             place-items: center;
-            background: #fff0e5;
+            background: var(--pc-color-primary-soft);
             color: var(--primary);
             font-weight: 900;
         }
@@ -188,13 +188,13 @@
             border-radius: 999px;
             font-size: .72rem;
             font-weight: 850;
-            background: #edf9f1;
+            background: var(--pc-status-success-bg);
             color: var(--success);
         }
 
         .badge.inactive {
-            background: #f0f2f5;
-            color: #697386;
+            background: var(--pc-color-background);
+            color: var(--pc-color-text-muted);
         }
 
         .facts {
@@ -207,7 +207,7 @@
         .fact {
             padding: 10px;
             border-radius: 10px;
-            background: #f8fafc;
+            background: var(--pc-color-background);
         }
 
         .fact small {
@@ -250,8 +250,8 @@
         }
 
         .module-link:hover {
-            border-color: #ffc398;
-            background: #fff9f4;
+            border-color: var(--pc-color-border);
+            background: var(--pc-color-surface-subtle);
         }
 
         .module-link .mi {
@@ -273,7 +273,7 @@
         }
 
         .arrow {
-            color: #98a2b3;
+            color: var(--pc-color-text-muted);
         }
 
         .section-title {
@@ -295,7 +295,7 @@
 
         .empty {
             background: #fff;
-            border: 1px dashed #ced5df;
+            border: 1px dashed var(--pc-color-border);
             border-radius: 16px;
             text-align: center;
             padding: 42px 20px;
@@ -355,7 +355,7 @@
         .field select {
             width: 100%;
             padding: 12px;
-            border: 1px solid #dce1e9;
+            border: 1px solid var(--pc-color-border);
             border-radius: 11px;
             background: #fff;
         }
@@ -493,7 +493,7 @@
                             </div>
                         </div>
                         <span
-                            class="badge {{ $organization->is_active ? '' : 'inactive' }}">{{ $organization->is_active ? 'Active' : 'Inactive' }}</span>
+                            class="badge {{ $organization->is_active ? 'active' : 'inactive' }}">{{ $organization->is_active ? 'Active' : 'Inactive' }}</span>
                     </div>
                     <div class="facts">
                         <div class="fact">

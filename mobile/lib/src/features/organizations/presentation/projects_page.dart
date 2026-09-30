@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_tokens.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
@@ -180,8 +182,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
                           ? Icons.check_circle
                           : Icons.pause_circle,
                       color: project['is_active'] == true
-                          ? Colors.green
-                          : Colors.grey,
+                          ? AppColors.successText
+                          : AppColors.neutralText,
                     ),
                     onTap: () => context.push(
                       '/organizations/${widget.organizationId}/projects/${project['id']}/funding',

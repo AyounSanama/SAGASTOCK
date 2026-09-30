@@ -4,16 +4,16 @@
     <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Créer un utilisateur · PharmaCare</title>
     <style>
-        :root{--o:#f47a20;--s:#fff7f0;--d:#382319;--danger:#b42318}*{box-sizing:border-box}body{margin:0;font-family:system-ui;background:var(--s);color:var(--d)}
+        :root{--o:var(--pc-color-primary-strong);--s:var(--pc-color-primary-soft);--d:var(--pc-color-text);--danger:var(--pc-status-danger-text)}*{box-sizing:border-box}body{margin:0;font-family:system-ui;background:var(--s);color:var(--d)}
         header{background:var(--o);color:white;padding:13px 6%;display:flex;align-items:center;gap:18px}header a{color:white;text-decoration:none}.brand-logo{width:42px;height:42px;object-fit:cover;border-radius:50%;background:white}
         main{max-width:1000px;margin:30px auto;padding:0 20px}.card{background:white;padding:28px;border-radius:18px;box-shadow:0 12px 36px #7a350018}
-        .intro{display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:24px}.intro h1{margin:0 0 7px}.muted{color:#78665a}
-        .section{padding:22px 0;border-top:1px solid #f1e1d5}.section h2{font-size:18px;margin-top:0}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
-        label{font-weight:700;font-size:14px}input,select{display:block;width:100%;margin-top:7px;padding:12px;border:1px solid #dbcabd;border-radius:9px;font:inherit;background:white}
+        .intro{display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:24px}.intro h1{margin:0 0 7px}.muted{color:var(--pc-color-text-muted)}
+        .section{padding:22px 0;border-top:1px solid var(--pc-color-border)}.section h2{font-size:18px;margin-top:0}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+        label{font-weight:700;font-size:14px}input,select{display:block;width:100%;margin-top:7px;padding:12px;border:1px solid var(--pc-color-border);border-radius:9px;font:inherit;background:white}
         input:focus,select:focus{outline:3px solid #f47a2030;border-color:var(--o)}.error{display:block;color:var(--danger);font-size:13px;margin-top:5px}.invalid{border-color:var(--danger)}
-        .password-field{position:relative}.password-field input{padding-right:50px}.password-field button{position:absolute;right:4px;top:11px;width:42px;padding:8px;background:transparent;color:#705b4c}
-        .notice{background:#fff7f0;padding:14px;border-radius:10px;color:#705b4c;font-size:14px}.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
-        button,.button{border:0;border-radius:9px;padding:12px 17px;background:var(--o);color:white;font-weight:800;text-decoration:none;cursor:pointer}.secondary{background:#fff0e5;color:#9a4300}
+        .password-field{position:relative}.password-field input{padding-right:50px}.password-field button{position:absolute;right:4px;top:11px;width:42px;padding:8px;background:transparent;color:var(--pc-color-text-muted)}
+        .notice{background:var(--pc-color-primary-soft);padding:14px;border-radius:10px;color:var(--pc-color-text-muted);font-size:14px}.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
+        button,.button{border:0;border-radius:9px;padding:12px 17px;background:var(--o);color:white;font-weight:800;text-decoration:none;cursor:pointer}.secondary{background:var(--pc-color-primary-soft);color:var(--pc-color-primary-strong)}
         @media(max-width:700px){.grid{grid-template-columns:1fr}.intro,.actions{flex-direction:column}.actions .button,.actions button{width:100%;text-align:center}}
     </style>
 </head>

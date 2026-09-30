@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_tokens.dart';
+
 import '../../../core/access/application_access.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
@@ -507,7 +509,7 @@ class _BatchFormState extends State<_BatchForm> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'La date d’expiration est obligatoire.',
-                style: TextStyle(color: Colors.red),
+                style: TextStyle(color: AppColors.dangerText),
               ),
             ),
           const SizedBox(height: 14),

@@ -15,10 +15,10 @@ class AppKpiCard extends StatelessWidget {
   final AppKpiTone tone;
 
   Color get _color => switch (tone) {
-    AppKpiTone.orange => AppColors.primary,
+    AppKpiTone.orange => AppColors.primaryStrong,
     AppKpiTone.green => AppColors.success,
     AppKpiTone.red => AppColors.danger,
-    AppKpiTone.blue => AppColors.link,
+    AppKpiTone.blue => AppColors.infoText,
   };
 
   @override
@@ -37,7 +37,7 @@ class AppKpiCard extends StatelessWidget {
             color: AppColors.surface,
             border: Border.all(color: AppColors.border),
             borderRadius: BorderRadius.circular(AppRadius.lg),
-            boxShadow: const [BoxShadow(color: Color(0x0D24324A), blurRadius: 18, offset: Offset(0, 6))],
+            boxShadow: const [BoxShadow(color: Color(0x0D1C1F23), blurRadius: 18, offset: Offset(0, 6))],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,

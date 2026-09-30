@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
@@ -371,14 +372,17 @@ class _ReceiptCard extends StatelessWidget {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: (validated ? AppTheme.green : AppTheme.orange)
-                        .withValues(alpha: .10),
+                    color: validated
+                        ? AppColors.successSurface
+                        : AppColors.neutralSurface,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     validated ? 'Validée' : 'Brouillon',
                     style: TextStyle(
-                      color: validated ? AppTheme.green : AppTheme.orange,
+                      color: validated
+                          ? AppColors.successText
+                          : AppColors.neutralText,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                     ),

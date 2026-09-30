@@ -210,7 +210,7 @@ class _BottomNavigation extends StatelessWidget {
           border: Border.all(color: AppTheme.border),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x1A182033),
+              color: Color(0x1A1C1F23),
               blurRadius: 22,
               offset: Offset(0, 7),
             ),

@@ -219,7 +219,7 @@ class AppButton extends StatelessWidget {
     final color = _color;
     final height = AppSizes.buttonHeight;
     final foreground = _filled ? Colors.white : color;
-    final disabledForeground = const Color(0xFF98A2B3);
+    const disabledForeground = AppColors.disabledText;
     final content = loading
         ? SizedBox.square(
             dimension: 20,
@@ -263,7 +263,7 @@ class AppButton extends StatelessWidget {
       backgroundColor: WidgetStateProperty.resolveWith((states) {
         if (!_filled) return Colors.transparent;
         if (states.contains(WidgetState.disabled)) {
-          return const Color(0xFFE4E7EC);
+          return AppColors.disabledSurface;
         }
         if (states.contains(WidgetState.pressed)) {
           return Color.alphaBlend(const Color(0x33000000), color);
@@ -277,7 +277,7 @@ class AppButton extends StatelessWidget {
         if (_filled || _textOnly) return BorderSide.none;
         return BorderSide(
           color: states.contains(WidgetState.disabled)
-              ? const Color(0xFFD0D5DD)
+              ? AppColors.border
               : color,
           width: 2,
         );
@@ -347,12 +347,12 @@ class AppIconButton extends StatelessWidget {
         ),
         backgroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled)
-              ? const Color(0xFFF2F4F7)
+              ? AppColors.disabledSurface
               : actionColor.withValues(alpha: .10),
         ),
         foregroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled)
-              ? const Color(0xFF98A2B3)
+              ? AppColors.disabledText
               : actionColor,
         ),
         overlayColor: WidgetStatePropertyAll(actionColor.withValues(alpha: .14)),

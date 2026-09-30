@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_tokens.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/app_navigation_drawer.dart';
@@ -444,8 +446,8 @@ class _StocksPageState extends State<StocksPage> {
                           ? Icons.arrow_upward
                           : Icons.arrow_downward,
                       color: '${movement['quantity']}'.startsWith('-')
-                          ? Colors.red
-                          : Colors.green,
+                          ? AppColors.dangerText
+                          : AppColors.successText,
                     ),
                     title: Text('${movement['product']?['name'] ?? 'Produit'}'),
                     subtitle: Text(

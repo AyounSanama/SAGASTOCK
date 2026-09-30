@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import '../../../core/files/private_attachment_store.dart';
 import '../../../core/access/session_scope.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
@@ -373,7 +374,7 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
               return Card(
                 child: ListTile(
                   leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFE8F7EE),
+                    backgroundColor: AppColors.successSurface,
                     child: Icon(
                       Icons.medication_outlined,
                       color: AppTheme.green,
@@ -1010,7 +1011,7 @@ class _ProductBarcodeScannerPageState
             width: 270,
             height: 170,
             decoration: BoxDecoration(
-              border: Border.all(color: AppTheme.orange, width: 3),
+              border: Border.all(color: AppTheme.primary, width: 3),
               borderRadius: BorderRadius.circular(16),
             ),
           ),
@@ -1046,13 +1047,13 @@ class Status extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: (ok ? AppTheme.green : AppTheme.orange).withValues(alpha: .1),
+        color: ok ? AppColors.successSurface : AppColors.infoSurface,
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(
         value,
         style: TextStyle(
-          color: ok ? AppTheme.green : AppTheme.orange,
+          color: ok ? AppColors.successText : AppColors.infoText,
           fontSize: 10,
           fontWeight: FontWeight.w800,
         ),

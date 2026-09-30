@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_tokens.dart';
 
 class AppDashboardPanel extends StatelessWidget {
-  const AppDashboardPanel({super.key, required this.title, required this.child, this.description, this.icon = Icons.analytics_outlined, this.color = AppColors.primary, this.action});
+  const AppDashboardPanel({super.key, required this.title, required this.child, this.description, this.icon = Icons.analytics_outlined, this.color = AppColors.primaryStrong, this.action});
 
   final String title;
   final String? description;
@@ -18,7 +18,7 @@ class AppDashboardPanel extends StatelessWidget {
       color: AppColors.surface,
       border: Border.all(color: AppColors.border),
       borderRadius: BorderRadius.circular(AppRadius.lg),
-      boxShadow: const [BoxShadow(color: Color(0x0D24324A), blurRadius: 18, offset: Offset(0, 6))],
+      boxShadow: const [BoxShadow(color: Color(0x0D1C1F23), blurRadius: 18, offset: Offset(0, 6))],
     ),
     clipBehavior: Clip.antiAlias,
     child: Column(

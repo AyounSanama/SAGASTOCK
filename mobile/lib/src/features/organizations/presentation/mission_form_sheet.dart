@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_tokens.dart';
+
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
 
@@ -315,7 +317,7 @@ class _MissionFormSheetState extends State<MissionFormSheet> {
               const SizedBox(height: 8),
               const Text(
                 'La date de fin doit être postérieure à la date de début.',
-                style: TextStyle(color: Colors.red),
+                style: TextStyle(color: AppColors.dangerText),
               ),
             ],
             const SizedBox(height: 14),

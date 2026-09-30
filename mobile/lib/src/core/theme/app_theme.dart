@@ -3,15 +3,22 @@ import 'package:flutter/material.dart';
 import 'app_tokens.dart';
 
 abstract final class AppTheme {
-  static const orange = AppColors.primary;
+  /// Texte et icônes orange sur fond clair (#B85D00, 4,56:1).
+  static const orange = AppColors.primaryStrong;
   static const orangeSoft = AppColors.primarySoft;
   static const blue = AppColors.text;
   static const green = AppColors.success;
   static const red = AppColors.danger;
   static const purple = AppColors.purple;
   static const gray = AppColors.textMuted;
-  static const primary = orange;
+
+  /// Orange de marque : indicateurs, soulignements, bordures (jamais du texte sur fond clair).
+  static const primary = AppColors.primary;
   static const primaryDark = AppColors.primaryDark;
+
+  /// Fond des boutons à texte blanc et texte orange sur fond clair.
+  static const strong = AppColors.primaryStrong;
+  static const strongPressed = AppColors.primaryStrongPressed;
   static const danger = red;
   static const ink = AppColors.text;
   static const muted = AppColors.textMuted;
@@ -23,11 +30,22 @@ abstract final class AppTheme {
   );
 
   static ThemeData get light {
+    // `primary` du schéma Material = teinte forte : Material l'utilise pour
+    // du texte et des fonds sous texte blanc. L'orange de marque est posé
+    // explicitement sur les indicateurs, soulignements et bordures de focus.
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
-      primary: primary,
-      secondary: primaryDark,
-      surface: surface,
+      primary: strong,
+      onPrimary: Colors.white,
+      secondary: strong,
+      // Pastilles sélectionnées (Material 3) : fond clair, texte fort.
+      secondaryContainer: orangeSoft,
+      onSecondaryContainer: strong,
+      surface: AppColors.surface,
+      onSurface: ink,
+      onSurfaceVariant: muted,
+      outline: AppColors.controlBorder,
+      outlineVariant: border,
       error: danger,
     );
 
@@ -35,7 +53,7 @@ abstract final class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: surface,
-      fontFamily: 'Roboto',
+      fontFamily: AppTypography.family,
       textTheme: const TextTheme(
         headlineSmall: AppTypography.pageTitle,
         titleLarge: AppTypography.sectionTitle,
@@ -44,6 +62,7 @@ abstract final class AppTheme {
         bodySmall: AppTypography.secondary,
         labelSmall: AppTypography.caption,
         labelLarge: TextStyle(
+          fontFamily: AppTypography.family,
           fontSize: 15,
           fontWeight: FontWeight.w700,
           letterSpacing: .1,
@@ -57,6 +76,7 @@ abstract final class AppTheme {
         foregroundColor: ink,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: TextStyle(
+          fontFamily: AppTypography.family,
           color: ink,
           fontSize: 19,
           fontWeight: FontWeight.w700,
@@ -74,17 +94,19 @@ abstract final class AppTheme {
         ),
       ),
       dataTableTheme: DataTableThemeData(
-        headingRowColor: const WidgetStatePropertyAll(Color(0xFFF7F9FC)),
+        headingRowColor: const WidgetStatePropertyAll(AppColors.surfaceSubtle),
         dataRowColor: WidgetStateProperty.resolveWith(
           (states) =>
               states.contains(WidgetState.selected) ? orangeSoft : Colors.white,
         ),
         headingTextStyle: const TextStyle(
+          fontFamily: AppTypography.family,
           color: ink,
           fontSize: 12,
           fontWeight: FontWeight.w800,
         ),
         dataTextStyle: const TextStyle(
+          fontFamily: AppTypography.family,
           color: ink,
           fontSize: 13,
           fontWeight: FontWeight.w500,
@@ -102,13 +124,18 @@ abstract final class AppTheme {
         ),
       ),
       tabBarTheme: TabBarThemeData(
-        labelColor: primary,
+        labelColor: strong,
         unselectedLabelColor: muted,
         indicatorColor: primary,
         indicatorSize: TabBarIndicatorSize.label,
         dividerColor: border,
-        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+        labelStyle: const TextStyle(
+          fontFamily: AppTypography.family,
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+        ),
         unselectedLabelStyle: const TextStyle(
+          fontFamily: AppTypography.family,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
@@ -116,21 +143,22 @@ abstract final class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         height: 72,
         backgroundColor: Colors.white,
-        indicatorColor: primary.withValues(alpha: .12),
+        indicatorColor: orangeSoft,
         elevation: 0,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             size: 24,
-            color: states.contains(WidgetState.selected) ? primary : muted,
+            color: states.contains(WidgetState.selected) ? strong : muted,
           ),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
+            fontFamily: AppTypography.family,
             fontSize: 11,
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w800
                 : FontWeight.w600,
-            color: states.contains(WidgetState.selected) ? primary : muted,
+            color: states.contains(WidgetState.selected) ? strong : muted,
           ),
         ),
       ),
@@ -143,7 +171,7 @@ abstract final class AppTheme {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         modalBackgroundColor: Colors.white,
-        modalBarrierColor: Color(0x99182033),
+        modalBarrierColor: Color(0x991C1F23),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -156,26 +184,44 @@ abstract final class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: ink,
-        contentTextStyle: const TextStyle(color: Colors.white),
+        contentTextStyle: const TextStyle(
+          fontFamily: AppTypography.family,
+          color: Colors.white,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+      // Pastille sélectionnée : fond clair, bordure marque, texte fort.
       chipTheme: ChipThemeData(
-        backgroundColor: const Color(0xFFF2F4F7),
+        backgroundColor: AppColors.surface,
         selectedColor: orangeSoft,
-        side: const BorderSide(color: border),
+        checkmarkColor: strong,
+        side: WidgetStateBorderSide.resolveWith(
+          (states) => BorderSide(
+            color: states.contains(WidgetState.selected) ? primary : border,
+          ),
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+        // RawChip ne résout que `labelStyle.color` selon l'état : couleur
+        // d'état explicite (texte courant / teinte forte si sélectionnée).
+        labelStyle: TextStyle(
+          fontFamily: AppTypography.family,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+          color: WidgetStateColor.resolveWith(
+            (states) => states.contains(WidgetState.selected) ? strong : ink,
+          ),
+        ),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? Colors.white
-              : const Color(0xFF98A2B3),
+              : AppColors.controlBorder,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
-              ? primary
-              : const Color(0xFFE4E7EC),
+              ? strong
+              : AppColors.disabledSurface,
         ),
         trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
@@ -183,10 +229,10 @@ abstract final class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
         fillColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
-              ? primary
+              ? strong
               : Colors.transparent,
         ),
-        side: const BorderSide(color: Color(0xFF98A2B3), width: 1.5),
+        side: const BorderSide(color: AppColors.controlBorder, width: 1.5),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: Colors.white,
@@ -197,6 +243,7 @@ abstract final class AppTheme {
           side: const BorderSide(color: border),
         ),
         textStyle: const TextStyle(
+          fontFamily: AppTypography.family,
           color: ink,
           fontSize: 13,
           fontWeight: FontWeight.w600,
@@ -208,6 +255,7 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(8),
         ),
         textStyle: const TextStyle(
+          fontFamily: AppTypography.family,
           color: Colors.white,
           fontSize: 12,
           fontWeight: FontWeight.w600,
@@ -221,7 +269,9 @@ abstract final class AppTheme {
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
-        hintStyle: const WidgetStatePropertyAll(TextStyle(color: muted)),
+        hintStyle: const WidgetStatePropertyAll(
+          TextStyle(fontFamily: AppTypography.family, color: muted),
+        ),
       ),
       dividerTheme: const DividerThemeData(color: border, thickness: 1),
       listTileTheme: const ListTileThemeData(
@@ -238,25 +288,27 @@ abstract final class AppTheme {
           shape: WidgetStatePropertyAll(_shape),
           elevation: const WidgetStatePropertyAll(0),
           textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            TextStyle(
+              fontFamily: AppTypography.family,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           backgroundColor: WidgetStateProperty.resolveWith(
             (states) => states.contains(WidgetState.disabled)
-                ? const Color(0xFFE4E7EC)
-                : states.contains(WidgetState.pressed)
-                ? primaryDark
-                : primary,
+                ? AppColors.disabledSurface
+                : states.contains(WidgetState.pressed) ||
+                      states.contains(WidgetState.hovered)
+                ? strongPressed
+                : strong,
           ),
           foregroundColor: WidgetStateProperty.resolveWith(
             (states) => states.contains(WidgetState.disabled)
-                ? const Color(0xFF98A2B3)
+                ? AppColors.disabledText
                 : Colors.white,
           ),
-          overlayColor: WidgetStateProperty.resolveWith(
-            (states) => states.contains(WidgetState.pressed)
-                ? Colors.white.withValues(alpha: .14)
-                : null,
-          ),
+          // Jamais d'éclaircissement : l'appui fonce le fond (voir ci-dessus).
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -269,19 +321,23 @@ abstract final class AppTheme {
           side: WidgetStateProperty.resolveWith(
             (states) => BorderSide(
               color: states.contains(WidgetState.disabled)
-                  ? const Color(0xFFE4E7EC)
-                  : const Color(0xFFD0D5DD),
+                  ? AppColors.disabledSurface
+                  : AppColors.controlBorder,
             ),
           ),
           foregroundColor: WidgetStateProperty.resolveWith(
             (states) => states.contains(WidgetState.disabled)
-                ? const Color(0xFF98A2B3)
+                ? AppColors.disabledText
                 : ink,
           ),
           textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            TextStyle(
+              fontFamily: AppTypography.family,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          overlayColor: WidgetStatePropertyAll(primary.withValues(alpha: .08)),
+          overlayColor: const WidgetStatePropertyAll(AppColors.primarySoft),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -293,13 +349,17 @@ abstract final class AppTheme {
           shape: WidgetStatePropertyAll(_shape),
           foregroundColor: WidgetStateProperty.resolveWith(
             (states) => states.contains(WidgetState.disabled)
-                ? const Color(0xFF98A2B3)
-                : primaryDark,
+                ? AppColors.disabledText
+                : strong,
           ),
           textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            TextStyle(
+              fontFamily: AppTypography.family,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          overlayColor: WidgetStatePropertyAll(primary.withValues(alpha: .08)),
+          overlayColor: const WidgetStatePropertyAll(AppColors.primarySoft),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
@@ -308,8 +368,8 @@ abstract final class AppTheme {
           iconSize: const WidgetStatePropertyAll(22),
           shape: WidgetStatePropertyAll(_shape),
           foregroundColor: const WidgetStatePropertyAll(ink),
-          backgroundColor: const WidgetStatePropertyAll(Color(0xFFF2F4F7)),
-          overlayColor: WidgetStatePropertyAll(primary.withValues(alpha: .10)),
+          backgroundColor: const WidgetStatePropertyAll(AppColors.background),
+          overlayColor: const WidgetStatePropertyAll(AppColors.primarySoft),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -317,10 +377,11 @@ abstract final class AppTheme {
         focusElevation: 3,
         hoverElevation: 3,
         highlightElevation: 1,
-        backgroundColor: primary,
+        backgroundColor: strong,
         foregroundColor: Colors.white,
         shape: const CircleBorder(),
         extendedTextStyle: const TextStyle(
+          fontFamily: AppTypography.family,
           fontSize: 14,
           fontWeight: FontWeight.w700,
         ),
@@ -328,6 +389,11 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
+        hintStyle: const TextStyle(
+          fontFamily: AppTypography.family,
+          color: muted,
+          fontSize: 15,
+        ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 15,
           vertical: 15,
@@ -347,7 +413,7 @@ abstract final class AppTheme {
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: primary,
-        linearTrackColor: Color(0xFFFFE5D0),
+        linearTrackColor: AppColors.primarySoft,
       ),
     );
   }

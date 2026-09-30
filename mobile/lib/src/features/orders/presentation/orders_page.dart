@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_form_sheet.dart';
 import '../data/order_service.dart';
 
@@ -181,11 +183,11 @@ class _OrdersPageState extends State<OrdersPage> {
               children: [
                 if (pending > 0)
                   Card(
-                    color: const Color(0xFFFFF3E8),
+                    color: AppColors.infoSurface,
                     child: ListTile(
                       leading: const Icon(
                         Icons.cloud_off,
-                        color: Color(0xFFF57C00),
+                        color: AppColors.infoText,
                       ),
                       title: Text('$pending opération(s) en attente'),
                       subtitle: const Text(

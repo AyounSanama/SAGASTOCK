@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
 import '../../organizations/data/organization_service.dart';
@@ -1031,8 +1032,8 @@ class _FacilityDetailsPageState extends State<FacilityDetailsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: saved == 'pending'
-              ? AppTheme.orange
-              : AppTheme.green,
+              ? AppColors.infoText
+              : AppColors.successText,
           content: Text(
             saved == 'pending'
                 ? '${_kindLabel(kind)} enregistré hors connexion. Synchronisation en attente.'
@@ -1537,7 +1538,7 @@ class _FacilityHeader extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppTheme.blue, Color(0xFF4F86F7)],
+          colors: [AppColors.sidebar, AppColors.text],
         ),
         borderRadius: BorderRadius.circular(20),
       ),

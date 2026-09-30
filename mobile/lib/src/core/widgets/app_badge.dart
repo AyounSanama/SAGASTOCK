@@ -16,17 +16,12 @@ class AppBadge extends StatelessWidget {
   final IconData? icon;
 
   (Color, Color) get _colors => switch (variant) {
-    AppBadgeVariant.success => (
-      const Color(0xFFE9F8EE),
-      const Color(0xFF16813A),
-    ),
-    AppBadgeVariant.warning => (AppColors.primarySoft, const Color(0xFFB85C00)),
-    AppBadgeVariant.danger => (
-      const Color(0xFFFFF1F0),
-      const Color(0xFFC62828),
-    ),
-    AppBadgeVariant.info => (const Color(0xFFEFF6FF), AppColors.link),
-    AppBadgeVariant.neutral => (const Color(0xFFF2F4F7), AppColors.textMuted),
+    AppBadgeVariant.success => (AppColors.successSurface, AppColors.successText),
+    // AM-160 : un état n'est jamais orange ; « avertissement » = information.
+    AppBadgeVariant.warning => (AppColors.infoSurface, AppColors.infoText),
+    AppBadgeVariant.danger => (AppColors.dangerSurface, AppColors.dangerText),
+    AppBadgeVariant.info => (AppColors.infoSurface, AppColors.infoText),
+    AppBadgeVariant.neutral => (AppColors.neutralSurface, AppColors.neutralText),
   };
 
   @override

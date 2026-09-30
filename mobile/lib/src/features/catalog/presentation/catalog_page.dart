@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_tokens.dart';
+
 import '../../../core/access/application_access.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
@@ -1190,10 +1192,10 @@ class _SyncStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, icon, color) = switch (status) {
-      'conflict' => ('Conflit', Icons.warning_amber_rounded, Colors.deepOrange),
-      'failed' => ('Échec', Icons.error_outline_rounded, Colors.red),
-      'synced' => ('Synchronisé', Icons.cloud_done_outlined, Colors.green),
-      _ => ('En attente', Icons.cloud_upload_outlined, Colors.orange),
+      'conflict' => ('Conflit', Icons.warning_amber_rounded, AppColors.dangerText),
+      'failed' => ('Échec', Icons.error_outline_rounded, AppColors.dangerText),
+      'synced' => ('Synchronisé', Icons.cloud_done_outlined, AppColors.successText),
+      _ => ('En attente', Icons.cloud_upload_outlined, AppColors.infoText),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),

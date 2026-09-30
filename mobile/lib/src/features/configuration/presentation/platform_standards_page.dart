@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/connectivity/connectivity_service.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_empty_state.dart';
@@ -399,8 +400,8 @@ class _SyncStatus extends StatelessWidget {
     final color = status == 'synced'
         ? AppTheme.green
         : status == 'error'
-        ? AppTheme.red
-        : AppTheme.orange;
+        ? AppColors.dangerText
+        : AppColors.infoText;
     final label = status == 'synced'
         ? 'Synchronisée'
         : status == 'error'
