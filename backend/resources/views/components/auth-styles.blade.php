@@ -3,7 +3,7 @@
     .auth-card{width:min(100%,420px);padding:var(--pc-space-6);border:1px solid var(--pc-color-border);border-radius:var(--pc-radius-lg);background:var(--pc-color-surface);box-shadow:var(--pc-shadow-card)}
     .auth-brand{text-align:center;margin-bottom:var(--pc-space-4)}
     .auth-logo{display:block;width:60px;height:60px;object-fit:contain;margin:0 auto var(--pc-space-1)}
-    .auth-wordmark{margin:0;font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-.02em}.auth-wordmark span{color:var(--pc-color-primary)}.auth-wordmark strong{color:var(--pc-color-success)}
+    .auth-wordmark{margin:0;font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-.02em}.auth-wordmark span{color:var(--pc-color-primary-strong)}.auth-wordmark strong{color:var(--pc-color-success)}
     .auth-brand p{margin:var(--pc-space-1) 0 0;color:var(--pc-color-text-muted);font-size:var(--pc-font-size-secondary);line-height:1.35}
     .auth-form{display:grid;gap:var(--pc-space-3)}
     .auth-options{display:flex;align-items:center;justify-content:space-between;gap:var(--pc-space-3);font-size:var(--pc-font-size-secondary)}
