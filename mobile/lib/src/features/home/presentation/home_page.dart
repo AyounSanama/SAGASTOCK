@@ -110,10 +110,10 @@ class _DashboardHeader extends StatelessWidget {
         const Expanded(
           child: Text(
             'Tableau de bord',
-            maxLines: 1,
+            maxLines: 2,
             style: TextStyle(
               color: AppTheme.ink,
-              fontSize: 21,
+              fontSize: 19,
               fontWeight: FontWeight.w900,
               letterSpacing: -.35,
             ),

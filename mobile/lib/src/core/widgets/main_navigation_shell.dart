@@ -7,12 +7,41 @@ import '../theme/app_theme.dart';
 import '../theme/app_tokens.dart';
 import 'app_navigation_drawer.dart';
 
+/// Primary destinations are selected from the already authorized manifest.
+List<ApplicationNavigationItem> mobilePrimaryNavigation(
+  String role,
+  List<ApplicationNavigationItem> items,
+) {
+  final keys = switch (role) {
+    'sago_admin' => const ['dashboard', 'organizations', 'history', 'profile'],
+    'coordination_admin' || 'project_admin' => const [
+      'dashboard',
+      'projects',
+      'standard-lists',
+      'profile',
+    ],
+    _ => const ['dashboard', 'stocks', 'receipts', 'dispensing', 'profile'],
+  };
+  return [
+    for (final key in keys)
+      for (final item in items)
+        if (item.key == key) item,
+  ];
+}
+
 /// Layout authentifié unique. Son contenu varie uniquement avec les permissions.
-class MainLayout extends StatelessWidget {
+class MainLayout extends StatefulWidget {
   const MainLayout({required this.location, required this.child, super.key});
 
   final String location;
   final Widget child;
+
+  @override
+  State<MainLayout> createState() => _MainLayoutState();
+}
+
+class _MainLayoutState extends State<MainLayout> {
+  bool _collapsed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -21,50 +50,140 @@ class MainLayout extends StatelessWidget {
       builder: (context, snapshot) {
         final items = ApplicationAccess.navigation(snapshot.data);
         final role = '${snapshot.data?['role'] ?? ''}'.toLowerCase();
-        final isSago = items.any((item) => item.key == 'standards');
-        final compactKeys = role == 'coordination_admin'
-            ? const {'dashboard', 'projects', 'standard-lists', 'profile'}
-            : role == 'project_admin'
-            ? const {'dashboard', 'projects', 'standard-lists', 'profile'}
-            : isSago
-            ? const {
-                'dashboard',
-                'organizations',
-                'assistance',
-                'history',
-                'profile',
-              }
-            : const {
-                'dashboard',
-                'stocks',
-                'receipts',
-                'dispensations',
-                'dispensing',
-                'inventory-orders',
-                'profile',
-              };
-        final compactItems = items
-            .where((item) => compactKeys.contains(item.key))
-            .take(5)
-            .toList(growable: false);
-        final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.desktop;
+        final isSago =
+            role == 'sago_admin' ||
+            items.any((item) => item.key == 'standards');
+        final operational =
+            !isSago &&
+            role != 'coordination_admin' &&
+            role != 'project_admin' &&
+            items.any((item) => item.key == 'stocks');
+        final compactItems = mobilePrimaryNavigation(role, items);
+        final width = MediaQuery.sizeOf(context).width;
+        final wide = width >= AppBreakpoints.tablet;
+        final compact = _collapsed || width < AppBreakpoints.desktop;
 
         return Scaffold(
+          drawer: const AppNavigationDrawer(),
           body: Row(
             children: [
               if (wide)
-                const SizedBox(
-                  width: AppSizes.sidebarWidth,
-                  child: AppNavigationDrawer(),
+                SizedBox(
+                  width: compact
+                      ? AppSizes.sidebarCollapsedWidth
+                      : AppSizes.sidebarWidth,
+                  child: AppNavigationDrawer(
+                    compact: compact,
+                    onToggle: width < AppBreakpoints.desktop
+                        ? null
+                        : () => setState(() => _collapsed = !_collapsed),
+                    persistent: true,
+                  ),
                 ),
-              Expanded(child: child),
+              Expanded(child: widget.child),
             ],
           ),
           bottomNavigationBar: wide || compactItems.isEmpty
               ? null
-              : _BottomNavigation(items: compactItems, location: location),
+              : operational
+              ? _OperationalNavigation(items: items, location: widget.location)
+              : _BottomNavigation(
+                  items: compactItems,
+                  location: widget.location,
+                ),
         );
       },
+    );
+  }
+}
+
+class _OperationalNavigation extends StatelessWidget {
+  const _OperationalNavigation({required this.items, required this.location});
+  final List<ApplicationNavigationItem> items;
+  final String location;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = items
+        .where((item) => {'dashboard', 'stocks', 'reports'}.contains(item.key))
+        .toList();
+    final actions = items
+        .where(
+          (item) => {
+            'receipts',
+            'dispensing',
+            'dispensations',
+            'inventory-orders',
+            'orders',
+          }.contains(item.key),
+        )
+        .toList();
+    return SafeArea(
+      child: Material(
+        color: AppColors.surface,
+        child: SizedBox(
+          height: 72,
+          child: Row(
+            children: [
+              for (final item in primary.where((item) => item.key != 'reports'))
+                Expanded(
+                  child: _NavigationItem(
+                    item: item,
+                    selected: location == item.path,
+                  ),
+                ),
+              if (actions.isNotEmpty)
+                Expanded(
+                  child: IconButton.filled(
+                    tooltip: 'Actions disponibles',
+                    icon: const Icon(Icons.add),
+                    onPressed: () => showModalBottomSheet<void>(
+                      context: context,
+                      useSafeArea: true,
+                      builder: (sheetContext) => ListView(
+                        shrinkWrap: true,
+                        children: [
+                          const ListTile(title: Text('Actions disponibles')),
+                          for (final item in actions)
+                            ListTile(
+                              leading: Icon(item.icon),
+                              title: Text(item.label),
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                context.go(item.path);
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              for (final item in primary.where((item) => item.key == 'reports'))
+                Expanded(
+                  child: _NavigationItem(
+                    item: item,
+                    selected: location == item.path,
+                  ),
+                ),
+              Expanded(
+                child: Builder(
+                  builder: (context) => InkWell(
+                    onTap: () => Scaffold.of(context).openDrawer(),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.menu),
+                        SizedBox(height: 4),
+                        Text('Menu', style: TextStyle(fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -406,6 +408,25 @@ class _FacilityFormState extends State<_FacilityForm> {
   late Set<String> _projectIds;
   bool _isActive = true;
   bool _saving = false;
+  late final String _initialDraft;
+
+  String get _draft => jsonEncode([
+    _code.text,
+    _name.text,
+    _careLevel,
+    _email.text,
+    _phone.text,
+    _address.text,
+    _region.text,
+    _district.text,
+    _locality.text,
+    _latitude.text,
+    _longitude.text,
+    _type,
+    _missionId,
+    _projectIds.toList()..sort(),
+    _isActive,
+  ]);
 
   static const _types = {
     'hospital': 'Hôpital',
@@ -460,6 +481,7 @@ class _FacilityFormState extends State<_FacilityForm> {
       _missionId ??= widget.projects.single['mission_id']?.toString();
     }
     _isActive = value['is_active'] != false;
+    _initialDraft = _draft;
   }
 
   String get _selectedProjectNames => widget.projects
@@ -539,318 +561,324 @@ class _FacilityFormState extends State<_FacilityForm> {
   @override
   Widget build(BuildContext context) {
     const labels = ['Informations', 'Classification', 'Localisation', 'Résumé'];
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * .72,
-      child: Column(
-        children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: List.generate(
-                labels.length,
-                (index) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text('${index + 1}. ${labels[index]}'),
-                    selected: _step == index,
-                    onSelected: (_) => _goTo(index),
+    return AppFormSheetGuard(
+      isDirty: () => _draft != _initialDraft,
+      isBusy: _saving,
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .72,
+        child: Column(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: List.generate(
+                  labels.length,
+                  (index) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text('${index + 1}. ${labels[index]}'),
+                      selected: _step == index,
+                      onSelected: (_) => _goTo(index),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: PageView(
-              controller: _pages,
-              onPageChanged: (index) async {
-                if (index > _step && !_validStep(_step)) {
-                  await _pages.animateToPage(
-                    _step,
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOut,
-                  );
-                  return;
-                }
-                setState(() => _step = index);
-              },
-              children: [
-                _stepBody(
-                  Form(
-                    key: _informationKey,
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _code,
-                                decoration: const InputDecoration(
-                                  labelText: 'Code établissement *',
-                                  prefixIcon: Icon(Icons.tag_rounded),
+            const SizedBox(height: 8),
+            Expanded(
+              child: PageView(
+                controller: _pages,
+                onPageChanged: (index) async {
+                  if (index > _step && !_validStep(_step)) {
+                    await _pages.animateToPage(
+                      _step,
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                    );
+                    return;
+                  }
+                  setState(() => _step = index);
+                },
+                children: [
+                  _stepBody(
+                    Form(
+                      key: _informationKey,
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _code,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Code établissement *',
+                                    prefixIcon: Icon(Icons.tag_rounded),
+                                  ),
+                                  validator: _required,
                                 ),
-                                validator: _required,
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _name,
-                                decoration: const InputDecoration(
-                                  labelText: 'Nom officiel *',
-                                  prefixIcon: Icon(Icons.business_outlined),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _name,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Nom officiel *',
+                                    prefixIcon: Icon(Icons.business_outlined),
+                                  ),
+                                  validator: _required,
                                 ),
-                                validator: _required,
                               ),
-                            ),
-                          ],
-                        ),
-                        if (widget.projects.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          _InheritedValue(
-                            label: 'Projet hérité',
-                            value: _selectedProjectNames,
-                          ),
-                        ],
-                        if (widget.missions.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          DropdownButtonFormField<String?>(
-                            initialValue: _missionId,
-                            decoration: const InputDecoration(
-                              labelText: 'Coordination / Mission',
-                            ),
-                            items: [
-                              const DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text('Mission héritée du projet'),
-                              ),
-                              for (final mission in widget.missions)
-                                DropdownMenuItem<String?>(
-                                  value: '${mission['id']}',
-                                  child: Text('${mission['name']}'),
-                                ),
                             ],
-                            onChanged: (value) => _missionId = value,
+                          ),
+                          if (widget.projects.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            _InheritedValue(
+                              label: 'Projet hérité',
+                              value: _selectedProjectNames,
+                            ),
+                          ],
+                          if (widget.missions.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String?>(
+                              initialValue: _missionId,
+                              decoration: const InputDecoration(
+                                labelText: 'Coordination / Mission',
+                              ),
+                              items: [
+                                const DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('Mission héritée du projet'),
+                                ),
+                                for (final mission in widget.missions)
+                                  DropdownMenuItem<String?>(
+                                    value: '${mission['id']}',
+                                    child: Text('${mission['name']}'),
+                                  ),
+                              ],
+                              onChanged: (value) => _missionId = value,
+                            ),
+                          ],
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Formation sanitaire active'),
+                            value: _isActive,
+                            onChanged: _saving
+                                ? null
+                                : (value) => setState(() => _isActive = value),
                           ),
                         ],
-                        SwitchListTile.adaptive(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Formation sanitaire active'),
-                          value: _isActive,
-                          onChanged: _saving
-                              ? null
-                              : (value) => setState(() => _isActive = value),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                _stepBody(
-                  Form(
-                    key: _classificationKey,
-                    child: Column(
-                      children: [
-                        DropdownButtonFormField<String>(
-                          initialValue: _careLevel,
-                          decoration: const InputDecoration(
-                            labelText: 'Niveau de soins *',
-                            prefixIcon: Icon(Icons.health_and_safety_outlined),
-                          ),
-                          items: _careLevels.entries
-                              .map(
-                                (entry) => DropdownMenuItem(
-                                  value: entry.key,
-                                  child: Text(entry.value),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) =>
-                              setState(() => _careLevel = value),
-                          validator: (value) =>
-                              value == null ? 'Sélection obligatoire' : null,
-                        ),
-                        const SizedBox(height: 14),
-                        DropdownButtonFormField<String>(
-                          initialValue: _type,
-                          decoration: const InputDecoration(
-                            labelText: 'Catégorie de formation sanitaire *',
-                            prefixIcon: Icon(Icons.local_hospital_outlined),
-                          ),
-                          items: _types.entries
-                              .map(
-                                (entry) => DropdownMenuItem(
-                                  value: entry.key,
-                                  child: Text(entry.value),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) => _type = value ?? _type,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                _stepBody(
-                  Form(
-                    key: _locationKey,
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _region,
-                                decoration: const InputDecoration(
-                                  labelText: 'Région',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _district,
-                                decoration: const InputDecoration(
-                                  labelText: 'District sanitaire',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: _locality,
-                          decoration: const InputDecoration(
-                            labelText: 'Localité',
-                            prefixIcon: Icon(Icons.place_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: _address,
-                          minLines: 2,
-                          maxLines: 3,
-                          decoration: const InputDecoration(
-                            labelText: 'Adresse',
-                            prefixIcon: Icon(Icons.location_on_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _latitude,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                      signed: true,
-                                    ),
-                                decoration: const InputDecoration(
-                                  labelText: 'Latitude (facultatif)',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _longitude,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                      signed: true,
-                                    ),
-                                decoration: const InputDecoration(
-                                  labelText: 'Longitude (facultatif)',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: _email,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Adresse e-mail',
-                            prefixIcon: Icon(Icons.email_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: _phone,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            labelText: 'Téléphone',
-                            prefixIcon: Icon(Icons.phone_outlined),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                _stepBody(
-                  Column(
-                    children: [
-                      _SummaryLine('Nom', _name.text),
-                      _SummaryLine('Code', _code.text),
-                      _SummaryLine(
-                        'Niveau de soins',
-                        _careLevels[_careLevel] ?? '—',
                       ),
-                      _SummaryLine('Catégorie', _types[_type] ?? '—'),
-                      _SummaryLine('Région', _region.text),
-                      _SummaryLine('District', _district.text),
-                      _SummaryLine('Localité', _locality.text),
-                      _SummaryLine('Adresse', _address.text),
-                      _SummaryLine(
-                        'GPS',
-                        [
-                          _latitude.text,
-                          _longitude.text,
-                        ].where((v) => v.isNotEmpty).join(', '),
+                    ),
+                  ),
+                  _stepBody(
+                    Form(
+                      key: _classificationKey,
+                      child: Column(
+                        children: [
+                          DropdownButtonFormField<String>(
+                            initialValue: _careLevel,
+                            decoration: const InputDecoration(
+                              labelText: 'Niveau de soins *',
+                              prefixIcon: Icon(
+                                Icons.health_and_safety_outlined,
+                              ),
+                            ),
+                            items: _careLevels.entries
+                                .map(
+                                  (entry) => DropdownMenuItem(
+                                    value: entry.key,
+                                    child: Text(entry.value),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) =>
+                                setState(() => _careLevel = value),
+                            validator: (value) =>
+                                value == null ? 'Sélection obligatoire' : null,
+                          ),
+                          const SizedBox(height: 14),
+                          DropdownButtonFormField<String>(
+                            initialValue: _type,
+                            decoration: const InputDecoration(
+                              labelText: 'Catégorie de formation sanitaire *',
+                              prefixIcon: Icon(Icons.local_hospital_outlined),
+                            ),
+                            items: _types.entries
+                                .map(
+                                  (entry) => DropdownMenuItem(
+                                    value: entry.key,
+                                    child: Text(entry.value),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) => _type = value ?? _type,
+                          ),
+                        ],
                       ),
-                      _SummaryLine('Projet', _selectedProjectNames),
-                    ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
-            child: Row(
-              children: [
-                Expanded(
-                  child: AppButton.cancel(
-                    label: _step == 0 ? 'Annuler' : 'Précédent',
-                    onPressed: _saving
-                        ? null
-                        : () => _step == 0
-                              ? Navigator.pop(context)
-                              : _goTo(_step - 1),
+                  _stepBody(
+                    Form(
+                      key: _locationKey,
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _region,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Région',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _district,
+                                  decoration: const InputDecoration(
+                                    labelText: 'District sanitaire',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _locality,
+                            decoration: const InputDecoration(
+                              labelText: 'Localité',
+                              prefixIcon: Icon(Icons.place_outlined),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _address,
+                            minLines: 2,
+                            maxLines: 3,
+                            decoration: const InputDecoration(
+                              labelText: 'Adresse',
+                              prefixIcon: Icon(Icons.location_on_outlined),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _latitude,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                        signed: true,
+                                      ),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Latitude (facultatif)',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _longitude,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                        signed: true,
+                                      ),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Longitude (facultatif)',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _email,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              labelText: 'Adresse e-mail',
+                              prefixIcon: Icon(Icons.email_outlined),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _phone,
+                            keyboardType: TextInputType.phone,
+                            decoration: const InputDecoration(
+                              labelText: 'Téléphone',
+                              prefixIcon: Icon(Icons.phone_outlined),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _step == 3
-                      ? AppButton.save(
-                          label: widget.facility == null
-                              ? 'Créer'
-                              : 'Enregistrer',
-                          loading: _saving,
-                          onPressed: _save,
-                        )
-                      : AppButton.primary(
-                          label: 'Suivant',
-                          icon: Icons.arrow_forward_rounded,
-                          onPressed: () => _goTo(_step + 1),
+                  _stepBody(
+                    Column(
+                      children: [
+                        _SummaryLine('Nom', _name.text),
+                        _SummaryLine('Code', _code.text),
+                        _SummaryLine(
+                          'Niveau de soins',
+                          _careLevels[_careLevel] ?? '—',
                         ),
-                ),
-              ],
+                        _SummaryLine('Catégorie', _types[_type] ?? '—'),
+                        _SummaryLine('Région', _region.text),
+                        _SummaryLine('District', _district.text),
+                        _SummaryLine('Localité', _locality.text),
+                        _SummaryLine('Adresse', _address.text),
+                        _SummaryLine(
+                          'GPS',
+                          [
+                            _latitude.text,
+                            _longitude.text,
+                          ].where((v) => v.isNotEmpty).join(', '),
+                        ),
+                        _SummaryLine('Projet', _selectedProjectNames),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: AppButton.cancel(
+                      label: _step == 0 ? 'Annuler' : 'Précédent',
+                      onPressed: _saving
+                          ? null
+                          : () => _step == 0
+                                ? Navigator.pop(context)
+                                : _goTo(_step - 1),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _step == 3
+                        ? AppButton.save(
+                            label: widget.facility == null
+                                ? 'Créer'
+                                : 'Enregistrer',
+                            loading: _saving,
+                            onPressed: _save,
+                          )
+                        : AppButton.primary(
+                            label: 'Suivant',
+                            icon: Icons.arrow_forward_rounded,
+                            onPressed: () => _goTo(_step + 1),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -890,7 +918,12 @@ class _FacilityFormState extends State<_FacilityForm> {
   };
 
   Future<void> _goTo(int target, {bool validateCurrentStep = true}) async {
+    if (_saving) return;
     if (validateCurrentStep && target > _step && !_validStep(_step)) return;
+    if (validateCurrentStep && target > _step) {
+      final invalid = _firstInvalidStep();
+      if (invalid != null && invalid < target) target = invalid;
+    }
     await _pages.animateToPage(
       target,
       duration: const Duration(milliseconds: 240),
@@ -939,242 +972,6 @@ class _SummaryLine extends StatelessWidget {
   );
 }
 
-/* Previous single-page implementation removed after migration to PageView.
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _code,
-                    decoration: const InputDecoration(
-                      labelText: 'Code établissement *',
-                      prefixIcon: Icon(Icons.tag_rounded),
-                    ),
-                    validator: _required,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _type,
-                    decoration: const InputDecoration(
-                      labelText: 'Type *',
-                      prefixIcon: Icon(Icons.local_hospital_outlined),
-                    ),
-                    items: _types.entries
-                        .map(
-                          (entry) => DropdownMenuItem(
-                            value: entry.key,
-                            child: Text(entry.value),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) => _type = value ?? _type,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _name,
-              decoration: const InputDecoration(
-                labelText: 'Nom officiel *',
-                prefixIcon: Icon(Icons.business_outlined),
-              ),
-              validator: _required,
-            ),
-            if (widget.missions.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String?>(
-                initialValue: _missionId,
-                decoration: const InputDecoration(
-                  labelText: 'Mission de rattachement',
-                  prefixIcon: Icon(Icons.public_outlined),
-                ),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('Aucune mission'),
-                  ),
-                  for (final mission in widget.missions)
-                    DropdownMenuItem<String?>(
-                      value: '${mission['id']}',
-                      child: Text('${mission['name']}'),
-                    ),
-                ],
-                onChanged: (value) => setState(() => _missionId = value),
-              ),
-            ],
-            if (widget.projects.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Projets associés',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: widget.projects
-                      .map((project) {
-                        final id = '${project['id']}';
-                        return FilterChip(
-                          label: Text('${project['name']}'),
-                          selected: _projectIds.contains(id),
-                          onSelected: (selected) => setState(() {
-                            if (selected) {
-                              _projectIds.add(id);
-                            } else {
-                              _projectIds.remove(id);
-                            }
-                          }),
-                        );
-                      })
-                      .toList(growable: false),
-                ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              initialValue: _careLevel,
-              decoration: const InputDecoration(
-                labelText: 'Niveau de soins *',
-                prefixIcon: Icon(Icons.health_and_safety_outlined),
-              ),
-              items: _careLevels.entries
-                  .map(
-                    (entry) => DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _careLevel = value),
-              validator: (value) =>
-                  value == null ? 'Sélection obligatoire' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _email,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Adresse e-mail',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Téléphone',
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _address,
-              minLines: 2,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Adresse / localisation',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _region,
-                    decoration: const InputDecoration(labelText: 'Région'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _district,
-                    decoration: const InputDecoration(labelText: 'District'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _locality,
-              decoration: const InputDecoration(
-                labelText: 'Localité',
-                prefixIcon: Icon(Icons.place_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _latitude,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'Latitude (facultatif)',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _longitude,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'Longitude (facultatif)',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Formation sanitaire active'),
-              value: _isActive,
-              onChanged: _saving
-                  ? null
-                  : (value) => setState(() => _isActive = value),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton.cancel(
-                    onPressed: _saving ? null : () => Navigator.pop(context),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppButton.save(loading: _saving, onPressed: _save),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String? _required(String? value) =>
-      value == null || value.trim().isEmpty ? 'Champ obligatoire' : null;
-}
-
-*/
 class FacilityDetailsPage extends StatefulWidget {
   const FacilityDetailsPage({
     required this.organizationId,
@@ -1370,6 +1167,9 @@ class _ChildFormState extends State<_ChildForm> {
   late final TextEditingController _location;
   late String _type;
   bool _saving = false;
+  late final String _initialDraft;
+  String get _draft =>
+      jsonEncode([_code.text, _name.text, _location.text, _type]);
 
   Map<String, String> get _types => switch (widget.kind) {
     'department' => {
@@ -1410,6 +1210,7 @@ class _ChildFormState extends State<_ChildForm> {
     _name = TextEditingController(text: '${value['name'] ?? ''}');
     _location = TextEditingController(text: '${value['location'] ?? ''}');
     _type = '${value[_typeField] ?? _types.keys.first}';
+    _initialDraft = _draft;
   }
 
   @override
@@ -1421,7 +1222,7 @@ class _ChildFormState extends State<_ChildForm> {
   }
 
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_saving || !(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
     try {
       final synchronized = await widget.service.saveChild(
@@ -1452,69 +1253,84 @@ class _ChildFormState extends State<_ChildForm> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+    return AppFormSheetGuard(
+      isDirty: () => _draft != _initialDraft,
+      isBusy: _saving,
       child: Form(
         key: _formKey,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            TextFormField(
-              controller: _code,
-              decoration: const InputDecoration(
-                labelText: 'Code *',
-                prefixIcon: Icon(Icons.tag_rounded),
-              ),
-              validator: _required,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _name,
-              decoration: const InputDecoration(
-                labelText: 'Nom *',
-                prefixIcon: Icon(Icons.badge_outlined),
-              ),
-              validator: _required,
-            ),
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              initialValue: _type,
-              decoration: const InputDecoration(
-                labelText: 'Type *',
-                prefixIcon: Icon(Icons.category_outlined),
-              ),
-              items: _types.entries
-                  .map(
-                    (entry) => DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    TextFormField(
+                      controller: _code,
+                      decoration: const InputDecoration(
+                        labelText: 'Code *',
+                        prefixIcon: Icon(Icons.tag_outlined),
+                      ),
+                      validator: _required,
                     ),
-                  )
-                  .toList(),
-              onChanged: (value) => _type = value ?? _type,
-            ),
-            if (widget.kind == 'site') ...[
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _location,
-                decoration: const InputDecoration(
-                  labelText: 'Localisation',
-                  prefixIcon: Icon(Icons.location_on_outlined),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _name,
+                      decoration: const InputDecoration(
+                        labelText: 'Nom *',
+                        prefixIcon: Icon(Icons.badge_outlined),
+                      ),
+                      validator: _required,
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      initialValue: _type,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Type *',
+                        prefixIcon: Icon(Icons.category_outlined),
+                      ),
+                      items: _types.entries
+                          .map(
+                            (entry) => DropdownMenuItem(
+                              value: entry.key,
+                              child: Text(entry.value),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => _type = value ?? _type,
+                    ),
+                    if (widget.kind == 'site') ...[
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _location,
+                        decoration: const InputDecoration(
+                          labelText: 'Localisation',
+                          prefixIcon: Icon(Icons.location_on_outlined),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ],
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton.cancel(
-                    onPressed: _saving ? null : () => Navigator.pop(context),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: AppButton.cancel(
+                      onPressed: _saving ? null : () => Navigator.pop(context),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppButton.save(loading: _saving, onPressed: _save),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppButton.save(loading: _saving, onPressed: _save),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

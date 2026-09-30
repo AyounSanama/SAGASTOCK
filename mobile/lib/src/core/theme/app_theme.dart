@@ -37,6 +37,12 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: surface,
       fontFamily: 'Roboto',
       textTheme: const TextTheme(
+        headlineSmall: AppTypography.pageTitle,
+        titleLarge: AppTypography.sectionTitle,
+        titleMedium: AppTypography.title,
+        bodyMedium: AppTypography.body,
+        bodySmall: AppTypography.secondary,
+        labelSmall: AppTypography.caption,
         labelLarge: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w700,
@@ -63,16 +69,15 @@ abstract final class AppTheme {
         color: Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           side: const BorderSide(color: border),
         ),
       ),
       dataTableTheme: DataTableThemeData(
         headingRowColor: const WidgetStatePropertyAll(Color(0xFFF7F9FC)),
         dataRowColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? orangeSoft
-              : Colors.white,
+          (states) =>
+              states.contains(WidgetState.selected) ? orangeSoft : Colors.white,
         ),
         headingTextStyle: const TextStyle(
           color: ink,
@@ -102,10 +107,7 @@ abstract final class AppTheme {
         indicatorColor: primary,
         indicatorSize: TabBarIndicatorSize.label,
         dividerColor: border,
-        labelStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-        ),
+        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
         unselectedLabelStyle: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,

@@ -9,38 +9,78 @@ import 'pharmacare_wordmark.dart';
 
 /// Sidebar unique, alimentée exclusivement par le manifeste de permissions.
 class AppNavigationDrawer extends StatelessWidget {
-  const AppNavigationDrawer({super.key});
+  const AppNavigationDrawer({
+    this.compact = false,
+    this.onToggle,
+    this.persistent = false,
+    super.key,
+  });
+  final bool compact;
+  final bool persistent;
+  final VoidCallback? onToggle;
 
   @override
   Widget build(BuildContext context) {
     return NavigationDrawer(
       backgroundColor: Colors.white,
       children: [
-        const _BrandHeader(),
+        if (!compact) const _BrandHeader(),
+        if (onToggle != null)
+          Align(
+            alignment: compact ? Alignment.center : Alignment.centerRight,
+            child: IconButton(
+              tooltip: compact
+                  ? 'Agrandir la barre latérale'
+                  : 'Réduire la barre latérale',
+              onPressed: onToggle,
+              icon: Icon(
+                compact
+                    ? Icons.keyboard_double_arrow_right
+                    : Icons.keyboard_double_arrow_left,
+              ),
+            ),
+          ),
         const Divider(height: 1),
-        const _DrawerSection('NAVIGATION'),
+        if (!compact) const _DrawerSection('NAVIGATION'),
         FutureBuilder<Map<String, dynamic>?>(
           future: AuthService().cachedUser(),
           builder: (context, snapshot) => Column(
             children: [
               for (final item in ApplicationAccess.navigation(snapshot.data))
-                _NavigationTile(item: item),
+                _NavigationTile(
+                  item: item,
+                  compact: compact,
+                  persistent: persistent,
+                ),
             ],
           ),
         ),
         const Divider(height: 32),
-        ListTile(
-          leading: const Icon(Icons.logout_rounded, color: AppTheme.danger),
-          title: const Text(
-            'Déconnexion',
-            style: TextStyle(color: AppTheme.danger, fontWeight: FontWeight.w700),
+        if (compact)
+          IconButton(
+            tooltip: 'Déconnexion',
+            icon: const Icon(Icons.logout_outlined, color: AppTheme.danger),
+            onPressed: () async {
+              await AuthService().logout();
+              if (context.mounted) context.go('/login');
+            },
+          )
+        else
+          ListTile(
+            leading: const Icon(Icons.logout_rounded, color: AppTheme.danger),
+            title: const Text(
+              'Déconnexion',
+              style: TextStyle(
+                color: AppTheme.danger,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            onTap: () async {
+              if (!persistent) Navigator.maybePop(context);
+              await AuthService().logout();
+              if (context.mounted) context.go('/login');
+            },
           ),
-          onTap: () async {
-            Navigator.maybePop(context);
-            await AuthService().logout();
-            if (context.mounted) context.go('/login');
-          },
-        ),
         const SizedBox(height: 24),
       ],
     );
@@ -53,7 +93,12 @@ class _BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.xl,
+        AppSpacing.lg,
+        AppSpacing.md,
+      ),
       child: Row(
         children: [
           Image.asset('assets/images/pharmacare-logo.png', width: 52),
@@ -68,17 +113,43 @@ class _BrandHeader extends StatelessWidget {
 }
 
 class _NavigationTile extends StatelessWidget {
-  const _NavigationTile({required this.item});
+  const _NavigationTile({
+    required this.item,
+    required this.compact,
+    required this.persistent,
+  });
 
   final ApplicationNavigationItem item;
+  final bool compact;
+  final bool persistent;
 
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
     final selected =
         location == item.path || location.startsWith('${item.path}/');
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        child: IconButton(
+          tooltip: item.label,
+          isSelected: selected,
+          style: IconButton.styleFrom(
+            foregroundColor: selected ? AppTheme.orange : AppTheme.ink,
+            backgroundColor: selected
+                ? AppTheme.orangeSoft
+                : Colors.transparent,
+          ),
+          onPressed: () => context.go(item.path),
+          icon: Icon(item.icon),
+        ),
+      );
+    }
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 2,
+      ),
       decoration: BoxDecoration(
         color: selected ? AppTheme.orangeSoft : Colors.transparent,
         borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -96,14 +167,16 @@ class _NavigationTile extends StatelessWidget {
         selectedColor: AppTheme.orange,
         iconColor: selected ? AppTheme.orange : AppTheme.gray,
         textColor: selected ? AppTheme.orange : AppTheme.ink,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
         leading: Icon(item.icon),
         title: Text(
           item.label,
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         onTap: () {
-          Navigator.maybePop(context);
+          if (!persistent) Navigator.maybePop(context);
           context.go(item.path);
         },
       ),

@@ -8,6 +8,9 @@ abstract final class AppColors {
   static const primary = Color(0xFFF57C00);
   static const primaryDark = Color(0xFFC86500);
   static const primarySoft = Color(0xFFFFF3E8);
+  static const warning = Color(0xFF9A6700);
+  static const info = Color(0xFF2563EB);
+  static const backdrop = Color(0x6624324A);
   static const success = Color(0xFF22A447);
   static const danger = Color(0xFFE53935);
   static const text = Color(0xFF24324A);
@@ -31,8 +34,9 @@ abstract final class AppSpacing {
 
 abstract final class AppRadius {
   static const sm = 8.0;
-  static const md = 10.0;
+  static const md = 12.0;
   static const lg = 14.0;
+  static const sheet = 20.0;
   static const pill = 999.0;
 }
 
@@ -45,11 +49,13 @@ abstract final class AppSizes {
   static const sidebarWidth = 260.0;
   static const sidebarCollapsedWidth = 78.0;
   static const topBarHeight = 64.0;
-  static const pagePaddingDesktop = 28.0;
-  static const pagePaddingTablet = 22.0;
+  static const pagePaddingDesktop = 32.0;
+  static const pagePaddingTablet = 24.0;
   static const pagePaddingMobile = 16.0;
   static const formSheetMinWidth = 480.0;
-  static const formSheetMaxWidth = 620.0;
+  static const formSheetMaxWidth = 720.0;
+  static const formSheetSmallWidth = 520.0;
+  static const formSheetLargeWidth = 880.0;
 }
 
 abstract final class AppTypography {
@@ -71,15 +77,9 @@ abstract final class AppTypography {
   static const body = TextStyle(fontSize: 14, height: 1.5);
   static const secondary = TextStyle(fontSize: 13, height: 1.4);
   static const caption = TextStyle(fontSize: 12, height: 1.35);
-  static const button = TextStyle(
-    fontSize: 14,
-    fontWeight: FontWeight.w600,
-  );
+  static const button = TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
   static const input = TextStyle(fontSize: 14);
-  static const label = TextStyle(
-    fontSize: 13,
-    fontWeight: FontWeight.w600,
-  );
+  static const label = TextStyle(fontSize: 13, fontWeight: FontWeight.w600);
 }
 
 abstract final class AppDurations {

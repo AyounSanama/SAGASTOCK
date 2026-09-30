@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -191,6 +192,20 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
         obscure = true,
         saving = false,
         synchronizing = false;
+    String draft() => jsonEncode([
+      firstName.text,
+      lastName.text,
+      username.text,
+      email.text,
+      phone.text,
+      password.text,
+      confirmation.text,
+      roleId,
+      scopeId,
+      facilityId,
+      active,
+    ]);
+    String? initialDraft;
     final result = await showAppFormSheet<Map<String, dynamic>>(
       context: context,
       title: editing ? 'Modifier l’utilisateur' : 'Créer un utilisateur',
@@ -214,419 +229,479 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                   : '${filteredSites.first['id']}';
             }
           }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+          initialDraft ??= draft();
+          return AppFormSheetGuard(
+            isDirty: () => draft() != initialDraft,
+            isBusy: saving || synchronizing,
             child: Form(
               key: key,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: firstName,
-                          decoration: const InputDecoration(
-                            labelText: 'Prénom *',
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: firstName,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Prénom *',
+                                  ),
+                                  validator: _required,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: lastName,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Nom *',
+                                  ),
+                                  validator: _required,
+                                ),
+                              ),
+                            ],
                           ),
-                          validator: _required,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextFormField(
-                          controller: lastName,
-                          decoration: const InputDecoration(labelText: 'Nom *'),
-                          validator: _required,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: email,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email *',
-                      prefixIcon: Icon(Icons.email_outlined),
-                    ),
-                    validator: (value) => value == null || !value.contains('@')
-                        ? 'Adresse e-mail invalide'
-                        : null,
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: username,
-                          decoration: const InputDecoration(
-                            labelText: 'Identifiant',
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: email,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              labelText: 'Email *',
+                              prefixIcon: Icon(Icons.email_outlined),
+                            ),
+                            validator: (value) =>
+                                value == null || !value.contains('@')
+                                ? 'Adresse e-mail invalide'
+                                : null,
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextFormField(
-                          controller: phone,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            labelText: 'Téléphone',
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: username,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Identifiant',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: phone,
+                                  keyboardType: TextInputType.phone,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Téléphone',
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  if (editing)
-                    InputDecorator(
-                      decoration: const InputDecoration(labelText: 'Rôle'),
-                      child: Text('${currentRole?['name'] ?? 'Rôle actuel'}'),
-                    )
-                  else
-                    DropdownButtonFormField<int>(
-                      initialValue: roleId,
-                      decoration: const InputDecoration(labelText: 'Rôle *'),
-                      items: _roles
-                          .map(
-                            (role) => DropdownMenuItem(
-                              value: role['id'] as int,
-                              child: Text('${role['name']}'),
+                          const SizedBox(height: 14),
+                          if (editing)
+                            InputDecorator(
+                              decoration: const InputDecoration(
+                                labelText: 'Rôle',
+                              ),
+                              child: Text(
+                                '${currentRole?['name'] ?? 'Rôle actuel'}',
+                              ),
+                            )
+                          else
+                            DropdownButtonFormField<int>(
+                              initialValue: roleId,
+                              decoration: const InputDecoration(
+                                labelText: 'Rôle *',
+                              ),
+                              items: _roles
+                                  .map(
+                                    (role) => DropdownMenuItem(
+                                      value: role['id'] as int,
+                                      child: Text('${role['name']}'),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) => setSheetState(() {
+                                roleId = value ?? roleId;
+                                roleCode =
+                                    '${_roles.firstWhere((item) => item['id'] == roleId)['code']}';
+                                scopeId = '';
+                                facilityId = _facilities.isEmpty
+                                    ? ''
+                                    : '${_facilities.first['id']}';
+                              }),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) => setSheetState(() {
-                        roleId = value ?? roleId;
-                        roleCode =
-                            '${_roles.firstWhere((item) => item['id'] == roleId)['code']}';
-                        scopeId = '';
-                        facilityId = _facilities.isEmpty
-                            ? ''
-                            : '${_facilities.first['id']}';
-                      }),
-                    ),
-                  const SizedBox(height: 14),
-                  if (editing)
-                    InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Périmètre actuel',
-                      ),
-                      child: Text(_currentScopeLabel(user, roleCode)),
-                    )
-                  else if (roleCode == 'project_admin')
-                    DropdownButtonFormField<String>(
-                      initialValue: scopeId.isEmpty ? null : scopeId,
-                      decoration: InputDecoration(labelText: 'Projet *'),
-                      items: scopes
-                          .map(
-                            (scope) => DropdownMenuItem(
-                              value: '${scope['id']}',
-                              child: Text(_scopeLabel(scope, roleCode)),
+                          const SizedBox(height: 14),
+                          if (editing)
+                            InputDecorator(
+                              decoration: const InputDecoration(
+                                labelText: 'Périmètre actuel',
+                              ),
+                              child: Text(_currentScopeLabel(user, roleCode)),
+                            )
+                          else if (roleCode == 'project_admin')
+                            DropdownButtonFormField<String>(
+                              initialValue: scopeId.isEmpty ? null : scopeId,
+                              decoration: InputDecoration(
+                                labelText: 'Projet *',
+                              ),
+                              items: scopes
+                                  .map(
+                                    (scope) => DropdownMenuItem(
+                                      value: '${scope['id']}',
+                                      child: Text(_scopeLabel(scope, roleCode)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) => scopeId = value ?? scopeId,
+                              validator: (value) =>
+                                  value == null || value.isEmpty
+                                  ? 'Périmètre obligatoire'
+                                  : null,
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) => scopeId = value ?? scopeId,
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Périmètre obligatoire'
-                          : null,
-                    ),
-                  if (!editing && roleCode != 'project_admin') ...[
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('facility-$facilityId'),
-                      initialValue: facilityId.isEmpty ? null : facilityId,
-                      decoration: const InputDecoration(
-                        labelText: 'Formation sanitaire *',
-                      ),
-                      items: _facilities
-                          .map(
-                            (facility) => DropdownMenuItem(
-                              value: '${facility['id']}',
-                              child: Text('${facility['name']}'),
+                          if (!editing && roleCode != 'project_admin') ...[
+                            DropdownButtonFormField<String>(
+                              key: ValueKey('facility-$facilityId'),
+                              initialValue: facilityId.isEmpty
+                                  ? null
+                                  : facilityId,
+                              decoration: const InputDecoration(
+                                labelText: 'Formation sanitaire *',
+                              ),
+                              items: _facilities
+                                  .map(
+                                    (facility) => DropdownMenuItem(
+                                      value: '${facility['id']}',
+                                      child: Text('${facility['name']}'),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) => setSheetState(() {
+                                facilityId = value ?? '';
+                                scopeId = '';
+                              }),
+                              validator: (value) =>
+                                  value == null || value.isEmpty
+                                  ? 'Formation sanitaire obligatoire'
+                                  : null,
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) => setSheetState(() {
-                        facilityId = value ?? '';
-                        scopeId = '';
-                      }),
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Formation sanitaire obligatoire'
-                          : null,
-                    ),
-                    const SizedBox(height: 14),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('site-$facilityId-$scopeId'),
-                      initialValue: scopeId.isEmpty ? null : scopeId,
-                      decoration: const InputDecoration(
-                        labelText: 'Point de dispensation *',
-                      ),
-                      items: sitesForFacility(_sites, facilityId)
-                          .where((site) => isPersistedScopeId(site['id']))
-                          .map(
-                            (site) => DropdownMenuItem(
-                              value: '${site['id']}',
-                              child: Text('${site['name']}'),
+                            const SizedBox(height: 14),
+                            DropdownButtonFormField<String>(
+                              key: ValueKey('site-$facilityId-$scopeId'),
+                              initialValue: scopeId.isEmpty ? null : scopeId,
+                              decoration: const InputDecoration(
+                                labelText: 'Point de dispensation *',
+                              ),
+                              items: sitesForFacility(_sites, facilityId)
+                                  .where(
+                                    (site) => isPersistedScopeId(site['id']),
+                                  )
+                                  .map(
+                                    (site) => DropdownMenuItem(
+                                      value: '${site['id']}',
+                                      child: Text('${site['name']}'),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) => scopeId = value ?? '',
+                              validator: (value) =>
+                                  value == null || value.isEmpty
+                                  ? 'Point de dispensation obligatoire'
+                                  : null,
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) => scopeId = value ?? '',
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Point de dispensation obligatoire'
-                          : null,
-                    ),
-                  ],
-                  if (roleCode != 'project_admin' &&
-                      persistedSitesForFacility(
-                        _sites,
-                        facilityId,
-                      ).isEmpty) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        facilityId.isEmpty
-                            ? 'Aucune formation sanitaire accessible.'
-                            : sitesForFacility(_sites, facilityId).isNotEmpty
-                            ? 'Le point de dispensation est en attente de synchronisation. Synchronisez les données avant de créer son utilisateur.'
-                            : 'Aucun point de dispensation n’est encore configuré pour cette formation sanitaire.',
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: facilityId.isEmpty || synchronizing
-                            ? null
-                            : () async {
-                                if (sitesForFacility(
-                                  _sites,
-                                  facilityId,
-                                ).isNotEmpty) {
-                                  setSheetState(() => synchronizing = true);
-                                  final report = await SyncBootstrap.syncNow();
-                                  final structures = await _structures.list(
-                                    _organizationId!,
-                                  );
-                                  final refreshedSites = _deduplicateById(
-                                    (structures['sites'] as List<dynamic>? ??
-                                            const [])
-                                        .whereType<Map>()
-                                        .map(
+                          ],
+                          if (roleCode != 'project_admin' &&
+                              persistedSitesForFacility(
+                                _sites,
+                                facilityId,
+                              ).isEmpty) ...[
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                facilityId.isEmpty
+                                    ? 'Aucune formation sanitaire accessible.'
+                                    : sitesForFacility(
+                                        _sites,
+                                        facilityId,
+                                      ).isNotEmpty
+                                    ? 'Le point de dispensation est en attente de synchronisation. Synchronisez les données avant de créer son utilisateur.'
+                                    : 'Aucun point de dispensation n’est encore configuré pour cette formation sanitaire.',
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: facilityId.isEmpty || synchronizing
+                                    ? null
+                                    : () async {
+                                        if (sitesForFacility(
+                                          _sites,
+                                          facilityId,
+                                        ).isNotEmpty) {
+                                          setSheetState(
+                                            () => synchronizing = true,
+                                          );
+                                          final report =
+                                              await SyncBootstrap.syncNow();
+                                          final structures = await _structures
+                                              .list(_organizationId!);
+                                          final refreshedSites =
+                                              _deduplicateById(
+                                                (structures['sites']
+                                                            as List<dynamic>? ??
+                                                        const [])
+                                                    .whereType<Map>()
+                                                    .map(
+                                                      (item) =>
+                                                          Map<
+                                                            String,
+                                                            dynamic
+                                                          >.from(item),
+                                                    )
+                                                    .toList(),
+                                              );
+                                          if (!sheetContext.mounted) return;
+                                          setState(
+                                            () => _sites = refreshedSites,
+                                          );
+                                          setSheetState(() {
+                                            synchronizing = false;
+                                            final available =
+                                                persistedSitesForFacility(
+                                                  refreshedSites,
+                                                  facilityId,
+                                                );
+                                            scopeId = available.isEmpty
+                                                ? ''
+                                                : '${available.last['id']}';
+                                          });
+                                          if (report.failed > 0 &&
+                                              sheetContext.mounted) {
+                                            ScaffoldMessenger.of(
+                                              sheetContext,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'La synchronisation a échoué. La donnée reste conservée pour une nouvelle tentative.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                          return;
+                                        }
+                                        final facility = _facilities.firstWhere(
                                           (item) =>
-                                              Map<String, dynamic>.from(item),
-                                        )
-                                        .toList(),
-                                  );
-                                  if (!sheetContext.mounted) return;
-                                  setState(() => _sites = refreshedSites);
-                                  setSheetState(() {
-                                    synchronizing = false;
-                                    final available = persistedSitesForFacility(
-                                      refreshedSites,
-                                      facilityId,
-                                    );
-                                    scopeId = available.isEmpty
-                                        ? ''
-                                        : '${available.last['id']}';
-                                  });
-                                  if (report.failed > 0 &&
-                                      sheetContext.mounted) {
-                                    ScaffoldMessenger.of(
-                                      sheetContext,
-                                    ).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'La synchronisation a échoué. La donnée reste conservée pour une nouvelle tentative.',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return;
-                                }
-                                final facility = _facilities.firstWhere(
-                                  (item) => '${item['id']}' == facilityId,
-                                );
-                                final saved = await showDispensingSiteFormSheet(
-                                  context: sheetContext,
-                                  organizationId: _organizationId!,
-                                  facility: facility,
-                                  service: _structures,
-                                );
-                                if (saved == null) return;
-                                final structures = await _structures.list(
-                                  _organizationId!,
-                                );
-                                final refreshedSites = _deduplicateById(
-                                  (structures['sites'] as List<dynamic>? ??
-                                          const [])
-                                      .whereType<Map>()
-                                      .map(
-                                        (item) =>
-                                            Map<String, dynamic>.from(item),
-                                      )
-                                      .toList(),
-                                );
-                                if (!sheetContext.mounted) return;
-                                setState(() => _sites = refreshedSites);
-                                setSheetState(() {
-                                  final available = persistedSitesForFacility(
-                                    refreshedSites,
-                                    facilityId,
-                                  );
-                                  scopeId = available.isEmpty
-                                      ? ''
-                                      : '${available.last['id']}';
-                                });
-                              },
-                        icon: Icon(
-                          sitesForFacility(_sites, facilityId).isNotEmpty
-                              ? Icons.sync
-                              : Icons.add_business_outlined,
-                        ),
-                        label: Text(
-                          synchronizing
-                              ? 'Synchronisation…'
-                              : sitesForFacility(_sites, facilityId).isNotEmpty
-                              ? 'Synchroniser maintenant'
-                              : 'Créer un point de dispensation',
-                        ),
+                                              '${item['id']}' == facilityId,
+                                        );
+                                        final saved =
+                                            await showDispensingSiteFormSheet(
+                                              context: sheetContext,
+                                              organizationId: _organizationId!,
+                                              facility: facility,
+                                              service: _structures,
+                                            );
+                                        if (saved == null) return;
+                                        final structures = await _structures
+                                            .list(_organizationId!);
+                                        final refreshedSites = _deduplicateById(
+                                          (structures['sites']
+                                                      as List<dynamic>? ??
+                                                  const [])
+                                              .whereType<Map>()
+                                              .map(
+                                                (item) =>
+                                                    Map<String, dynamic>.from(
+                                                      item,
+                                                    ),
+                                              )
+                                              .toList(),
+                                        );
+                                        if (!sheetContext.mounted) return;
+                                        setState(() => _sites = refreshedSites);
+                                        setSheetState(() {
+                                          final available =
+                                              persistedSitesForFacility(
+                                                refreshedSites,
+                                                facilityId,
+                                              );
+                                          scopeId = available.isEmpty
+                                              ? ''
+                                              : '${available.last['id']}';
+                                        });
+                                      },
+                                icon: Icon(
+                                  sitesForFacility(
+                                        _sites,
+                                        facilityId,
+                                      ).isNotEmpty
+                                      ? Icons.sync
+                                      : Icons.add_business_outlined,
+                                ),
+                                label: Text(
+                                  synchronizing
+                                      ? 'Synchronisation…'
+                                      : sitesForFacility(
+                                          _sites,
+                                          facilityId,
+                                        ).isNotEmpty
+                                      ? 'Synchroniser maintenant'
+                                      : 'Créer un point de dispensation',
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (!editing) ...[
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: password,
+                              obscureText: obscure,
+                              decoration: InputDecoration(
+                                labelText: 'Mot de passe',
+                                helperText:
+                                    'Laissez vide pour générer un mot de passe temporaire.',
+                                suffixIcon: IconButton(
+                                  onPressed: () =>
+                                      setSheetState(() => obscure = !obscure),
+                                  icon: Icon(
+                                    obscure
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                ),
+                              ),
+                              validator: (value) => (value ?? '').isEmpty
+                                  ? null
+                                  : PasswordPolicy.validate(value),
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: confirmation,
+                              obscureText: obscure,
+                              decoration: const InputDecoration(
+                                labelText: 'Confirmation',
+                              ),
+                              validator: (value) =>
+                                  password.text.isNotEmpty &&
+                                      value != password.text
+                                  ? 'Les mots de passe diffèrent'
+                                  : null,
+                            ),
+                          ],
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Compte actif'),
+                            value: active,
+                            onChanged: saving
+                                ? null
+                                : (value) =>
+                                      setSheetState(() => active = value),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                  if (!editing) ...[
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: password,
-                      obscureText: obscure,
-                      decoration: InputDecoration(
-                        labelText: 'Mot de passe',
-                        helperText:
-                            'Laissez vide pour générer un mot de passe temporaire.',
-                        suffixIcon: IconButton(
-                          onPressed: () =>
-                              setSheetState(() => obscure = !obscure),
-                          icon: Icon(
-                            obscure
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                  ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: AppButton.cancel(
+                            onPressed: saving
+                                ? null
+                                : () => Navigator.pop(sheetContext),
                           ),
                         ),
-                      ),
-                      validator: (value) => (value ?? '').isEmpty
-                          ? null
-                          : PasswordPolicy.validate(value),
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: confirmation,
-                      obscureText: obscure,
-                      decoration: const InputDecoration(
-                        labelText: 'Confirmation',
-                      ),
-                      validator: (value) =>
-                          password.text.isNotEmpty && value != password.text
-                          ? 'Les mots de passe diffèrent'
-                          : null,
-                    ),
-                  ],
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Compte actif'),
-                    value: active,
-                    onChanged: saving
-                        ? null
-                        : (value) => setSheetState(() => active = value),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppButton.cancel(
-                          onPressed: saving
-                              ? null
-                              : () => Navigator.pop(sheetContext),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: AppButton.save(
-                          label: editing
-                              ? 'Enregistrer'
-                              : 'Créer l’utilisateur',
-                          loading: saving,
-                          onPressed: saving
-                              ? null
-                              : () async {
-                                  if (!(key.currentState?.validate() ??
-                                      false)) {
-                                    return;
-                                  }
-                                  if (!editing &&
-                                      roleCode != 'project_admin' &&
-                                      !isPersistedScopeId(scopeId)) {
-                                    ScaffoldMessenger.of(
-                                      sheetContext,
-                                    ).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Synchronisez d’abord le point de dispensation avant de créer son utilisateur.',
-                                        ),
-                                      ),
-                                    );
-                                    return;
-                                  }
-                                  setSheetState(() => saving = true);
-                                  final payload = <String, dynamic>{
-                                    'name':
-                                        '${firstName.text.trim()} ${lastName.text.trim()}'
-                                            .trim(),
-                                    'first_name': firstName.text.trim(),
-                                    'last_name': lastName.text.trim(),
-                                    'username': username.text.trim().isEmpty
-                                        ? null
-                                        : username.text.trim(),
-                                    'email': email.text.trim(),
-                                    'phone': phone.text.trim(),
-                                    'is_active': active,
-                                    if (!editing) 'role_id': roleId,
-                                    if (!editing)
-                                      'scope_type': roleCode == 'project_admin'
-                                          ? 'project'
-                                          : 'site',
-                                    if (!editing) 'scope_id': scopeId,
-                                    if (!editing && password.text.isNotEmpty)
-                                      'password': password.text,
-                                    if (!editing && password.text.isNotEmpty)
-                                      'password_confirmation':
-                                          confirmation.text,
-                                  };
-                                  try {
-                                    final response = editing
-                                        ? await _service.update(
-                                            '${user['id']}',
-                                            payload,
-                                          )
-                                        : await _service.create(payload);
-                                    if (sheetContext.mounted) {
-                                      Navigator.pop(sheetContext, response);
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: AppButton.save(
+                            label: editing
+                                ? 'Enregistrer'
+                                : 'Créer l’utilisateur',
+                            loading: saving,
+                            onPressed: saving
+                                ? null
+                                : () async {
+                                    if (!(key.currentState?.validate() ??
+                                        false)) {
+                                      return;
                                     }
-                                  } on DioException catch (error) {
-                                    if (!sheetContext.mounted) return;
-                                    setSheetState(() => saving = false);
-                                    ScaffoldMessenger.of(
-                                      sheetContext,
-                                    ).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          error.response?.statusCode == 403
-                                              ? 'Rôle ou périmètre non autorisé.'
-                                              : _userCreationError(error),
+                                    if (!editing &&
+                                        roleCode != 'project_admin' &&
+                                        !isPersistedScopeId(scopeId)) {
+                                      ScaffoldMessenger.of(
+                                        sheetContext,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Synchronisez d’abord le point de dispensation avant de créer son utilisateur.',
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  }
-                                },
+                                      );
+                                      return;
+                                    }
+                                    setSheetState(() => saving = true);
+                                    final payload = <String, dynamic>{
+                                      'name':
+                                          '${firstName.text.trim()} ${lastName.text.trim()}'
+                                              .trim(),
+                                      'first_name': firstName.text.trim(),
+                                      'last_name': lastName.text.trim(),
+                                      'username': username.text.trim().isEmpty
+                                          ? null
+                                          : username.text.trim(),
+                                      'email': email.text.trim(),
+                                      'phone': phone.text.trim(),
+                                      'is_active': active,
+                                      if (!editing) 'role_id': roleId,
+                                      if (!editing)
+                                        'scope_type':
+                                            roleCode == 'project_admin'
+                                            ? 'project'
+                                            : 'site',
+                                      if (!editing) 'scope_id': scopeId,
+                                      if (!editing && password.text.isNotEmpty)
+                                        'password': password.text,
+                                      if (!editing && password.text.isNotEmpty)
+                                        'password_confirmation':
+                                            confirmation.text,
+                                    };
+                                    try {
+                                      final response = editing
+                                          ? await _service.update(
+                                              '${user['id']}',
+                                              payload,
+                                            )
+                                          : await _service.create(payload);
+                                      if (sheetContext.mounted) {
+                                        Navigator.pop(sheetContext, response);
+                                      }
+                                    } on DioException catch (error) {
+                                      if (!sheetContext.mounted) return;
+                                      setSheetState(() => saving = false);
+                                      ScaffoldMessenger.of(
+                                        sheetContext,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            error.response?.statusCode == 403
+                                                ? 'Rôle ou périmètre non autorisé.'
+                                                : _userCreationError(error),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
