@@ -26,7 +26,7 @@ Les entrées suivantes seront ajoutées au fil des livraisons.
 | 11 | 30/09/2026 | `bce20dd`, `126aa74` | Configuration du projet (cahier des charges Mission / Projet) | AM-110 → AM-114 |
 | 12 | 30/09 → 01/10/2026 | `193a7bd` → `7c45e25` | Charte couleurs et typographie (lot a), corrections de recette | AM-160 |
 | 13 | 01/10/2026 | `a3db199` | Configuration Mission : Créer un projet et Comptes de la Coordination | AM-170, AM-171 |
-| 14 | 01/10/2026 | voir lot | Structure Admin Projet et masquage des fonctions EN TROP (lot b) | AM-161 |
+| 14 | 01/10/2026 | `bc38cba` | Structure Admin Projet et masquage des fonctions EN TROP (lot b) | AM-161 |
 
 ---
 
