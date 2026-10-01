@@ -25,7 +25,7 @@ Les entrées suivantes seront ajoutées au fil des livraisons.
 | 10 | 30/09/2026 | `bbbf9f1` → `d42c7ea` | Stabilisation : tests au vert, commit de la refonte | AM-101, AM-102 |
 | 11 | 30/09/2026 | `bce20dd`, `126aa74` | Configuration du projet (cahier des charges Mission / Projet) | AM-110 → AM-114 |
 | 12 | 30/09 → 01/10/2026 | `193a7bd` → `7c45e25` | Charte couleurs et typographie (lot a), corrections de recette | AM-160 |
-| 13 | 01/10/2026 | voir lot | Configuration Mission : Créer un projet et Comptes de la Coordination | AM-170, AM-171 |
+| 13 | 01/10/2026 | `a3db199` | Configuration Mission : Créer un projet et Comptes de la Coordination | AM-170, AM-171 |
 
 ---
 
