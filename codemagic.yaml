@@ -1,0 +1,57 @@
+# PharmaCare — compilation iOS sur Codemagic (préparée, NON activée).
+#
+# Ce fichier n'a aucun effet tant que le dépôt n'est pas connecté à Codemagic.
+# Avant la première compilation :
+#   1. Compte Apple Developer actif (organisation, D-U-N-S).
+#   2. Dans App Store Connect : créer l'app avec l'identifiant org.sagastock.sagastockMobile
+#      (ou celui que vous choisirez — il ne peut plus changer après publication).
+#   3. Dans Codemagic > Teams > Integrations : ajouter la clé API App Store Connect
+#      sous le nom « pharmacare_asc » (aucune clé n'est écrite dans ce fichier).
+#   4. Dans Codemagic > Environment variables : groupe « pharmacare_ios » avec
+#      API_BASE_URL (adresse du serveur de test ou de production).
+# Rien n'est publié automatiquement : `submit_to_testflight` reste à false.
+
+workflows:
+  ios-test:
+    name: iOS — build de test (TestFlight désactivé)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    working_directory: mobile
+    integrations:
+      app_store_connect: pharmacare_asc
+    environment:
+      flutter: 3.41.6
+      xcode: latest
+      cocoapods: default
+      groups:
+        - pharmacare_ios
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: org.sagastock.sagastockMobile
+    triggering:
+      # Lancement manuel uniquement : aucun build à chaque commit.
+      events: []
+    scripts:
+      - name: Dépendances
+        script: flutter pub get
+      - name: Analyse et tests
+        script: |
+          flutter analyze
+          flutter test
+      - name: Signature
+        script: xcode-project use-profiles
+      - name: Pods
+        script: cd ios && pod install
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --dart-define=APP_ENV=staging \
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false

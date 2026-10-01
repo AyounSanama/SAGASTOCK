@@ -71,6 +71,17 @@ $queries = [
         FROM prescriptions
         WHERE status = 'validated' AND validated_by IS NULL AND validated_at IS NULL
         SQL,
+    'R5 — Comptes dont le périmètre ne correspond pas au rôle (plateforme hors Admin Sago, comptes FOSA hors site)' => <<<'SQL'
+        SELECT u.name AS nom, u.email, r.code AS role, ru.scope_type AS perimetre,
+               CASE WHEN u.is_active = 1 THEN 'actif' ELSE 'inactif' END AS etat,
+               CASE WHEN u.deleted_at IS NULL THEN 'non' ELSE 'oui' END AS archive
+        FROM role_user ru
+        JOIN users u ON u.id = ru.user_id
+        JOIN roles r ON r.id = ru.role_id
+        WHERE (ru.scope_type = 'platform' AND r.code NOT IN ('sago_admin', 'owner', 'platform_owner'))
+           OR (r.code IN ('site_admin', 'site_user', 'facility_manager', 'pharmacist', 'clinician', 'supervisor') AND ru.scope_type <> 'site')
+        ORDER BY r.code, u.name
+        SQL,
 ];
 
 foreach ($queries as $title => $sql) {

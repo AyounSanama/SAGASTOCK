@@ -31,6 +31,8 @@ Mis à jour le 30/09/2026. Source principale :
 | AM-160 | P1 | UI | Charte couleurs et typographie Web + mobile (lot a, audit `06`) | **Livrée** (01/10) | — |
 | AM-161 | P1 | UI | Structure commune Admin Projet : menu 4 entrées, barre supérieure, navigation mobile, masquages V1 (lot b) | **En recette** (01/10) | AM-160 |
 | AM-162 | P1 | STRUCT | Fiche FOSA complète : statut de validation, classification issue de la configuration, approvisionnement (DEC-08), Liste Standard FOSA, comptes FOSA après validation (lot c1) | En recette (registre lot 15) ; tableau de bord et export Excel reportés au lot c2 | AM-161 |
+| AM-172 | P1 | UI | « Ma Coordination » (maquettes 01–06) et tableau de bord de la Coordination (maquettes 07–08), couleur d'état violette (lot c1-bis) | Validée | AM-162 |
+| AM-177 | P1 | UI | Mode clair / sombre / système, Web et mobile, préférence dans le profil ; page de comparaison des couleurs à valider d'abord | Validée le 01/10 (remplace le masquage) | AM-172 |
 | AM-163 | P1 | UI | Écrans Web Admin Projet 01–04 (lot c2) | Validée | AM-162 |
 | AM-164 | P1 | UI | Écrans mobiles Admin Projet 05–08, tablette (lot c3) | Validée | AM-162 |
 | AM-165 | P1 | SYNC | Hors ligne Admin Projet : conflits, opérations en échec, chiffrement local (lot d) | Validée (DEC-10 à préciser) | AM-164 |
