@@ -207,10 +207,11 @@ class GovernanceMatrixTest extends TestCase
         $siteMenu = collect($navigation->mobileItems(
             $this->actor('site_admin', 'site', $site->id)
         ))->pluck('key');
-        foreach (['dashboard', 'standard-lists', 'products', 'stocks', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'synchronization', 'profile'] as $key) {
+        foreach (['dashboard', 'standard-lists', 'stocks', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'synchronization', 'profile'] as $key) {
             $this->assertTrue($siteMenu->contains($key), "Site menu is missing {$key}");
         }
-        foreach (['configuration', 'organizations', 'missions', 'projects', 'funding', 'facilities', 'sites', 'users', 'inventories', 'orders', 'settings', 'project_settings', 'site_settings', 'activity_logs', 'local_activity_logs'] as $key) {
+        // Décision P-07 : menu « Produits » masqué pour les FOSA (le stock par produit reste accessible).
+        foreach (['products', 'configuration', 'organizations', 'missions', 'projects', 'funding', 'facilities', 'sites', 'users', 'inventories', 'orders', 'settings', 'project_settings', 'site_settings', 'activity_logs', 'local_activity_logs'] as $key) {
             $this->assertFalse($siteMenu->contains($key), "Site menu must not contain {$key}");
         }
 

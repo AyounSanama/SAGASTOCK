@@ -54,6 +54,19 @@ function translateText(root) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // AM-161 — Indicateur de connexion de la barre supérieure.
+    const connection = document.querySelector('[data-connection-status]');
+    const renderConnection = () => {
+        if (!connection) return;
+        const online = navigator.onLine;
+        connection.classList.toggle('is-offline', !online);
+        const label = connection.querySelector('[data-connection-label]');
+        if (label) label.textContent = window.pcTranslate ? window.pcTranslate(online ? 'En ligne' : 'Hors ligne') : (online ? 'En ligne' : 'Hors ligne');
+    };
+    window.addEventListener('online', renderConnection);
+    window.addEventListener('offline', renderConnection);
+    renderConnection();
+
     let savedTheme = 'light';
     // Mode sombre masqué en V1 : thème clair imposé, même si un choix est mémorisé.
     if (window.PC_DARK_MODE) {

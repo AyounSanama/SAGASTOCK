@@ -34,4 +34,28 @@ void main() {
       );
     },
   );
+
+  test('barre basse Admin Projet : Accueil, FOSA, Liste, Profil (AM-161)', () {
+    final items = ApplicationAccess.navigation({
+      'role': 'project_admin',
+      'permissions': [
+        'project.view',
+        'health_facilities.view',
+        'users.view',
+        'standard_lists.view',
+      ],
+      'navigation': [
+        {'key': 'dashboard', 'label': 'Tableau de bord', 'path': '/home', 'permission': null},
+        {'key': 'projects', 'label': 'Projet & FOSA', 'path': '/projects', 'permission': 'project.view'},
+        {'key': 'facilities', 'label': 'FOSA', 'path': '/health-facilities', 'permission': 'health_facilities.view'},
+        {'key': 'users', 'label': 'Équipe FOSA', 'path': '/users', 'permission': 'users.view'},
+        {'key': 'standard-lists', 'label': 'Liste standard', 'path': '/standard-lists', 'permission': 'standard_lists.view'},
+        {'key': 'profile', 'label': 'Mon profil', 'path': '/profile', 'permission': null},
+      ],
+    });
+    expect(
+      mobilePrimaryNavigation('project_admin', items).map((item) => item.key),
+      ['dashboard', 'facilities', 'standard-lists', 'profile'],
+    );
+  });
 }

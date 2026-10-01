@@ -14,9 +14,16 @@ List<ApplicationNavigationItem> mobilePrimaryNavigation(
 ) {
   final keys = switch (role) {
     'sago_admin' => const ['dashboard', 'organizations', 'history', 'profile'],
-    'coordination_admin' || 'project_admin' => const [
+    'coordination_admin' => const [
       'dashboard',
       'projects',
+      'standard-lists',
+      'profile',
+    ],
+    // AM-161 — maquette 05 : Accueil, FOSA, Liste, Profil.
+    'project_admin' => const [
+      'dashboard',
+      'facilities',
       'standard-lists',
       'profile',
     ],
@@ -274,6 +281,7 @@ class _NavigationItem extends StatelessWidget {
     'dashboard' => 'Accueil',
     'projects' => item.label == 'Mon projet' ? 'Mon projet' : 'Projets',
     'standard-lists' => 'Liste standard',
+    'facilities' => 'FOSA',
     'profile' => 'Mon profil',
     _ => item.label,
   };

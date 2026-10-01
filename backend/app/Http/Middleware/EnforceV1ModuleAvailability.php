@@ -11,19 +11,46 @@ class EnforceV1ModuleAvailability
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        // Middleware global : il s'exécute avant auth:sanctum. Sans résolution
+        // explicite du jeton, les restrictions V1 de l'API ne s'appliqueraient
+        // pas aux appels mobiles réels (les tests, via Sanctum::actingAs, ne le voyaient pas).
+        $user = $request->user() ?? ($request->bearerToken() ? $request->user('sanctum') : null);
         if (! $user) return $next($request);
 
         $role = app(GovernanceService::class)->roleCode($user);
+        $path = trim($request->path(), '/');
+
+        // Fonctions masquées en V1 pour tous les rôles (code conservé).
+        if (! config('pharmacare_v1.features.clinical_validation')
+            && preg_match('#^(?:api/v1/)?organizations/[^/]+/prescriptions/[^/]+/validate$#', $path)) {
+            return $this->refuse($request);
+        }
+
+        // FOSA : menu « Produits » masqué (P-07). L'API catalogue reste ouverte :
+        // le mobile en a besoin pour la dispensation, les entrées et l'inventaire.
+        if (in_array($role, [GovernanceService::SITE_ADMIN, GovernanceService::SITE_USER], true) && $path === 'products') {
+            return $this->refuse($request);
+        }
+
         if (! in_array($role, [GovernanceService::COORDINATION_ADMIN, GovernanceService::PROJECT_ADMIN], true)) {
             return $next($request);
         }
 
-        $path = trim($request->path(), '/');
+        // Admin Projet : catalogue en consultation seule (codification réservée à la Coordination).
+        if ($role === GovernanceService::PROJECT_ADMIN && ! $request->isMethodSafe()
+            && preg_match('#^(?:api/v1/)?organizations/[^/]+/catalog/(?:products|references)(?:/|$)#', $path)) {
+            return $this->refuse($request);
+        }
+
         if ($this->isInfrastructurePath($path) || $this->isAllowed($request, $role, $path)) return $next($request);
 
+        return $this->refuse($request);
+    }
+
+    private function refuse(Request $request): Response
+    {
         $message = 'Ce module n’est pas disponible dans la version de test actuelle de PharmaCare.';
-        return $request->expectsJson()
+        return $request->expectsJson() || $request->is('api/*')
             ? response()->json(['message' => $message, 'code' => 'module_not_available_v1'], 403)
             : response()->view('errors.403', ['message' => $message], 403);
     }

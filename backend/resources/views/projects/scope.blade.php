@@ -5,6 +5,7 @@
 <x-app-page-header :title="$projectMode ? 'Mon projet' : 'Configuration des projets'" :description="$projectMode ? 'Consultez les informations et paramètres autorisés du projet qui vous est affecté.' : 'Gérez les projets de votre coordination, leurs responsables, leurs bailleurs et leur configuration.'">
  <x-slot:actions>@if($canCreateProject)<a class="app-button app-button--secondary" href="{{ route('modules.funding') }}">Bailleurs &amp; Programmes</a><x-app-button type="button" icon="add" data-sheet-open="project-create-sheet">Créer un projet</x-app-button>@endif</x-slot:actions>
 </x-app-page-header>
+@if($projectMode)@include('projects.partials.project-admin-tabs', ['activeTab' => 'project'])@endif
 @unless($projectMode)
  @include('projects.partials.configuration-tabs', ['activeTab' => 'projects'])
 @endunless

@@ -52,8 +52,8 @@
                 </div>
             @else
                 @foreach ($navigationItems as $item)
-                    @continue(!$item['url'] || $item['key'] === 'profile')
-                    @php($active = request()->routeIs($item['route']) || request()->routeIs($item['route'] . '*') || ($item['key'] === 'projects' && request()->routeIs('modules.funding')))
+                    @continue(!$item['url'] || $item['key'] === 'profile' || ! ($item['menu'] ?? true))
+                    @php($active = request()->routeIs($item['route']) || request()->routeIs($item['route'] . '*') || ($item['key'] === 'projects' && request()->routeIs('modules.funding')) || (! empty($item['active_routes']) && request()->routeIs(...$item['active_routes'])))
                     <a class="{{ $active ? 'active' : '' }}" href="{{ $item['url'] }}">
                         <span class="nav-icon material-symbols-outlined">{{ $materialIcons[$item['icon']] ?? 'circle' }}</span>
                         <span class="nav-text">{{ __($item['label']) }}</span>
@@ -63,6 +63,14 @@
         </nav>
     </div>
 
+    @php($sidebarContext = $actor ? app(\App\Services\ApplicationNavigationService::class)->context($actor) : [])
+    @if(! $isSagoAdmin && ! empty($sidebarContext['coordination']))
+    <div class="app-sidebar-context">
+        <small>{{ __('Coordination') }}</small>
+        <strong>{{ $sidebarContext['coordination'] }}</strong>
+        @if(! empty($sidebarContext['country']))<span>{{ $sidebarContext['country'] }}</span>@endif
+    </div>
+    @endif
     <div class="app-account">
         <a class="app-account-profile {{ request()->routeIs('profile.*') ? 'active' : '' }}" href="{{ route('profile.show') }}"><span class="material-symbols-outlined">person</span><span class="nav-text">{{ __('Mon profil') }}</span></a>
         <form method="post" action="{{ route('logout') }}">

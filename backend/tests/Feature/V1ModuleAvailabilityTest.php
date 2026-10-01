@@ -33,7 +33,9 @@ class V1ModuleAvailabilityTest extends TestCase
 
         $projectItems = collect($navigation->items($project));
         $this->assertSame(['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'profile'], $projectItems->pluck('key')->all());
-        $this->assertSame(['Tableau de bord', 'Mon projet', 'Formations sanitaires', 'Équipe FOSA', 'Liste standard', 'Mon profil'], $projectItems->pluck('label')->all());
+        $this->assertSame(['Tableau de bord', 'Projet & FOSA', 'FOSA', 'Équipe FOSA', 'Liste standard', 'Mon profil'], $projectItems->pluck('label')->all());
+        // Menu V1 (Q-3) : 4 entrées ; FOSA et Comptes deviennent des onglets de « Projet & FOSA ».
+        $this->assertSame(['dashboard', 'projects', 'standard-lists', 'profile'], $projectItems->where('menu', true)->pluck('key')->values()->all());
     }
 
     public function test_hidden_v1_modules_are_refused_without_being_removed(): void

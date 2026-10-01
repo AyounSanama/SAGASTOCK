@@ -143,7 +143,9 @@ class DispensationController extends Controller
             $model = Prescription::create([...collect($data)->except(['items', 'attachment'])->all(), 'attachment_path' => $attachment,
                 'attachment_original_name' => null, 'attachment_mime_type' => $attachmentFile?->getMimeType(),
                 'attachment_size' => $attachmentFile?->getSize(), 'attachment_captured_at' => $attachmentFile ? now() : null,
-                'organization_id' => $organization->id, 'patient_id' => $patient->id, 'site_id' => $site->id, 'created_by' => $request->user()->id]);
+                'organization_id' => $organization->id, 'patient_id' => $patient->id, 'site_id' => $site->id, 'created_by' => $request->user()->id,
+                // Validation clinique masquée en V1 (C-07) : l'ordonnance est directement dispensable.
+                'status' => config('pharmacare_v1.features.clinical_validation') ? 'draft' : 'validated']);
             foreach ($data['items'] as $row) $model->items()->create([...$row, 'substitution_authorized' => (bool) ($row['substitution_authorized'] ?? false)]);
             return $model;
         });
@@ -215,7 +217,7 @@ class DispensationController extends Controller
             'offline_uuid' => ['nullable', 'uuid'], 'reference' => ['required', 'max:80', Rule::unique('dispensations')->where('organization_id', $organization->id)],
             'patient_id' => ['required', 'uuid'], 'prescription_id' => ['nullable', 'uuid'], 'site_id' => ['required', 'uuid'],
             'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
-            'destination_type' => ['nullable', Rule::in(['patient', 'hospital_service', 'community', 'other'])], 'destination_name' => ['nullable', 'string', 'max:190'],
+            'destination_type' => ['nullable', Rule::in(array_values(array_filter(['patient', 'hospital_service', config('pharmacare_v1.features.community_dispensation') ? 'community' : null, 'other'])))], 'destination_name' => ['nullable', 'string', 'max:190'],
             'allow_partial' => ['nullable', 'boolean'], 'dispensed_at' => ['required', 'date', 'before_or_equal:now'], 'notes' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'], 'items.*.prescription_item_id' => ['nullable', 'uuid'],
             'items.*.product_id' => ['required', 'uuid'], 'items.*.quantity' => ['required', 'numeric', 'gt:0'],

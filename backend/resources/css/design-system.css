@@ -234,3 +234,24 @@ body.pc-app :is([data-toggle="password"],[data-password-toggle]) { background:tr
 body.pc-app :is([data-toggle="password"],[data-password-toggle]):hover { background:var(--pc-color-background)!important; color:var(--pc-color-text)!important; }
 /* Encarts d’aide dans un formulaire : information. Les confirmations (.notice hors formulaire) restent en succès. */
 body.pc-app form :is(.notice,.message):not(.error):not(.success) { background:var(--pc-status-info-bg)!important; color:var(--pc-status-info-text)!important; border-color:var(--pc-status-info-bg)!important; }
+/* AM-161 — Onglets « Projet & FOSA » de l'Admin Projet (soulignement de marque). */
+.project-admin-tabs { display:flex; gap:4px; margin:0 0 18px; padding:0; border:0; border-bottom:1px solid var(--pc-color-border); border-radius:0; background:transparent; box-shadow:none; overflow-x:auto; scrollbar-width:none; }
+.project-admin-tabs::-webkit-scrollbar { display:none; }
+.project-admin-tabs a { display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:0 12px; border:0; border-bottom:2px solid transparent; margin-bottom:-1px; border-radius:0; background:transparent; color:var(--pc-color-text-muted); font-size:13px; font-weight:600; white-space:nowrap; text-decoration:none; }
+.project-admin-tabs a:hover { color:var(--pc-color-text); background:transparent; }
+.project-admin-tabs a.active { color:var(--pc-color-primary-strong); border-bottom-color:var(--pc-color-primary); background:transparent; }
+.project-admin-tabs .material-symbols-outlined { font-size:18px; }
+/* AM-161 — Barre supérieure : fil d'Ariane, connexion ; encart Coordination. */
+.topbar-heading { display:grid; gap:1px; min-width:0; }
+.topbar-heading .topbar-context { line-height:1.2; }
+.topbar-breadcrumb { display:flex; flex-wrap:wrap; gap:4px; font-size:11px; color:var(--pc-color-text-muted); min-width:0; }
+.topbar-breadcrumb span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
+.topbar-breadcrumb span + span::before { content:"/"; margin-right:4px; color:var(--pc-color-border); }
+.topbar-connection { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; border-radius:999px; font-size:11px; font-weight:600; background:var(--pc-status-success-bg); color:var(--pc-status-success-text); white-space:nowrap; }
+.topbar-connection-dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+.topbar-connection.is-offline { background:var(--pc-status-info-bg); color:var(--pc-status-info-text); }
+.app-sidebar-context { margin:0 12px 10px; padding:10px 12px; border-radius:10px; background:var(--pc-color-sidebar-hover); color:var(--pc-color-sidebar-text); display:grid; gap:2px; font-size:12px; }
+.app-sidebar-context small { font-size:10px; text-transform:uppercase; letter-spacing:.06em; opacity:.8; }
+.app-sidebar-context strong { color:#FFFFFF; font-size:13px; font-weight:600; }
+.sidebar-collapsed .app-sidebar-context { display:none; }
+@media (max-width:760px) { .topbar-breadcrumb, .topbar-connection [data-connection-label], .topbar-profile-copy { display:none; } .topbar-connection { padding:0 8px; } }

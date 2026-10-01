@@ -73,8 +73,15 @@ class ApplicationNavigationService
                     $item['label'] = 'Configuration des projets';
                 }
                 if ($role === GovernanceService::PROJECT_ADMIN && $item['key'] === 'projects') {
-                    $item['label'] = 'Mon projet';
+                    $item['label'] = 'Projet & FOSA';
+                    // Onglets FOSA et Comptes utilisateurs de « Projet & FOSA ».
+                    $item['active_routes'] = ['modules.projects', 'modules.health-facilities', 'users.*'];
                 }
+                if ($role === GovernanceService::PROJECT_ADMIN && $item['key'] === 'facilities') {
+                    $item['label'] = 'FOSA';
+                }
+                $menu = config("pharmacare_v1.menu.$role");
+                $item['menu'] = $menu === null || in_array($item['key'], $menu, true);
                 if ($role === GovernanceService::PROJECT_ADMIN && $item['key'] === 'standard-lists') {
                     $item['label'] = 'Liste standard';
                 }
@@ -102,7 +109,7 @@ class ApplicationNavigationService
             ],
             GovernanceService::SITE_ADMIN,
             GovernanceService::SITE_USER => [
-                'dashboard', 'standard-lists', 'products', 'stocks', 'receipts', 'dispensing',
+                'dashboard', 'standard-lists', 'stocks', 'receipts', 'dispensing',
                 'inventory-orders', 'reports', 'synchronization', 'profile',
             ],
             default => null,
@@ -141,6 +148,41 @@ class ApplicationNavigationService
             'sites.manage' => 'structures.manage',
             default => $permission,
         };
+    }
+
+    /**
+     * AM-161 — Fil d'Ariane ONG / Coordination / Projet / FOSA du compte.
+     *
+     * @return array{organization: ?string, coordination: ?string, country: ?string, project: ?string, facility: ?string}
+     */
+    public function context(User $user): array
+    {
+        // Menu latéral et barre supérieure le demandent sur la même page.
+        static $cache = null;
+        $cache ??= new \WeakMap();
+        if (isset($cache[$user])) {
+            return $cache[$user];
+        }
+        $scopes = app(UserScopeService::class);
+        $role = app(GovernanceService::class)->roleCode($user);
+        $project = in_array($role, [GovernanceService::PROJECT_ADMIN], true)
+            ? \App\Models\Project::with('mission.country')->whereIn('id', $scopes->projectIds($user))->orderBy('name')->first()
+            : null;
+        $site = in_array($role, [GovernanceService::SITE_ADMIN, GovernanceService::SITE_USER], true)
+            ? \App\Models\Site::with('healthFacility.mission.country', 'healthFacility.projects')->whereIn('id', $scopes->siteIds($user))->first()
+            : null;
+        $mission = $project?->mission ?? $site?->healthFacility?->mission;
+        if (! $mission && $role === GovernanceService::COORDINATION_ADMIN) {
+            $mission = \App\Models\Mission::with('country')->whereIn('id', $scopes->coordinationMissionIds($user))->first();
+        }
+
+        return $cache[$user] = [
+            'organization' => $role === GovernanceService::SAGO_ADMIN ? null : $user->organization?->name,
+            'coordination' => $mission?->name,
+            'country' => $mission?->country?->name,
+            'project' => $project?->name ?? $site?->healthFacility?->projects->first()?->name,
+            'facility' => $site?->healthFacility?->name,
+        ];
     }
 
     public function mobileItems(User $user): array

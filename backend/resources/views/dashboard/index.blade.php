@@ -236,7 +236,7 @@
             href="{{ route('security.index') }}">Rôles et sécurité</a><a href="{{ route('profile.show') }}">Mon profil</a>
         <form method="post" action="{{ route('logout') }}">@csrf<button class="secondary">Déconnexion</button></form>
     </header>
-    <main>
+    <main>@if(app(\App\Services\GovernanceService::class)->roleCode(auth()->user()) === \App\Services\GovernanceService::PROJECT_ADMIN)@include('projects.partials.project-admin-tabs', ['activeTab' => 'users'])@endif
         <h1>Gestion des utilisateurs</h1>
         <h3 class="muted">Gérez les utilisateurs, leurs rôles et leurs niveaux d’accès.</h3>
         @if (session('success'))

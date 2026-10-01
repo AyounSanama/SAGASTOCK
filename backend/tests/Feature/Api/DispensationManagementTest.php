@@ -19,6 +19,14 @@ class DispensationManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Validation clinique masquée en V1 (C-07) mais conservée pour la V4 :
+        // ces tests continuent de couvrir le code en réactivant la fonction.
+        config(['pharmacare_v1.features.clinical_validation' => true]);
+    }
+
     private function context(): array
     {
         $organization = Organization::create(['code' => 'CARE', 'name' => 'PharmaCare ONG']);

@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
+import '../../../core/config/app_config.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'dart:typed_data';
@@ -346,7 +348,7 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
                         '${(p['items'] as List? ?? []).length} produit(s) · ${p['prescriber_name']}',
                         style: const TextStyle(color: AppTheme.muted),
                       ),
-                      if (draft) ...[
+                      if (draft && AppConfig.clinicalValidation) ...[
                         const SizedBox(height: 10),
                         AppButton.validate(
                           label: 'Valider l’ordonnance',

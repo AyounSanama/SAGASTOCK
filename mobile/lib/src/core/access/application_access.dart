@@ -308,6 +308,7 @@ abstract final class ApplicationAccess {
                 : role == 'project_admin'
                 ? switch (raw['key']) {
                     'projects' => 'Mon projet',
+                    'facilities' => 'FOSA',
                     'standard-lists' => 'Liste standard',
                     'users' => 'Équipe FOSA',
                     _ => raw['label']?.toString() ?? '',

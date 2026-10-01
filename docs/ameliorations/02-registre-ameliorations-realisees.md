@@ -26,6 +26,7 @@ Les entrées suivantes seront ajoutées au fil des livraisons.
 | 11 | 30/09/2026 | `bce20dd`, `126aa74` | Configuration du projet (cahier des charges Mission / Projet) | AM-110 → AM-114 |
 | 12 | 30/09 → 01/10/2026 | `193a7bd` → `7c45e25` | Charte couleurs et typographie (lot a), corrections de recette | AM-160 |
 | 13 | 01/10/2026 | `a3db199` | Configuration Mission : Créer un projet et Comptes de la Coordination | AM-170, AM-171 |
+| 14 | 01/10/2026 | voir lot | Structure Admin Projet et masquage des fonctions EN TROP (lot b) | AM-161 |
 
 ---
 
@@ -208,6 +209,20 @@ Source : captures « Configuration Mission » validées par le porteur.
 - La Coordination ne peut plus créer de comptes de formation sanitaire (Admin Site) ; le Projet le fait (Équipe FOSA).
 - Un projet ne peut plus être rattaché à plusieurs bailleurs : un projet existant qui en a plusieurs devra n'en garder qu'un à sa prochaine modification.
 - Six tests existants encodaient l'ancienne règle (« la Coordination ne crée pas de comptes ») ; ils sont mis à jour selon la spécification validée, sans relâcher les autres contrôles.
+
+## Lot 14 — Structure Admin Projet et masquages V1 (lot b) · 01/10/2026
+
+Source : audit `07` (section 2) et décisions du 01/10.
+
+| Élément | Réalisation |
+|---|---|
+| Menu Admin Projet (Q-3) | 4 entrées : Tableau de bord, Projet & FOSA, Liste standard, Profil. FOSA et Comptes utilisateurs deviennent des onglets (routes conservées). Mobile : barre basse Accueil, FOSA, Liste, Profil. |
+| Barre supérieure | Fil d'Ariane ONG / Coordination / Projet (ou FOSA), indicateur En ligne / Hors ligne, initiales sur deux lettres ; encart Coordination en bas du menu latéral. |
+| EN TROP masqués | Onglets du catalogue sur la Liste Standard (rôles V1) ; filtres Organisation et Mission des FOSA (Admin Projet) ; écriture du catalogue produits et des référentiels pour l'Admin Projet (API refusée) ; menu et page « Produits » des FOSA (API catalogue conservée pour le mobile) ; validation clinique des ordonnances (V4) ; destination « Communauté » (historique visible). |
+| Validation clinique masquée | Les ordonnances sont créées « validées », ce qui les rend directement dispensables. Les tests du code conservé réactivent la fonction. |
+| **Correction de sécurité** | Le middleware V1 est global et s'exécutait avant l'authentification Sanctum. Sur un vrai appel mobile avec jeton, **les restrictions V1 de l'API ne s'appliquaient pas** (les tests ne le voyaient pas, car `Sanctum::actingAs` authentifie avant). Le jeton est maintenant résolu explicitement ; un test utilise un vrai jeton. |
+
+Tests : `V1AdminProjectStructureAndMaskingTest` (6), `mobile_navigation_test` ; tests existants alignés sur Q-3 et P-07.
 
 ## Modèle d'entrée pour les prochaines livraisons
 

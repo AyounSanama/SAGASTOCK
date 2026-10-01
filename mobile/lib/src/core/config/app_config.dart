@@ -11,7 +11,7 @@ abstract final class AppConfig {
   );
   static const _developmentBaseUrl = String.fromEnvironment(
     'DEVELOPMENT_API_BASE_URL',
-    defaultValue: 'http://192.168.137.1:8000/api/v1',
+    defaultValue: 'http://192.168.137.234:8000/api/v1',
   );
   static const _stagingBaseUrl = String.fromEnvironment(
     'STAGING_API_BASE_URL',
@@ -20,6 +20,11 @@ abstract final class AppConfig {
   static const _productionBaseUrl = String.fromEnvironment(
     'PRODUCTION_API_BASE_URL',
     defaultValue: '',
+  );
+
+  /// Validation clinique des ordonnances : masquée en V1, prévue en V4 (C-07).
+  static const clinicalValidation = bool.fromEnvironment(
+    'FEATURE_CLINICAL_VALIDATION',
   );
 
   /// Adresse saisie sur l'écran « Paramètres serveur » (tests uniquement),
