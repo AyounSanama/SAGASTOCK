@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../features/auth/presentation/change_password_page.dart';
 import '../../features/auth/presentation/forgot_password_page.dart';
 import '../../features/auth/presentation/login_page.dart';
+import '../../features/auth/presentation/server_settings_page.dart';
+import '../config/app_config.dart';
 import '../../features/auth/presentation/profile_page.dart';
 import '../../features/auth/presentation/reset_password_page.dart';
 import '../../features/configuration/presentation/configuration_page.dart';
@@ -43,6 +45,7 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
       '/login',
       '/forgot-password',
       '/reset-password',
+      if (AppConfig.runtimeOverrideAllowed) '/server-settings',
     }.contains(state.uri.path);
     final auth = AuthService();
     final hasSession = await auth.hasSession();
@@ -62,6 +65,11 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
   },
   routes: [
     GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+    if (AppConfig.runtimeOverrideAllowed)
+      GoRoute(
+        path: '/server-settings',
+        builder: (context, state) => const ServerSettingsPage(),
+      ),
     GoRoute(
       path: '/forgot-password',
       builder: (context, state) => const ForgotPasswordPage(),

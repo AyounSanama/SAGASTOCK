@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/access/application_access.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/localization/app_locale.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_text_field.dart';
@@ -43,6 +45,7 @@ class _LoginPageState extends State<LoginPage> {
         password: _password.text,
       );
       if (mounted) {
+        AppLocale.apply('${user['preferred_locale'] ?? 'fr'}');
         context.go(ApplicationAccess.landingPath(user));
       }
     } catch (error) {
@@ -76,9 +79,12 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 2),
                       const PharmaCareWordmark(fontSize: 26),
-                      const Text(
-                        'Putting Patients at the Heart of Every Supply.',
-                        textAlign: TextAlign.center,
+                      ValueListenableBuilder<String>(
+                        valueListenable: AppLocale.preferredCode,
+                        builder: (context, _, _) => Text(
+                          AppLocale.tagline,
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       AppTextField(
@@ -155,6 +161,16 @@ class _LoginPageState extends State<LoginPage> {
                         expanded: true,
                         onPressed: _submit,
                       ),
+                      // Builds de test : adresse du serveur modifiable.
+                      if (AppConfig.runtimeOverrideAllowed)
+                        Center(
+                          child: AppButton.text(
+                            compact: true,
+                            label: 'Paramètres serveur',
+                            icon: Icons.dns_outlined,
+                            onPressed: () => context.push('/server-settings'),
+                          ),
+                        ),
                     ],
                   ),
                 ),

@@ -9,6 +9,7 @@ import 'src/core/access/application_access.dart';
 import 'src/features/auth/data/auth_service.dart';
 import 'src/core/sync/sync_bootstrap.dart';
 import 'src/core/localization/app_locale.dart';
+import 'src/core/config/server_settings.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,8 @@ Future<void> main() async {
 }
 
 Future<String> _resolveInitialLocation() async {
+  await AppLocale.restore();
+  await ServerSettings.load();
   try {
     final service = AuthService();
     final hasSession = await service.hasSession();

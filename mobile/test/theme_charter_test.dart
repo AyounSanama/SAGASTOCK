@@ -131,7 +131,12 @@ void main() {
   });
 
   testWidgets('capture de la charte mobile', (tester) async {
-    if (_capture) await _loadFonts();
+    if (_capture) {
+      await _loadFonts();
+      // Par défaut, flutter_test remplace les ombres par un contour noir
+      // (debugDisableShadows) : ombres réelles pour une capture fidèle.
+      debugDisableShadows = false;
+    }
     final key = GlobalKey();
     tester.view.physicalSize = const Size(390 * 2, 844 * 2);
     tester.view.devicePixelRatio = 2;
@@ -155,6 +160,9 @@ void main() {
       await file.parent.create(recursive: true);
       await file.writeAsBytes(bytes!.buffer.asUint8List());
     });
+    // Rétabli dans le corps du test : le framework vérifie cette variable
+    // avant les tearDown.
+    debugDisableShadows = true;
   });
 }
 
