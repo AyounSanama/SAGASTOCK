@@ -10,9 +10,11 @@
                 <button class="topbar-locale-option {{ app()->getLocale() === $locale ? 'is-active' : '' }}" type="submit" name="locale" value="{{ $locale }}" aria-pressed="{{ app()->getLocale() === $locale ? 'true' : 'false' }}">{{ $label }}</button>
             @endforeach
         </form>
+        @if(config('pharmacare_v1.features.dark_mode'))
         <button class="topbar-theme-toggle" type="button" data-theme-toggle aria-label="{{ __('ui.enable_dark_mode') }}" title="{{ __('ui.enable_dark_mode') }}">
             <span class="material-symbols-outlined" data-theme-icon aria-hidden="true">dark_mode</span>
         </button>
+        @endif
     </div>
     @include('components.notification-center')
     <details class="profile-menu">

@@ -51,3 +51,21 @@ suivie d'une actualisation, et l'ouverture du formulaire Projet. Les captures
 et mesures sont enregistrées dans `.tmp/ui-screenshots` et
 `.tmp/ui-browser-results.json`. Le cycle métier inventaire → notification →
 lecture est vérifié séparément par `InventoryManagementTest`.
+
+## Serveur de démonstration sur le réseau local (PC + téléphone)
+
+Sert l'application sur `http://192.168.137.1:8000` avec la base isolée
+`.tmp/pharmacare-stabilisation-browser.sqlite` (jamais la base de `.env`). Les
+variables d'environnement imposées (base, file `sync`, e-mails en journal) sont
+prioritaires sur `.env`. Le processus reste actif après la fermeture du terminal.
+
+```powershell
+npm --prefix backend run build
+& .\backend\tests\Browser\serve-demo.ps1    # démarrer
+& .\backend\tests\Browser\stop-demo.ps1     # arrêter
+```
+
+Comptes de démonstration : `project_admin@ui.example`, `coordination_admin@ui.example`,
+`site_admin@ui.example`, `site_user@ui.example` (mot de passe `UiBrowser123!`).
+Le téléphone doit être connecté au point d'accès du PC ; le pare-feu Windows doit
+autoriser le port 8000 en entrée.

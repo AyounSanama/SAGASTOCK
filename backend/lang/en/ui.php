@@ -1,6 +1,17 @@
 <?php
 
 return [
+    'tagline' => 'Putting Patients at the Heart of Every Supply.',
+    'auth' => [
+        'page_title' => 'Sign in',
+        'login' => 'Email address or username',
+        'password' => 'Password',
+        'remember' => 'Keep me signed in',
+        'forgot' => 'Forgot password?',
+        'submit' => 'Sign in',
+        'show_password' => 'Show password',
+        'hide_password' => 'Hide password',
+    ],
     'texts' => [
         'Tableau de bord' => 'Dashboard',
         'Missions' => 'Missions',

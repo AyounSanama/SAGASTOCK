@@ -10,7 +10,8 @@
     <script>
         (() => {
             try {
-                if (localStorage.getItem('pc-theme') === 'dark') document.documentElement.dataset.theme = 'dark';
+                window.PC_DARK_MODE = @json((bool) config('pharmacare_v1.features.dark_mode'));
+                if (window.PC_DARK_MODE && localStorage.getItem('pc-theme') === 'dark') document.documentElement.dataset.theme = 'dark';
             } catch (_) {}
         })();
         window.PC_I18N = {

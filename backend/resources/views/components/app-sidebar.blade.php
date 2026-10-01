@@ -19,7 +19,7 @@
              alt="Logo PharmaCare" width="48" height="48">
         <span class="app-brand-copy">
             <strong><span class="brand-pharma">Pharma</span><span class="brand-care">Care</span></strong>
-            <small>Putting Patients at the Heart of Every Supply.</small>
+            <small>{{ __('ui.tagline') }}</small>
         </span>
     </a>
 

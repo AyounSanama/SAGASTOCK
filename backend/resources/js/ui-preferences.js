@@ -55,7 +55,10 @@ function translateText(root) {
 
 document.addEventListener('DOMContentLoaded', () => {
     let savedTheme = 'light';
-    try { savedTheme = localStorage.getItem(themeKey) || 'light'; } catch (_) {}
+    // Mode sombre masqué en V1 : thème clair imposé, même si un choix est mémorisé.
+    if (window.PC_DARK_MODE) {
+        try { savedTheme = localStorage.getItem(themeKey) || 'light'; } catch (_) {}
+    }
     applyTheme(savedTheme);
 
     document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {

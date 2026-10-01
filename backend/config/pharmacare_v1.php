@@ -1,6 +1,10 @@
 <?php
 
 return [
+    // Fonctions masquées en V1 (le code est conservé).
+    'features' => [
+        'dark_mode' => false,
+    ],
     'navigation' => [
         'coordination_admin' => ['dashboard', 'missions', 'projects', 'standard-lists', 'profile'],
         'project_admin' => ['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'profile'],
