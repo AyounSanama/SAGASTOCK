@@ -144,8 +144,8 @@ class DispensationController extends Controller
                 'attachment_original_name' => null, 'attachment_mime_type' => $attachmentFile?->getMimeType(),
                 'attachment_size' => $attachmentFile?->getSize(), 'attachment_captured_at' => $attachmentFile ? now() : null,
                 'organization_id' => $organization->id, 'patient_id' => $patient->id, 'site_id' => $site->id, 'created_by' => $request->user()->id,
-                // Validation clinique masquée en V1 (C-07) : l'ordonnance est directement dispensable.
-                'status' => config('pharmacare_v1.features.clinical_validation') ? 'draft' : 'validated']);
+                // Validation clinique masquée en V1 (C-07) : statut distinct, jamais « validée ».
+                'status' => config('pharmacare_v1.features.clinical_validation') ? 'draft' : Prescription::STATUS_VALIDATION_NOT_REQUIRED]);
             foreach ($data['items'] as $row) $model->items()->create([...$row, 'substitution_authorized' => (bool) ($row['substitution_authorized'] ?? false)]);
             return $model;
         });
@@ -188,7 +188,7 @@ class DispensationController extends Controller
         $this->access($request, $organization, 'dispensations.manage');
         $sites = Site::with('healthFacility:id,name')->whereIn('id', $this->siteIds($request, $organization))->orderBy('name')->get();
         return response()->json(['sites' => $sites, 'patients' => $this->patientQuery($request, $organization)->where('is_active', true)->orderBy('last_name')->get(),
-            'prescriptions' => Prescription::with(['patient', 'items.product'])->where('organization_id', $organization->id)->whereIn('site_id', $sites->pluck('id'))->whereIn('status', ['validated', 'partially_dispensed', 'waiting_stock'])->latest('prescribed_on')->get(),
+            'prescriptions' => Prescription::with(['patient', 'items.product'])->where('organization_id', $organization->id)->whereIn('site_id', $sites->pluck('id'))->whereIn('status', Prescription::DISPENSABLE_STATUSES)->latest('prescribed_on')->get(),
             'products' => $this->allowedProducts($request, $organization)->with('codes:id,product_id,code_type,value,is_primary')->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name'])]);
     }
 
@@ -225,7 +225,7 @@ class DispensationController extends Controller
         $patient = $this->patientQuery($request, $organization)->where('is_active', true)->findOrFail($data['patient_id']);
         $site = $this->site($request, $organization, $data['site_id']);
         abort_unless($patient->site_id === null || $patient->site_id === $site->id, 422, 'Le patient appartient à une autre formation sanitaire.');
-        $prescription = empty($data['prescription_id']) ? null : Prescription::where('organization_id', $organization->id)->where('patient_id', $patient->id)->whereIn('status', ['validated', 'partially_dispensed', 'waiting_stock'])->findOrFail($data['prescription_id']);
+        $prescription = empty($data['prescription_id']) ? null : Prescription::where('organization_id', $organization->id)->where('patient_id', $patient->id)->whereIn('status', Prescription::DISPENSABLE_STATUSES)->findOrFail($data['prescription_id']);
         $allowPartial = (bool) ($data['allow_partial'] ?? false);
         $attachmentFile = $request->file('attachment');
         $attachmentPath = $attachmentFile?->storeAs('private/dispensations', Str::uuid().'.'.$attachmentFile->extension());

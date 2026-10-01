@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Http\Middleware\Concerns\ResolvesAuthenticatedUser;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,6 +14,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class EnforceReadOnlyAccount
 {
+    use ResolvesAuthenticatedUser;
+
     private const ACCOUNT_PATHS = [
         'logout', 'profile', 'profile/*',
         'api/v1/auth/logout', 'api/v1/auth/password', 'api/v1/auth/locale', 'api/v1/auth/devices/*',
@@ -21,8 +24,7 @@ class EnforceReadOnlyAccount
 
     public function handle(Request $request, Closure $next): Response
     {
-        // Le groupe API s'exécute avant auth:sanctum : le jeton est résolu ici.
-        $user = $request->user() ?? ($request->bearerToken() ? $request->user('sanctum') : null);
+        $user = $this->authenticatedUser($request);
         if ($user?->read_only && ! $request->isMethodSafe() && ! $request->is(...self::ACCOUNT_PATHS)) {
             $message = 'Compte en lecture seule : cette action n’est pas autorisée.';
             if ($request->expectsJson() || $request->is('api/*')) {

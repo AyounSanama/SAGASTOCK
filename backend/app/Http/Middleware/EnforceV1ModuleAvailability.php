@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Http\Middleware\Concerns\ResolvesAuthenticatedUser;
 use App\Services\GovernanceService;
 use Closure;
 use Illuminate\Http\Request;
@@ -9,12 +10,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnforceV1ModuleAvailability
 {
+    use ResolvesAuthenticatedUser;
+
     public function handle(Request $request, Closure $next): Response
     {
-        // Middleware global : il s'exécute avant auth:sanctum. Sans résolution
-        // explicite du jeton, les restrictions V1 de l'API ne s'appliqueraient
-        // pas aux appels mobiles réels (les tests, via Sanctum::actingAs, ne le voyaient pas).
-        $user = $request->user() ?? ($request->bearerToken() ? $request->user('sanctum') : null);
+        $user = $this->authenticatedUser($request);
         if (! $user) return $next($request);
 
         $role = app(GovernanceService::class)->roleCode($user);

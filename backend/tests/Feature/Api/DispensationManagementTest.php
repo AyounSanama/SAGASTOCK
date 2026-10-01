@@ -65,6 +65,36 @@ class DispensationManagementTest extends TestCase
         ])->assertOk()->assertJsonPath('prescription.status', 'validated');
     }
 
+    public function test_v1_prescription_is_dispensable_without_claiming_a_clinical_validation(): void
+    {
+        // V1 : validation clinique masquée (C-07).
+        config(['pharmacare_v1.features.clinical_validation' => false]);
+        $c = $this->context(); $patient = $this->patient($c); $rx = $this->prescription($c, $patient);
+
+        $this->assertSame('validation_not_required', $rx['status']);
+        $this->assertDatabaseHas('prescriptions', ['id' => $rx['id'], 'status' => 'validation_not_required', 'validated_by' => null, 'validated_at' => null]);
+
+        $payload = ['offline_uuid' => fake()->uuid(), 'reference' => 'DIS-V1', 'patient_id' => $patient['id'], 'prescription_id' => $rx['id'], 'site_id' => $c['site']->id, 'dispensed_at' => now()->toISOString(), 'items' => [['prescription_item_id' => $rx['items'][0]['id'], 'product_id' => $c['product']->id, 'quantity' => 8]]];
+        $this->postJson("/api/v1/organizations/{$c['organization']->id}/dispensations", $payload)->assertCreated();
+        $this->assertDatabaseHas('prescriptions', ['id' => $rx['id'], 'status' => 'dispensed']);
+    }
+
+    public function test_fix_command_only_reclassifies_prescriptions_validated_without_a_validator(): void
+    {
+        $c = $this->context(); $patient = $this->patient($c);
+        $bypassed = $this->prescription($c, $patient, 'ORD-V1');
+        $checked = $this->prescription($c, $patient, 'ORD-PHARMA');
+        $this->approve($c, $checked);
+        \App\Models\Prescription::whereKey($bypassed['id'])->update(['status' => 'validated']);
+
+        $this->artisan('pharmacare:prescriptions:fix-v1-status', ['--dry-run' => true])->assertSuccessful();
+        $this->assertDatabaseHas('prescriptions', ['id' => $bypassed['id'], 'status' => 'validated']);
+
+        $this->artisan('pharmacare:prescriptions:fix-v1-status')->assertSuccessful();
+        $this->assertDatabaseHas('prescriptions', ['id' => $bypassed['id'], 'status' => 'validation_not_required']);
+        $this->assertDatabaseHas('prescriptions', ['id' => $checked['id'], 'status' => 'validated']);
+    }
+
     public function test_clinical_validation_and_total_fefo_dispensation(): void
     {
         $c = $this->context(); $patient = $this->patient($c); $rx = $this->prescription($c, $patient); $this->approve($c, $rx);

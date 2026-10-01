@@ -1043,19 +1043,32 @@ class _ProductBarcodeScannerPageState
 class Status extends StatelessWidget {
   const Status(this.value, {super.key});
   final String value;
+  /// Libellé et couleur d'état ; « validation non requise (V1) » n'est pas
+  /// une validation pharmaceutique (statut neutre).
+  static (String, Color, Color) describe(String value) => switch (value) {
+    'draft' => ('En attente de validation', AppColors.infoSurface, AppColors.infoText),
+    'validation_not_required' => ('Validation non requise (V1)', AppColors.neutralSurface, AppColors.neutralText),
+    'validated' => ('Validée', AppColors.successSurface, AppColors.successText),
+    'rejected' => ('Refusée', AppColors.dangerSurface, AppColors.dangerText),
+    'partially_dispensed' => ('Partiellement dispensée', AppColors.infoSurface, AppColors.infoText),
+    'waiting_stock' => ('En attente de stock', AppColors.infoSurface, AppColors.infoText),
+    'dispensed' => ('Dispensée', AppColors.successSurface, AppColors.successText),
+    _ => (value, AppColors.neutralSurface, AppColors.neutralText),
+  };
+
   @override
   Widget build(BuildContext c) {
-    final ok = value != 'draft';
+    final (label, surface, text) = describe(value);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: ok ? AppColors.successSurface : AppColors.infoSurface,
+        color: surface,
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(
-        value,
+        label,
         style: TextStyle(
-          color: ok ? AppColors.successText : AppColors.infoText,
+          color: text,
           fontSize: 10,
           fontWeight: FontWeight.w800,
         ),

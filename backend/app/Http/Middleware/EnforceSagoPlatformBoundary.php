@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Http\Middleware\Concerns\ResolvesAuthenticatedUser;
 use App\Services\GovernanceService;
 use Closure;
 use Illuminate\Http\Request;
@@ -9,9 +10,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnforceSagoPlatformBoundary
 {
+    use ResolvesAuthenticatedUser;
+
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        $user = $this->authenticatedUser($request);
         if (! $user || app(GovernanceService::class)->roleCode($user) !== GovernanceService::SAGO_ADMIN) {
             return $next($request);
         }
@@ -27,7 +30,7 @@ class EnforceSagoPlatformBoundary
             return $next($request);
         }
 
-        return $request->expectsJson()
+        return $request->expectsJson() || $request->is('api/*')
             ? response()->json(['message' => 'Ce domaine opérationnel est réservé aux administrateurs des organisations.'], 403)
             : response()->view('errors.403', [
                 'message' => 'Ce domaine opérationnel est réservé aux administrateurs des organisations.',
