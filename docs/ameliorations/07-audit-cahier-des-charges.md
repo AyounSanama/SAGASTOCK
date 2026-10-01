@@ -300,3 +300,22 @@ Points déjà ouverts :
 6. P-01 : pré-rupture avec ou sans stock de sécurité ?
 7. P-07 : masquer le menu « Produits » pour les FOSA ?
 8. DEC-10 : chiffrement de la base locale, option 1 (migration sur place) à confirmer après étude.
+
+## 9. Décisions du porteur (01/10/2026)
+
+| Sujet | Décision |
+|---|---|
+| Plan V1 (section 7) | Validé. |
+| Librairie codes-barres | `flutter_zxing` validée (licence MIT, traitement sur l'appareil, aucun envoi, hors ligne, Android et iOS). `mobile_scanner` retiré **uniquement** après des essais réussis sur un vrai téléphone Android et sur iOS. |
+| Librairie ordonnance | Option B (`opencv_dart` + `camera`) : précisions envoyées, validation en attente. |
+| C-11 Origine ONG/Bailleur | Validée en V1, **obligatoire** pour toute nouvelle entrée en stock. Stock existant : couple déduit du projet ; liste des cas non déductibles à fournir **avant** toute modification. |
+| C-12 Consommation (CMM) | Sorties « Patient » et « Service » uniquement. Jours de rupture affichés à côté de chaque CMM. |
+| DEC-05 Sites | Un site principal créé automatiquement par FOSA, invisible ; le modèle « sites » est conservé. |
+| C-05 Stock de sécurité | Liste 0,25 / 0,5 / 0,75 / 1 / 1,5 / 2 mois (projets et FOSA) ; périodicité 1 à 12 mois. Liste des valeurs actuelles hors liste à fournir avant le changement (lecture seule). |
+| C-06 Utilisateur Site | Saisit les entrées en stock et les inventaires ; l'analyse de l'inventaire reste réservée à l'ONG. |
+| C-07 Validation clinique | Masquée en V1 (code conservé), prévue en V4. |
+| C-08 « Communauté » | Masquée en V1 (code conservé) ; l'historique reste visible. |
+| P-01 Pré-rupture | Formule de la section 7.1 validée. |
+| P-07 Menu « Produits » (FOSA) | Masqué ; la consultation du stock par produit (quantités, lots, péremptions) reste accessible. |
+| DEC-10 Chiffrement local | Étude de faisabilité de la migration sur place, puis rapport avant tout code ; terminé avant tout déploiement sur le terrain. |
+| c1 | FOSA existantes → « validées » ; seules les nouvelles passent par « en attente ». |
