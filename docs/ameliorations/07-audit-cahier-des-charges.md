@@ -256,7 +256,7 @@ Justification : une seule unité (le mois) ; le stock de sécurité joue son rô
 |---|---|---|---|---|
 | 1 | b | AM-161 | Structure Admin Projet : menu 4 entrées, barre supérieure, barre basse mobile ; **masquage des éléments EN TROP** (section 2) côté menu, route et API. | — |
 | 2 | c1 | AM-162 | Modèle FOSA : statut en attente / validée / suspendue (FOSA existantes → validées) ; catégories (5 par défaut) ; niveau, populations et pathologies issus de la configuration ; paramètres d'approvisionnement de la FOSA (DEC-08, 3 dates) ; Liste Standard par FOSA ; comptes Admin Site **et** Utilisateur Site par l'Admin Projet, refusés tant que la FOSA n'est pas validée. | b |
-| 3 | c1-bis | AM-172 | **Écrans Coordination** : FOSA à valider, liste des FOSA et des comptes de la coordination, suspension, journal des actions de la coordination. Lecture seule : consultation sans action. | c1 |
+| 3 | c1-bis | AM-172 | **« Ma Coordination » (maquettes 01–06 du 01/10)** — 4 onglets : *Projets et programmes* (indicateurs, bandeau des FOSA en attente, liste des projets et programmes nationaux, formulaire unique « Créer un projet / programme » avec champ Type) ; *FOSA à valider* (liste + détail complet, « Valider la FOSA », « Refuser avec un motif » obligatoire et visible par l'Admin Projet) ; *FOSA et comptes* (filtres projet et statut, comptes dépliables, suspension / réactivation) ; *Comptes de la coordination* (Admin Projet et Coordination lecture seule + journal). Mobile : mêmes onglets en cartes, boutons ≥ 44 px ; validation, refus et suspension en ligne seulement, listes consultables hors ligne. Lecture seule : aucun bouton, refus serveur. Journal pour chaque validation, refus, suspension, réactivation. FOSA suspendue : plus de connexion, données conservées, opérations hors ligne déjà faites synchronisées et signalées. | c1 |
 | 4 | c2 / c3 | AM-163 / 164 | Écrans Web 01–04 et mobiles 05–08 de l'Admin Projet, tablette. | c1 |
 | 5 | f | AM-173 | Listes Standard (Coordination) : « Programme Laboratoire », pathologies par niveau × population, ajout de molécule et import Excel, décochage par FOSA, **lien code-barres ↔ produit**. | c1 |
 | 6 | g | AM-174 | Dispensation FOSA : 4 destinations, date verrouillée, champs obligatoires de l'entête, droits de l'Utilisateur Site (C-06), masquage de la validation clinique (C-07). | c1 |
@@ -300,6 +300,16 @@ Points déjà ouverts :
 6. P-01 : pré-rupture avec ou sans stock de sécurité ?
 7. P-07 : masquer le menu « Produits » pour les FOSA ?
 8. DEC-10 : chiffrement de la base locale, option 1 (migration sur place) à confirmer après étude.
+
+## 8 bis. Points soulevés par les maquettes « Ma Coordination » (01/10)
+
+| N° | Sujet | Proposition |
+|---|---|---|
+| M-01 | Champ **Type** du projet (Projet bailleur / Programme national) ; un programme national a pour « bailleur » le Ministère de la Santé | Nouveau champ `type` sur le projet (même formulaire). Pour un programme national, le bailleur n'est pas obligatoire et s'affiche « Ministère de la Santé » ; la règle « un projet = un bailleur » reste valable pour les projets bailleurs. |
+| M-02 | Statut **« Refusée »** d'une FOSA | Statuts : en attente → validée, ou refusée (motif obligatoire, visible par l'Admin Projet) ; l'Admin Projet corrige la FOSA refusée, qui repasse « en attente » (nouvelle validation). |
+| M-03 | Entrée **« Analyses »** dans le menu (Web) et la barre basse (mobile) de la Coordination | Ajoutée avec le lot des analyses (étape 8), pas avant : aucun module à moitié fonctionnel. D'ici là, la barre basse mobile Coordination reste Accueil, Coordination, Liste, Profil. |
+| M-04 | Opérations hors ligne d'une FOSA **suspendue** (« synchronisées quand même et signalées ») | La suspension bloque toute nouvelle connexion et toute nouvelle opération ; le jeton de l'appareil garde **uniquement** le droit d'envoyer les opérations créées **avant** la date de suspension, marquées « reçues après suspension » dans le journal. Les opérations datées après la suspension sont refusées. |
+| M-05 | Statut de compte **« À activer »** | Compte jamais connecté (premier mot de passe non changé) ; calculé, pas de nouveau statut stocké. |
 
 ## 9. Décisions du porteur (01/10/2026)
 
