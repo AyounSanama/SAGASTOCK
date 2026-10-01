@@ -149,11 +149,12 @@ class AuthController extends Controller
                 ->findOrFail($data['organization_id']);
             $mission = Mission::whereKey($data['mission_id'])->where('organization_id', $organization->id)->firstOrFail();
             [$scopeType, $scopeId] = ['mission', $mission->id];
-        } elseif (in_array($roleCode, [GovernanceService::PROJECT_ADMIN, GovernanceService::SITE_ADMIN], true)) {
+        } elseif (in_array($roleCode, [GovernanceService::PROJECT_ADMIN, GovernanceService::SITE_ADMIN], true)
+            || ($roleCode === GovernanceService::SITE_USER && $this->governance->roleCode($request->user()) === GovernanceService::PROJECT_ADMIN)) {
+            $facilityRole = $roleCode !== GovernanceService::PROJECT_ADMIN;
             $request->validate([
                 'organization_id' => ['required'], 'mission_id' => ['required'], 'project_id' => ['required'],
-                'health_facility_id' => [Rule::requiredIf($roleCode === GovernanceService::SITE_ADMIN)],
-                'dispensing_site_id' => [Rule::requiredIf($roleCode === GovernanceService::SITE_ADMIN)],
+                'health_facility_id' => [Rule::requiredIf($facilityRole)],
             ]);
             $organization = $this->scopes->organizations($request->user())->findOrFail($data['organization_id']);
             $mission = Mission::whereKey($data['mission_id'])->where('organization_id', $organization->id)->firstOrFail();
@@ -164,8 +165,11 @@ class AuthController extends Controller
             } else {
                 $facility = $this->scopes->facilities($request->user())->whereKey($data['health_facility_id'])
                     ->whereHas('projects', fn ($query) => $query->whereKey($project->id))->firstOrFail();
-                $site = $this->scopes->sites($request->user())->whereKey($data['dispensing_site_id'])
-                    ->where('health_facility_id', $facility->id)->firstOrFail();
+                // DEC-05 : site principal invisible quand aucun site n'est choisi.
+                $site = empty($data['dispensing_site_id'])
+                    ? app(\App\Services\HealthFacilityConfigurationService::class)->ensurePrimarySite($facility)
+                    : $this->scopes->sites($request->user())->whereKey($data['dispensing_site_id'])->where('health_facility_id', $facility->id)->firstOrFail();
+                $this->governance->assertFacilityOpenForAccounts($site->id);
                 [$scopeType, $scopeId] = ['site', $site->id];
             }
         } else {

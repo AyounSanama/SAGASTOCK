@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SaveHealthFacilityRequest;
 use App\Models\Department;
 use App\Models\HealthFacility;
 use App\Models\Mission;
@@ -86,7 +87,7 @@ class StructureController extends Controller
             'sites' => Site::whereIn('health_facility_id', (clone $facilityBase)->pluck('id'))->count(),
             'missions' => (clone $facilityBase)->whereNotNull('mission_id')->distinct()->count('mission_id'),
         ];
-        $facilities = $organization->healthFacilities()->whereIn('id', $facilityIds)->with(['mission.country', 'projects:id,name', 'departments', 'archivedDepartments', 'pharmacies.department', 'archivedPharmacies', 'sites.department', 'sites.pharmacy', 'archivedSites'])->withCount('sites')
+        $facilities = $organization->healthFacilities()->whereIn('id', $facilityIds)->with(['mission.country', 'projects:id,name', 'targetPopulations:id', 'pathologies:id', 'departments', 'archivedDepartments', 'pharmacies.department', 'archivedPharmacies', 'sites.department', 'sites.pharmacy', 'archivedSites'])->withCount('sites')
             ->when($request->string('search')->toString(), fn ($query, $search) => $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")))
             ->when($request->filled('mission_id'), fn ($query) => $query->where('mission_id', $request->string('mission_id')->toString()))
             ->when($request->filled('facility_type'), fn ($query) => $query->where('facility_type', $request->string('facility_type')->toString()))
@@ -99,8 +100,14 @@ class StructureController extends Controller
                 ->orWhere(fn ($q) => $q->where('target_type', 'project')->whereIn('target_id', $organization->projects()->pluck('id')))
                 ->orWhere(fn ($q) => $q->where('target_type', 'facility')->whereIn('target_id', $organization->healthFacilities()->pluck('id')));
         })->get()->keyBy(fn ($item) => "{$item->target_type}:{$item->target_id}:{$item->module_code}");
+        // AM-162 : choix de la FOSA limités à la configuration validée du projet (Admin Projet).
+        $facilityOptions = null;
+        if (app(\App\Services\GovernanceService::class)->roleCode($request->user()) === \App\Services\GovernanceService::PROJECT_ADMIN) {
+            $project = app(\App\Services\HealthFacilityManagementService::class)->projectFor($request->user(), $organization);
+            $facilityOptions = app(\App\Services\HealthFacilityConfigurationService::class)->options($project);
+        }
         return view('structures.index', [
-            'organization' => $organization, 'facilities' => $facilities,
+            'organization' => $organization, 'facilities' => $facilities, 'facilityOptions' => $facilityOptions,
             'organizations' => $this->scopes->organizations($request->user())->orderBy('name')->get(),
             'facilityStats' => $facilityStats,
             'archivedFacilities' => $archivedFacilities, 'activations' => $activations,
@@ -130,24 +137,18 @@ class StructureController extends Controller
         ]);
     }
 
-    public function storeFacility(Request $request, Organization $organization): RedirectResponse
+    public function storeFacility(SaveHealthFacilityRequest $request, Organization $organization): RedirectResponse
     {
-        $this->manage($request, $organization);
-        $data = $this->facilityData($request, $organization);
-        $projects = $data['project_ids'] ?? []; unset($data['project_ids']);
-        $facility = $organization->healthFacilities()->create($data);
-        $facility->projects()->sync($projects);
+        $facility = app(\App\Services\HealthFacilityManagementService::class)->declare($request, $organization);
         $this->audit->record($request, 'facility.created', $facility, [], $facility->toArray());
         return redirect()->route('organizations.structures.index', [$organization, 'facility' => $facility->id])
             ->with('status', 'Formation sanitaire créée avec succès.');
     }
 
-    public function updateFacility(Request $request, Organization $organization, HealthFacility $facility): RedirectResponse
+    public function updateFacility(SaveHealthFacilityRequest $request, Organization $organization, HealthFacility $facility): RedirectResponse
     {
-        $this->manageFacility($request, $organization, $facility);
-        $data = $this->facilityData($request, $organization, $facility);
-        $projects = $data['project_ids'] ?? []; unset($data['project_ids']);
-        $old = $facility->toArray(); $facility->update($data); $facility->projects()->sync($projects);
+        $old = $facility->toArray();
+        app(\App\Services\HealthFacilityManagementService::class)->update($request, $facility);
         $this->audit->record($request, 'facility.updated', $facility, $old, $facility->fresh()->toArray());
         return back()->with('status', 'Formation sanitaire mise à jour.');
     }

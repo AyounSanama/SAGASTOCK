@@ -51,6 +51,29 @@ class StandardListGenerationService {
   return !$same($published->target_population_ids,$populations)||(empty($published->laboratory_exam_ids)&&!$same($published->pathology_ids,$pathologies));
  }
 
+ /**
+  * Produits retenus par la Coordination dans la dernière version publiée de
+  * la Liste Standard du projet (null : aucune version publiée).
+  * @return array<int,string>|null
+  */
+ public function publishedProductIds(Project $project): ?array {
+  $version=StandardListVersion::where('status','published')
+   ->whereHas('standardList',fn($q)=>$q->where('scope_type','project')->where('scope_id',$project->id))
+   ->orderByDesc('version_number')->first();
+  return $version?->products()->pluck('products.id')->all();
+ }
+
+ /** Niveaux retenus et leurs descendants (catégories, programmes). @return Collection<int,string> */
+ public function expandDescendants(Collection $ids): Collection {
+  $result=$ids->values();
+  $frontier=$ids;
+  for($i=0;$i<CareLevelHierarchyService::MAX_DEPTH&&$frontier->isNotEmpty();$i++){
+   $frontier=CatalogReference::whereIn('parent_id',$frontier)->where('is_active',true)->pluck('id')->diff($result);
+   $result=$result->merge($frontier);
+  }
+  return $result->unique()->values();
+ }
+
  /** @return Collection<int,string> */
  public function expandHierarchy(Collection $ids): Collection {
   $result=$ids->values();

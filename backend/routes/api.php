@@ -53,6 +53,8 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/projects/medical-references/care-levels/{reference}', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'archiveCareLevel'])->middleware('permission:standard_lists.manage');
         Route::post('/projects/medical-references/{type}', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'storeReference'])->whereIn('type', ['target_population', 'pathology'])->middleware('permission:standard_lists.manage');
         Route::get('/projects/{project}/medical-configuration', [\App\Http\Controllers\Api\V1\ProjectMedicalConfigurationController::class, 'show'])->middleware('permission:projects.view');
+        // DEC-08 : action explicite, jamais automatique.
+        Route::post('/projects/{project}/supply-settings/apply-to-facilities', [ProjectController::class, 'applySupplyToFacilities'])->middleware('permission:projects.manage');
         Route::put('/projects/{project}/medical-configuration', [\App\Http\Controllers\Api\V1\ProjectMedicalConfigurationController::class, 'update'])->middleware('permission:standard_lists.manage');
         Route::get('/projects/{project}', [ProjectController::class, 'show'])->middleware('permission:projects.view');
         Route::middleware(['role:sago_admin', 'permission:platform_standards.view'])->prefix('platform-configuration')->group(function (): void {
@@ -183,7 +185,10 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/organizations/{organization}/projects/{project}/donors/{donor}', [FundingController::class, 'detachDonor'])->middleware('permission:funding.manage');
         Route::delete('/organizations/{organization}/projects/{project}/programs/{program}', [FundingController::class, 'detachProgram'])->middleware('permission:funding.manage');
         Route::get('/organizations/{organization}/structures', [StructureController::class, 'index'])->middleware('permission:structures.view|health_facilities.view');
+        // AM-162 : choix limités à la configuration validée du projet (avant {facility}).
+        Route::get('/organizations/{organization}/facilities/options', [StructureController::class, 'facilityOptions'])->middleware('permission:structures.view|health_facilities.view');
         Route::post('/organizations/{organization}/facilities', [StructureController::class, 'storeFacility'])->middleware('permission:structures.manage|health_facilities.manage');
+        Route::get('/organizations/{organization}/facilities/{facility}/standard-list', [StructureController::class, 'facilityStandardList'])->middleware('permission:structures.view|health_facilities.view');
         Route::get('/organizations/{organization}/facilities/{facility}', [StructureController::class, 'showFacility'])->middleware('permission:structures.view|health_facilities.view');
         Route::put('/organizations/{organization}/facilities/{facility}', [StructureController::class, 'updateFacility'])->middleware('permission:structures.manage|health_facilities.manage');
         Route::delete('/organizations/{organization}/facilities/{facility}', [StructureController::class, 'archiveFacility'])->middleware('permission:structures.manage|health_facilities.manage');

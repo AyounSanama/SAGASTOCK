@@ -99,6 +99,15 @@ class UserController extends Controller
         $generated = empty($data['password']);
         $password = $generated ? Str::password(16, symbols: true) : $data['password'];
         [$scopeType, $scopeId] = $this->scope($data['scope_type'] ?? 'platform', $data['scope_id'] ?? null);
+        // Compte FOSA désigné par sa FOSA : rattaché à son site principal (DEC-05).
+        if ($scopeType === 'facility') {
+            $facility = HealthFacility::findOrFail($scopeId);
+            abort_unless($this->scopes->facilityIds($request->user())->contains($facility->id), 404);
+            [$scopeType, $scopeId] = ['site', app(\App\Services\HealthFacilityConfigurationService::class)->ensurePrimarySite($facility)->id];
+        }
+        if ($scopeType === 'site') {
+            $this->governance->assertFacilityOpenForAccounts($scopeId);
+        }
         abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
         $roleIds = isset($data['role_id']) ? [$data['role_id']] : ($data['role_ids'] ?? []);
         abort_unless($this->scopes->assignableRoles($request->user())->whereIn('id', $roleIds)->count() === count($roleIds), 403);

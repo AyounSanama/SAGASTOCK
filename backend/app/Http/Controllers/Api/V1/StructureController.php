@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SaveHealthFacilityRequest;
 use App\Models\Department;
 use App\Models\HealthFacility;
 use App\Models\Mission;
@@ -12,6 +13,8 @@ use App\Models\Pharmacy;
 use App\Models\Project;
 use App\Models\Site;
 use App\Services\AuditService;
+use App\Services\HealthFacilityConfigurationService;
+use App\Services\HealthFacilityManagementService;
 use App\Services\UserScopeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +24,12 @@ use Illuminate\Validation\Rule;
 
 class StructureController extends Controller
 {
-    public function __construct(private AuditService $audit, private UserScopeService $scopes) {}
+    public function __construct(
+        private AuditService $audit,
+        private UserScopeService $scopes,
+        private HealthFacilityManagementService $facilities,
+        private HealthFacilityConfigurationService $configuration,
+    ) {}
 
     public function index(Request $request, Organization $organization): JsonResponse
     {
@@ -46,20 +54,12 @@ class StructureController extends Controller
         ]);
     }
 
-    public function storeFacility(Request $request, Organization $organization): JsonResponse
+    public function storeFacility(SaveHealthFacilityRequest $request, Organization $organization): JsonResponse
     {
-        $this->organization($request, $organization);
-        $data = $this->facilityData($request, $organization);
-        $projectIds = $data['project_ids'] ?? [];
-        unset($data['project_ids']);
-        $facility = DB::transaction(function () use ($organization, $data, $projectIds) {
-            $facility = $organization->healthFacilities()->create($data);
-            $facility->projects()->sync($projectIds);
+        $facility = $this->facilities->declare($request, $organization);
+        $this->audit->record($request, 'facility.created', $facility, [], $facility->only(['organization_id', 'code', 'name', 'facility_type', 'validation_status']));
 
-            return $facility;
-        });
-        $this->audit->record($request, 'facility.created', $facility, [], $facility->only(['organization_id', 'code', 'name', 'facility_type']));
-        return response()->json(['facility' => $facility->load(['organization:id,code,name', 'mission.country', 'projects:id,organization_id,mission_id,code,name'])], 201);
+        return response()->json(['facility' => $this->facilities->present($facility)], 201);
     }
 
     public function showFacility(Request $request, Organization $organization, HealthFacility $facility): JsonResponse
@@ -72,17 +72,31 @@ class StructureController extends Controller
         ])]);
     }
 
-    public function updateFacility(Request $request, Organization $organization, HealthFacility $facility): JsonResponse
+    public function updateFacility(SaveHealthFacilityRequest $request, Organization $organization, HealthFacility $facility): JsonResponse
+    {
+        $old = $facility->toArray();
+        $this->facilities->update($request, $facility);
+        $this->audit->record($request, 'facility.updated', $facility, $old, $facility->fresh()->toArray());
+
+        return response()->json(['facility' => $this->facilities->present($facility->fresh())]);
+    }
+
+    /** AM-162 — Choix proposés pour une FOSA (configuration validée du projet). */
+    public function facilityOptions(Request $request, Organization $organization): JsonResponse
+    {
+        $this->organization($request, $organization);
+        $project = $this->facilities->projectFor($request->user(), $organization, $request->query('project_id'));
+
+        return response()->json(['project' => $project->only(['id', 'code', 'name']), ...$this->configuration->options($project)]);
+    }
+
+    /** AM-162 — Liste Standard générée pour la FOSA (consultation). */
+    public function facilityStandardList(Request $request, Organization $organization, HealthFacility $facility): JsonResponse
     {
         $this->facility($request, $organization, $facility);
-        $data = $this->facilityData($request, $organization, $facility);
-        $projectIds = $data['project_ids'] ?? [];
-        unset($data['project_ids']);
-        $old = $facility->toArray();
-        $facility->update($data);
-        $facility->projects()->sync($projectIds);
-        $this->audit->record($request, 'facility.updated', $facility, $old, $facility->fresh()->toArray());
-        return response()->json(['facility' => $facility->load(['mission', 'projects'])]);
+        $products = $this->facilities->standardList($facility);
+
+        return response()->json(['count' => $products->count(), 'products' => $products]);
     }
 
     public function archiveFacility(Request $request, Organization $organization, HealthFacility $facility): JsonResponse

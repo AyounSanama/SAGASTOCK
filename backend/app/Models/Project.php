@@ -16,9 +16,23 @@ class Project extends Model
     protected $keyType = 'string';
     public const STATUSES = ['draft' => 'Brouillon', 'active' => 'Actif', 'suspended' => 'Suspendu', 'closed' => 'Clôturé'];
 
-    protected $fillable = ['organization_id', 'mission_id', 'code', 'name', 'implementing_partner', 'donor_reference_code', 'moh_program_code', 'responsible_name', 'responsible_contact', 'description', 'starts_on', 'ends_on', 'order_period_months', 'delivery_lead_time_months', 'safety_stock_months', 'status', 'is_active'];
+    protected $fillable = ['organization_id', 'mission_id', 'code', 'name', 'implementing_partner', 'donor_reference_code', 'moh_program_code', 'responsible_name', 'responsible_contact', 'description', 'starts_on', 'ends_on', 'order_period_months', 'delivery_lead_time_months', 'safety_stock_months', 'status', 'type', 'is_active'];
 
-    protected $appends = ['status_label'];
+    /** Type de projet (décision E1) : un bailleur au plus dans les deux cas. */
+    public const TYPES = [
+        'donor_project' => 'Projet bailleur',
+        'national_program' => 'Programme national',
+    ];
+
+    /** Bailleur affiché par défaut pour un programme national sans bailleur. */
+    public const NATIONAL_PROGRAM_DEFAULT_DONOR = 'Ministère de la Santé';
+
+    protected $appends = ['status_label', 'type_label'];
+
+    public function getTypeLabelAttribute(): string
+    {
+        return self::TYPES[$this->type ?? 'donor_project'] ?? (string) $this->type;
+    }
 
     protected static function booted(): void
     {

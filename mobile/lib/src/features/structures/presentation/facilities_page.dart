@@ -130,6 +130,22 @@ class _FacilitiesPageState extends State<FacilitiesPage>
   }
 
   Future<void> _openFacilityForm([Map<String, dynamic>? facility]) async {
+    Map<String, dynamic>? v1Options;
+    if (widget.scopedProject != null) {
+      try {
+        v1Options = await _service.facilityOptions(widget.organizationId);
+      } catch (_) {
+        v1Options = null;
+      }
+      if (!mounted) return;
+      if (v1Options == null) {
+        _success(
+          'Les choix de la FOSA ne sont pas encore disponibles hors ligne : connectez-vous une première fois.',
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
     final saved = await showAppFormSheet<String>(
       context: context,
       title: facility == null
@@ -142,6 +158,7 @@ class _FacilitiesPageState extends State<FacilitiesPage>
         service: _service,
         missions: _missions,
         projects: _projects,
+        v1Options: v1Options,
       ),
     );
     if (saved != null) {
@@ -375,6 +392,7 @@ class _FacilityForm extends StatefulWidget {
     required this.missions,
     required this.projects,
     this.facility,
+    this.v1Options,
   });
 
   final String organizationId;
@@ -382,6 +400,9 @@ class _FacilityForm extends StatefulWidget {
   final List<Map<String, dynamic>> missions;
   final List<Map<String, dynamic>> projects;
   final Map<String, dynamic>? facility;
+
+  /// Admin Projet (V1) : choix issus de la configuration validée du projet.
+  final Map<String, dynamic>? v1Options;
 
   @override
   State<_FacilityForm> createState() => _FacilityFormState();
@@ -410,6 +431,27 @@ class _FacilityFormState extends State<_FacilityForm> {
   bool _isActive = true;
   bool _saving = false;
   late final String _initialDraft;
+  // AM-162 — Champs V1 de l'Admin Projet.
+  String? _careLevelId;
+  String? _categoryId;
+  final Set<String> _populationIds = {};
+  final Set<String> _pathologyIds = {};
+  int? _orderPeriod;
+  int? _leadTime;
+  double? _safetyStock;
+  DateTime? _inventoryDate;
+  DateTime? _submissionDate;
+  DateTime? _receiptDate;
+
+  bool get _v1 => widget.v1Options != null;
+
+  static const _safetyStockOptions = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0];
+
+  List<Map<String, dynamic>> _option(String key) =>
+      ((widget.v1Options?[key] as List?) ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList(growable: false);
 
   String get _draft => jsonEncode([
     _code.text,
@@ -482,6 +524,38 @@ class _FacilityFormState extends State<_FacilityForm> {
       _missionId ??= widget.projects.single['mission_id']?.toString();
     }
     _isActive = value['is_active'] != false;
+    if (_v1) {
+      final defaults = Map<String, dynamic>.from(
+        (widget.v1Options!['supply_defaults'] as Map?) ?? const {},
+      );
+      _careLevelId = value['care_level_id']?.toString();
+      _categoryId = value['facility_category_id']?.toString();
+      _populationIds.addAll(
+        ((value['target_populations'] as List?) ?? const []).map(
+          (item) => '${(item as Map)['id']}',
+        ),
+      );
+      _pathologyIds.addAll(
+        ((value['pathologies'] as List?) ?? const []).map(
+          (item) => '${(item as Map)['id']}',
+        ),
+      );
+      _orderPeriod = int.tryParse(
+        '${value['order_period_months'] ?? defaults['order_period_months'] ?? ''}',
+      );
+      _leadTime = int.tryParse(
+        '${value['delivery_lead_time_months'] ?? defaults['delivery_lead_time_months'] ?? ''}',
+      );
+      final safety = double.tryParse(
+        '${value['safety_stock_months'] ?? defaults['safety_stock_months'] ?? ''}',
+      );
+      _safetyStock = _safetyStockOptions.contains(safety) ? safety : null;
+      _inventoryDate = DateTime.tryParse('${value['inventory_date'] ?? ''}');
+      _submissionDate = DateTime.tryParse(
+        '${value['order_submission_date'] ?? ''}',
+      );
+      _receiptDate = DateTime.tryParse('${value['order_receipt_date'] ?? ''}');
+    }
     _initialDraft = _draft;
   }
 
@@ -525,8 +599,9 @@ class _FacilityFormState extends State<_FacilityForm> {
         data: {
           'code': _code.text.trim(),
           'name': _name.text.trim(),
-          'facility_type': _type,
-          'care_level': _careLevel,
+          if (!_v1) 'facility_type': _type,
+          if (!_v1) 'care_level': _careLevel,
+          if (_v1) ..._v1Payload(),
           'email': _email.text.trim(),
           'phone': _phone.text.trim(),
           'address': _address.text.trim(),
@@ -535,8 +610,8 @@ class _FacilityFormState extends State<_FacilityForm> {
           'locality': _locality.text.trim(),
           'latitude': double.tryParse(_latitude.text.replaceAll(',', '.')),
           'longitude': double.tryParse(_longitude.text.replaceAll(',', '.')),
-          'mission_id': _missionId,
-          'project_ids': _projectIds.toList(growable: false),
+          if (!_v1) 'mission_id': _missionId,
+          if (!_v1) 'project_ids': _projectIds.toList(growable: false),
           'is_active': _isActive,
         },
       );
@@ -673,51 +748,57 @@ class _FacilityFormState extends State<_FacilityForm> {
                     ),
                   ),
                   _stepBody(
-                    Form(
-                      key: _classificationKey,
-                      child: Column(
-                        children: [
-                          DropdownButtonFormField<String>(
-                            initialValue: _careLevel,
-                            decoration: const InputDecoration(
-                              labelText: 'Niveau de soins *',
-                              prefixIcon: Icon(
-                                Icons.health_and_safety_outlined,
-                              ),
-                            ),
-                            items: _careLevels.entries
-                                .map(
-                                  (entry) => DropdownMenuItem(
-                                    value: entry.key,
-                                    child: Text(entry.value),
+                    _v1
+                        ? _v1Classification()
+                        : Form(
+                            key: _classificationKey,
+                            child: Column(
+                              children: [
+                                DropdownButtonFormField<String>(
+                                  initialValue: _careLevel,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Niveau de soins *',
+                                    prefixIcon: Icon(
+                                      Icons.health_and_safety_outlined,
+                                    ),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: (value) =>
-                                setState(() => _careLevel = value),
-                            validator: (value) =>
-                                value == null ? 'Sélection obligatoire' : null,
-                          ),
-                          const SizedBox(height: 14),
-                          DropdownButtonFormField<String>(
-                            initialValue: _type,
-                            decoration: const InputDecoration(
-                              labelText: 'Catégorie de formation sanitaire *',
-                              prefixIcon: Icon(Icons.local_hospital_outlined),
-                            ),
-                            items: _types.entries
-                                .map(
-                                  (entry) => DropdownMenuItem(
-                                    value: entry.key,
-                                    child: Text(entry.value),
+                                  items: _careLevels.entries
+                                      .map(
+                                        (entry) => DropdownMenuItem(
+                                          value: entry.key,
+                                          child: Text(entry.value),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (value) =>
+                                      setState(() => _careLevel = value),
+                                  validator: (value) => value == null
+                                      ? 'Sélection obligatoire'
+                                      : null,
+                                ),
+                                const SizedBox(height: 14),
+                                DropdownButtonFormField<String>(
+                                  initialValue: _type,
+                                  decoration: const InputDecoration(
+                                    labelText:
+                                        'Catégorie de formation sanitaire *',
+                                    prefixIcon: Icon(
+                                      Icons.local_hospital_outlined,
+                                    ),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: (value) => _type = value ?? _type,
+                                  items: _types.entries
+                                      .map(
+                                        (entry) => DropdownMenuItem(
+                                          value: entry.key,
+                                          child: Text(entry.value),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (value) => _type = value ?? _type,
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
                   ),
                   _stepBody(
                     Form(
@@ -891,6 +972,7 @@ class _FacilityFormState extends State<_FacilityForm> {
 
   bool _validStep(int step) => switch (step) {
     0 => _informationKey.currentState?.validate() ?? _informationIsValid,
+    1 when _v1 => _v1ClassificationIsValid,
     1 => _classificationKey.currentState?.validate() ?? _classificationIsValid,
     2 => _locationKey.currentState?.validate() ?? true,
     _ => true,
@@ -902,7 +984,203 @@ class _FacilityFormState extends State<_FacilityForm> {
   bool get _classificationIsValid =>
       _careLevel != null && _types.containsKey(_type);
 
+  bool get _v1ClassificationIsValid =>
+      _careLevelId != null &&
+      _categoryId != null &&
+      _populationIds.isNotEmpty &&
+      _pathologyIds.isNotEmpty;
+
+  Map<String, dynamic> _v1Payload() {
+    String? day(DateTime? value) => value?.toIso8601String().substring(0, 10);
+    return {
+      'care_level_id': _careLevelId,
+      'facility_category_id': _categoryId,
+      'target_population_ids': _populationIds.toList(growable: false),
+      'pathology_ids': _pathologyIds.toList(growable: false),
+      'order_period_months': _orderPeriod,
+      'delivery_lead_time_months': _leadTime,
+      'safety_stock_months': _safetyStock,
+      'inventory_date': day(_inventoryDate),
+      'order_submission_date': day(_submissionDate),
+      'order_receipt_date': day(_receiptDate),
+    };
+  }
+
+  Widget _v1Classification() {
+    String months(num value) =>
+        '${value.toString().replaceAll('.0', '').replaceAll('.', ',')} mois';
+    Widget chips(
+      String title,
+      List<Map<String, dynamic>> items,
+      Set<String> selected,
+    ) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        if (items.isEmpty)
+          const Text('Non configuré par la Coordination pour ce projet.')
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final item in items)
+                FilterChip(
+                  label: Text('${item['name']}'),
+                  selected: selected.contains('${item['id']}'),
+                  onSelected: _saving
+                      ? null
+                      : (value) => setState(
+                          () => value
+                              ? selected.add('${item['id']}')
+                              : selected.remove('${item['id']}'),
+                        ),
+                ),
+            ],
+          ),
+      ],
+    );
+    Widget date(
+      String label,
+      DateTime? value,
+      ValueChanged<DateTime?> set,
+    ) => ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(label),
+      subtitle: Text(
+        value == null
+            ? 'Non renseignée'
+            : '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}',
+      ),
+      trailing: const Icon(Icons.event_outlined),
+      onTap: _saving
+          ? null
+          : () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: value ?? DateTime.now(),
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2100),
+              );
+              if (picked != null) setState(() => set(picked));
+            },
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<String>(
+          initialValue: _careLevelId,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Niveau de soins *'),
+          items: [
+            for (final level in _option('care_levels'))
+              DropdownMenuItem(
+                value: '${level['id']}',
+                child: Text(
+                  '${'— ' * ((int.tryParse('${level['depth']}') ?? 1) - 1)}${level['name']}',
+                ),
+              ),
+          ],
+          onChanged: (value) => setState(() => _careLevelId = value),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          initialValue: _categoryId,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Catégorie de FOSA *'),
+          items: [
+            for (final category in _option('facility_categories'))
+              DropdownMenuItem(
+                value: '${category['id']}',
+                child: Text('${category['name']}'),
+              ),
+          ],
+          onChanged: (value) => setState(() => _categoryId = value),
+        ),
+        const SizedBox(height: 16),
+        chips(
+          'Population cible *',
+          _option('target_populations'),
+          _populationIds,
+        ),
+        const SizedBox(height: 16),
+        chips(
+          'Pathologies / activités *',
+          _option('pathologies'),
+          _pathologyIds,
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Paramètres d’approvisionnement (préremplis depuis le projet)',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          initialValue: _orderPeriod,
+          decoration: const InputDecoration(
+            labelText: 'Périodicité de commande',
+          ),
+          items: [
+            for (var month = 1; month <= 12; month++)
+              DropdownMenuItem(value: month, child: Text(months(month))),
+          ],
+          onChanged: (value) => setState(() => _orderPeriod = value),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<int>(
+          initialValue: _leadTime,
+          decoration: const InputDecoration(
+            labelText: 'Délai de livraison (DL)',
+          ),
+          items: [
+            for (var month = 1; month <= 12; month++)
+              DropdownMenuItem(value: month, child: Text(months(month))),
+          ],
+          onChanged: (value) => setState(() => _leadTime = value),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<double>(
+          initialValue: _safetyStock,
+          decoration: const InputDecoration(labelText: 'Stock de sécurité'),
+          items: [
+            for (final value in _safetyStockOptions)
+              DropdownMenuItem(value: value, child: Text(months(value))),
+          ],
+          onChanged: (value) => setState(() => _safetyStock = value),
+        ),
+        date(
+          'Date d’inventaire',
+          _inventoryDate,
+          (value) => _inventoryDate = value,
+        ),
+        date(
+          'Date de soumission de commande',
+          _submissionDate,
+          (value) => _submissionDate = value,
+        ),
+        date(
+          'Date de réception de commande',
+          _receiptDate,
+          (value) => _receiptDate = value,
+        ),
+        if (!_v1ClassificationIsValid)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              'Choisissez le niveau de soins, la catégorie, au moins une population et une pathologie.',
+            ),
+          ),
+      ],
+    );
+  }
+
   int? _firstInvalidStep() {
+    if (_v1) {
+      if (!_informationIsValid) return 0;
+      if (!_v1ClassificationIsValid) return 1;
+      return null;
+    }
     return facilityFormFirstInvalidStep(
       code: _code.text,
       name: _name.text,

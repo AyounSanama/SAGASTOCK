@@ -39,10 +39,11 @@ class GovernanceMatrixTest extends TestCase
         $scopes = app(UserScopeService::class);
 
         $this->assertSame(['project_admin', 'coordination_admin'], $governance->assignableCodes($coordination));
-        $this->assertSame(['site_admin'], $governance->assignableCodes($projectAdmin));
+        // AM-162 : l'Admin Projet crée les deux comptes de la FOSA validée.
+        $this->assertSame(['site_admin', 'site_user'], $governance->assignableCodes($projectAdmin));
         $this->assertSame(['site_user'], $governance->assignableCodes($siteAdmin));
         $this->assertEqualsCanonicalizing(['project_admin', 'coordination_admin'], $scopes->assignableRoles($coordination)->pluck('code')->all());
-        $this->assertSame(['site_admin'], $scopes->assignableRoles($projectAdmin)->pluck('code')->all());
+        $this->assertEqualsCanonicalizing(['site_admin', 'site_user'], $scopes->assignableRoles($projectAdmin)->pluck('code')->all());
         $this->assertSame(['site_user'], $scopes->assignableRoles($siteAdmin)->pluck('code')->all());
     }
 
@@ -100,8 +101,9 @@ class GovernanceMatrixTest extends TestCase
         Sanctum::actingAs($this->actor('project_admin', 'project', $project->id));
         $this->getJson('/api/v1/assignable-roles')
             ->assertOk()
-            ->assertJsonCount(1, 'roles')
-            ->assertJsonPath('roles.0.code', 'site_admin');
+            ->assertJsonCount(2, 'roles')
+            ->assertJsonPath('roles.0.code', 'site_admin')
+            ->assertJsonPath('roles.1.code', 'site_user');
 
         Sanctum::actingAs($this->actor('site_admin', 'site', $site->id));
         $this->getJson('/api/v1/assignable-roles')

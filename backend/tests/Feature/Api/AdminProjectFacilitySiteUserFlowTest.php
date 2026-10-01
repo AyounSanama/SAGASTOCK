@@ -14,11 +14,13 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\V1FacilityFixtures;
 use Tests\TestCase;
 
 class AdminProjectFacilitySiteUserFlowTest extends TestCase
 {
     use RefreshDatabase;
+    use V1FacilityFixtures;
 
     protected function setUp(): void
     {
@@ -59,13 +61,13 @@ class AdminProjectFacilitySiteUserFlowTest extends TestCase
             'scope_type' => 'project',
             'scope_id' => $projectA->id,
         ]);
+        $v1 = $this->configureV1Project($projectA);
         Sanctum::actingAs($projectAdmin);
 
         $facility = $this->postJson("/api/v1/organizations/{$organization->id}/facilities", [
             'code' => 'FOSA_A',
             'name' => 'Formation sanitaire A',
-            'facility_type' => 'health_center',
-            'care_level' => 'primary',
+            ...$v1,
             // Un Admin Projet ne peut pas imposer un autre projet au serveur.
             'project_ids' => [$projectB->id],
             'is_active' => true,
@@ -89,10 +91,10 @@ class AdminProjectFacilitySiteUserFlowTest extends TestCase
         $this->putJson("/api/v1/organizations/{$organization->id}/facilities/{$facility['id']}", [
             'code' => 'FOSA_A',
             'name' => 'Formation sanitaire A modifiée',
-            'facility_type' => 'health_center',
-            'care_level' => 'primary',
+            ...$v1,
             'is_active' => true,
         ])->assertOk()->assertJsonPath('facility.name', 'Formation sanitaire A modifiée');
+        $this->validateFacility($facility['id']);
 
         $site = $this->postJson("/api/v1/organizations/{$organization->id}/facilities/{$facility['id']}/sites", [
             'code' => 'SITE_A',

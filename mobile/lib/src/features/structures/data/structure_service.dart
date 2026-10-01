@@ -125,6 +125,16 @@ class StructureService {
     return data;
   }
 
+  /// AM-162 — Choix d'une FOSA limités à la configuration validée du
+  /// projet (niveaux, catégories, populations, pathologies, paramètres par
+  /// défaut). Mis en cache : la déclaration d'une FOSA reste possible hors ligne.
+  Future<Map<String, dynamic>> facilityOptions(String organizationId) =>
+      _repository.document(
+        collection: 'structures.facility_options',
+        organizationId: organizationId,
+        endpoint: '/organizations/$organizationId/facilities/options',
+      );
+
   Future<bool> saveFacility({
     required String organizationId,
     String? facilityId,

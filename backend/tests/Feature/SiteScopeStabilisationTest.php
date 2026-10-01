@@ -9,11 +9,13 @@ use App\Notifications\OperationalNotification;
 use Laravel\Sanctum\Sanctum;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\V1FacilityFixtures;
 use Tests\TestCase;
 
 class SiteScopeStabilisationTest extends TestCase
 {
     use RefreshDatabase;
+    use V1FacilityFixtures;
 
     public function test_project_creates_facility_site_and_account_then_site_login_is_scoped(): void
     {
@@ -27,14 +29,16 @@ class SiteScopeStabilisationTest extends TestCase
         $foreignSite = $foreignFacility->sites()->create(['organization_id' => $organization->id, 'code' => 'B', 'name' => 'Site B', 'site_type' => 'stock_and_dispensing']);
         $admin = User::factory()->create(['organization_id' => $organization->id]);
         $admin->roles()->attach(Role::where('code', 'project_admin')->firstOrFail(), ['scope_type' => 'project', 'scope_id' => $project->id]);
+        $v1 = $this->configureV1Project($project);
         Sanctum::actingAs($admin);
         $base = "/api/v1/organizations/{$organization->id}";
-        $facilityId = $this->postJson("$base/facilities", ['code' => 'A', 'name' => 'FOSA A', 'facility_type' => 'clinic', 'care_level' => 'primary'])
+        $facilityId = $this->postJson("$base/facilities", ['code' => 'A', 'name' => 'FOSA A', ...$v1])
             ->assertCreated()->json('facility.id');
         $facility = HealthFacility::findOrFail($facilityId);
         $this->assertSame($mission->id, $facility->mission_id);
         $this->assertSame([$project->id], $facility->projects()->pluck('projects.id')->all());
-        $this->putJson("$base/facilities/$facilityId", ['code' => 'A', 'name' => 'FOSA A actualisee', 'facility_type' => 'clinic'])->assertOk();
+        $this->putJson("$base/facilities/$facilityId", ['code' => 'A', 'name' => 'FOSA A actualisee', ...$v1])->assertOk();
+        $this->validateFacility($facilityId);
         $this->putJson("$base/facilities/{$foreignFacility->id}", ['code' => 'B', 'name' => 'Modification interdite', 'facility_type' => 'clinic'])->assertNotFound();
         $this->assertSame('FOSA B', $foreignFacility->fresh()->name);
         $siteId = $this->postJson("$base/facilities/$facilityId/sites", ['code' => 'A', 'name' => 'Pharmacie A', 'site_type' => 'stock_and_dispensing'])->assertCreated()->json('site.id');

@@ -219,10 +219,40 @@ Source : audit `07` (section 2) et décisions du 01/10.
 | Menu Admin Projet (Q-3) | 4 entrées : Tableau de bord, Projet & FOSA, Liste standard, Profil. FOSA et Comptes utilisateurs deviennent des onglets (routes conservées). Mobile : barre basse Accueil, FOSA, Liste, Profil. |
 | Barre supérieure | Fil d'Ariane ONG / Coordination / Projet (ou FOSA), indicateur En ligne / Hors ligne, initiales sur deux lettres ; encart Coordination en bas du menu latéral. |
 | EN TROP masqués | Onglets du catalogue sur la Liste Standard (rôles V1) ; filtres Organisation et Mission des FOSA (Admin Projet) ; écriture du catalogue produits et des référentiels pour l'Admin Projet (API refusée) ; menu et page « Produits » des FOSA (API catalogue conservée pour le mobile) ; validation clinique des ordonnances (V4) ; destination « Communauté » (historique visible). |
-| Validation clinique masquée | Les ordonnances sont créées « validées », ce qui les rend directement dispensables. Les tests du code conservé réactivent la fonction. |
+| Validation clinique masquée | Les ordonnances sont directement dispensables. ~~Créées « validées »~~ : remplacé au lot 15 par le statut distinct « Validation non requise (V1) ». Les tests du code conservé réactivent la fonction. |
 | **Correction de sécurité** | Le middleware V1 est global et s'exécutait avant l'authentification Sanctum. Sur un vrai appel mobile avec jeton, **les restrictions V1 de l'API ne s'appliquaient pas** (les tests ne le voyaient pas, car `Sanctum::actingAs` authentifie avant). Le jeton est maintenant résolu explicitement ; un test utilise un vrai jeton. |
 
 Tests : `V1AdminProjectStructureAndMaskingTest` (6), `mobile_navigation_test` ; tests existants alignés sur Q-3 et P-07.
+
+## Lot 15 — Correctifs du point A et fiche FOSA (c1) · 01/10/2026
+
+### Point A — `b2ce968`
+
+| Élément | Réalisation |
+|---|---|
+| Statut des ordonnances V1 | Statut distinct `validation_not_required` (« Validation non requise (V1) ») : dispensable, mais jamais présenté comme validé cliniquement. Commande `pharmacare:prescriptions:fix-v1-status {--dry-run}` pour corriger les ordonnances « validées » sans validateur (base de test : 0). |
+| Ordre des middlewares | Restrictions V1, frontière Sago et lecture seule appliquées aux vrais jetons mobiles (trait `ResolvesAuthenticatedUser`). `RealTokenRoleMatrixTest` (7) appelle l'API avec un vrai jeton pour chaque rôle. |
+| Rapport base réelle | `backend/tools/rapport-lecture-seule.php` (SQLite ouvert en lecture seule + `PRAGMA query_only`). Pas encore lancé sur la base réelle : on attend la sauvegarde du porteur. |
+
+### AM-162 — Fiche FOSA complète (lot c1)
+
+| Élément | Réalisation |
+|---|---|
+| Statut de validation | `validation_status` : en attente, validée, refusée, suspendue. FOSA existantes → validées. Une FOSA déclarée par l'Admin Projet est « en attente » ; une FOSA refusée et corrigée repasse « en attente ». Les écrans de validation (Coordination) arrivent au lot c1-bis. |
+| Classification | Catégorie (5 par défaut : HR, HD, CMA, CSI, CSA), niveau de soins, populations et pathologies **limités à la configuration validée du projet** (refus serveur sinon). Endpoint `GET …/facilities/options`. |
+| Approvisionnement (DEC-08) | Périodicité, DL, stock de sécurité (0,25 ; 0,5 ; 0,75 ; 1 ; 1,5 ; 2 mois) et 3 dates. Préremplis depuis le projet à la création ; historisés. Un changement du projet n'écrase jamais les FOSA, sauf action explicite de la Coordination avec confirmation (`POST /projects/{id}/supply-settings/apply-to-facilities`). |
+| Liste Standard de la FOSA | `GET …/facilities/{id}/standard-list` : liste générée par sa propre configuration, limitée aux produits publiés du projet. |
+| Comptes FOSA | L'Admin Projet crée l'Admin Site **et** l'Utilisateur Site. Refus (422) tant que la FOSA n'est pas validée. Site principal invisible créé automatiquement (DEC-05). |
+| Type de projet | `donor_project` (défaut) ou `national_program` (« Programme national », bailleur facultatif). |
+| Écrans | Web : champs V1 dans les formulaires FOSA de l'Admin Projet (mise en page définitive au lot c2). Mobile : l'étape « Classification » de l'assistant FOSA est remplacée pour l'Admin Projet ; choix mis en cache pour la déclaration hors ligne. Les autres rôles gardent leur formulaire. |
+
+Tests : `HealthFacilityConfigurationTest` (8). Suite backend complète : 316 tests OK. Mobile : `flutter analyze` sans remarque, 91 tests OK.
+
+**Changements de comportement à connaître**
+
+- L'Admin Projet doit renseigner niveau, catégorie, au moins une population et une pathologie ; le type de FOSA est déduit de la catégorie.
+- Quatre tests existants encodaient l'ancienne règle (FOSA sans classification, Admin Projet limité à l'Admin Site) ; ils passent maintenant par la configuration du projet et la validation (helper `Tests\Support\V1FacilityFixtures`).
+- Le stock de sécurité du **projet** reste un entier tant que le rapport R1 sur la base réelle n'a pas été lu.
 
 ## Modèle d'entrée pour les prochaines livraisons
 

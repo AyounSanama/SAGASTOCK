@@ -102,10 +102,26 @@ class GovernanceService
                 self::COORDINATION_ADMIN,
                 config('pharmacare_v1.features.coordination_creates_site_admin') ? self::SITE_ADMIN : null,
             ])),
-            self::PROJECT_ADMIN => [self::SITE_ADMIN],
+            // Comptes FOSA créés par l'Admin Projet (cahier des charges, section 3).
+            self::PROJECT_ADMIN => [self::SITE_ADMIN, self::SITE_USER],
             self::SITE_ADMIN => [self::SITE_USER],
             default => [],
         };
+    }
+
+    /**
+     * Les comptes d'une FOSA ne peuvent être créés qu'une fois la FOSA validée
+     * par la Coordination (refus serveur, quelle que soit l'interface).
+     */
+    public function assertFacilityOpenForAccounts(string $siteId): void
+    {
+        $facility = Site::with('healthFacility')->find($siteId)?->healthFacility;
+        abort_unless($facility, 404);
+        abort_unless(
+            $facility->validation_status === \App\Models\HealthFacility::STATUS_VALIDATED,
+            422,
+            'Les comptes de cette FOSA ne pourront être créés qu’après sa validation par la Coordination.',
+        );
     }
 
     /** Un Admin Coordination créé par une Coordination est en lecture seule. */

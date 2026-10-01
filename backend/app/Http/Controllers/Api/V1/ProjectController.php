@@ -141,6 +141,21 @@ class ProjectController extends Controller
     }
 
 
+    /**
+     * DEC-08 — « Appliquer à toutes les FOSA » : recopie la périodicité, le délai
+     * et le stock de sécurité du projet dans ses FOSA, avec confirmation
+     * explicite. Jamais déclenché automatiquement par une modification du projet.
+     */
+    public function applySupplyToFacilities(Request $request, Project $project): JsonResponse
+    {
+        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
+        $request->validate(['confirm' => ['required', 'accepted']], ['confirm.accepted' => 'Confirmez l’application des paramètres du projet à toutes ses FOSA.']);
+        $updated = app(\App\Services\HealthFacilityConfigurationService::class)->applyProjectSupplyToFacilities($project, $request->user());
+        $this->audit->record($request, 'project.supply_applied_to_facilities', $project, [], ['facilities_updated' => $updated]);
+
+        return response()->json(['facilities_updated' => $updated]);
+    }
+
     private function accessible(Request $request, Organization $organization): void
     {
         abort_unless($this->scopes->organizations($request->user())->whereKey($organization->id)->exists(), 404);

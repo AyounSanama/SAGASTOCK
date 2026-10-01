@@ -39,7 +39,7 @@ class ProjectProvisioningService
                 'donor_reference_code', 'moh_program_code', 'responsible_name',
                 'responsible_contact', 'description', 'starts_on', 'ends_on',
                 'order_period_months', 'delivery_lead_time_months',
-                'safety_stock_months', 'status', 'is_active',
+                'safety_stock_months', 'status', 'type', 'is_active',
             ]));
 
             $project->donors()->sync($data['donor_ids'] ?? []);
@@ -85,7 +85,7 @@ class ProjectProvisioningService
                 'donor_reference_code', 'moh_program_code', 'responsible_name',
                 'responsible_contact', 'description', 'starts_on', 'ends_on',
                 'order_period_months', 'delivery_lead_time_months',
-                'safety_stock_months', 'status', 'is_active',
+                'safety_stock_months', 'status', 'type', 'is_active',
             ]));
             $supplyChanged = $project->isDirty(self::SUPPLY_FIELDS);
             $project->save();
