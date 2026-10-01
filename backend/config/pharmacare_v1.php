@@ -4,6 +4,8 @@ return [
     // Fonctions masquées en V1 (le code est conservé).
     'features' => [
         'dark_mode' => false,
+        // Rôle « Formation sanitaire » (Admin Site) masqué pour la Coordination.
+        'coordination_creates_site_admin' => false,
     ],
     'navigation' => [
         'coordination_admin' => ['dashboard', 'missions', 'projects', 'standard-lists', 'profile'],

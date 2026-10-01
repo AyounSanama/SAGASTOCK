@@ -19,7 +19,8 @@
  <div class="mc-grid">
   <x-app-card>
    <h3 class="mc-title">1. Niveaux de soins</h3>
-   <p class="mc-muted">Cochez les niveaux, catégories ou programmes couverts par le projet. <a href="{{ route('projects.medical-references') }}">Gérer le référentiel</a></p>
+   <p class="mc-muted">Cochez les niveaux, catégories ou programmes couverts par le projet.</p>
+   @if(auth()->user()->hasPermission('standard_lists.manage'))<p><x-app-button variant="outline" icon="add" :href="route('projects.medical-references').'#ajouter-un-service'">Ajouter un service</x-app-button></p>@endif
    <ul class="mc-tree">@foreach($options['care_level_tree'] as $node)@include('projects.partials.care-level-checkbox', ['node' => $node, 'selected' => $selectedLevels])@endforeach</ul>
   </x-app-card>
   <x-app-card>

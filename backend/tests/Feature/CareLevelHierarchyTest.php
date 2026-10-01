@@ -69,7 +69,7 @@ class CareLevelHierarchyTest extends TestCase
         $coordination = $this->actor('coordination_admin', 'mission', $this->mission->id);
 
         $this->actingAs($coordination)->get(route('projects.medical-references'))
-            ->assertOk()->assertSee('Programme PEC Paludisme')->assertSee('Ajouter un élément');
+            ->assertOk()->assertSee('Programme PEC Paludisme')->assertSee('Ajouter un service');
 
         $this->post(route('projects.medical-references.care-levels.store'), ['code' => 'STERT', 'name' => 'Soins de santé tertiaire'])
             ->assertSessionHasNoErrors();

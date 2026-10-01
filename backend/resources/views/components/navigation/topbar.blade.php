@@ -3,6 +3,7 @@
     <button class="sidebar-toggle material-symbols-outlined secondary" type="button" aria-label="Ouvrir ou fermer le menu" aria-expanded="true" aria-controls="pharmacare-sidebar">menu</button>
     <strong class="topbar-context">@yield('page-title', 'PharmaCare')</strong>
     <span class="topbar-spacer"></span>
+    @if($actor?->read_only)<span class="app-badge app-badge--info" title="Vous consultez les informations sans pouvoir les modifier."><span class="material-symbols-outlined" aria-hidden="true">visibility</span>Lecture seule</span>@endif
     <div class="topbar-tools" aria-label="Préférences d’affichage">
         <form class="topbar-locale-switch" method="post" action="{{ route('profile.locale') }}" aria-label="{{ __('ui.language') }}">
             @csrf

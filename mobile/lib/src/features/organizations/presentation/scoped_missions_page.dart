@@ -40,6 +40,8 @@ class ScopedMissionsPage extends StatelessWidget {
         allowedCountries: allowedCountries,
         readOnly: role == 'coordination_admin',
         canCreateProject: ApplicationAccess.allows(user, 'projects.manage'),
+        canCreateAccount: ApplicationAccess.allows(user, 'users.manage'),
+        accessReadOnly: ApplicationAccess.isReadOnly(user),
         initialCoordination: coordination,
       );
     },

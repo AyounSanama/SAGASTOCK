@@ -6,6 +6,7 @@ use App\Http\Middleware\EnforceSagoPlatformBoundary;
 use App\Http\Middleware\EnforceV1ModuleAvailability;
 use App\Http\Middleware\EnsureIdempotentApiRequest;
 use App\Http\Middleware\ApplyUserLocale;
+use App\Http\Middleware\EnforceReadOnlyAccount;
 use App\Http\Middleware\AddSecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -22,7 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(AddSecurityHeaders::class);
         $middleware->append(EnforceSagoPlatformBoundary::class);
         $middleware->append(EnforceV1ModuleAvailability::class);
-        $middleware->web(append: [ApplyUserLocale::class]);
+        $middleware->web(append: [ApplyUserLocale::class, EnforceReadOnlyAccount::class]);
+        $middleware->api(append: [EnforceReadOnlyAccount::class]);
         $middleware->alias([
             'permission' => EnsurePermission::class,
             'role' => EnsureRole::class,

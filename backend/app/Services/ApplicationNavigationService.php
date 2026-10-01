@@ -44,6 +44,7 @@ class ApplicationNavigationService
         return $user->roles()->with('permissions:id,code')->get()
             ->pluck('permissions')->flatten()->pluck('code')
             ->merge($user->directPermissions()->pluck('code'))
+            ->when($user->read_only, fn (Collection $codes) => $codes->filter(fn (string $code) => User::isReadPermission($code)))
             ->unique()->values();
     }
 

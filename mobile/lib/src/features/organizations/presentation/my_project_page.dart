@@ -232,7 +232,7 @@ class _SupplySection extends StatelessWidget {
     title: 'Paramètres d’approvisionnement',
     children: [
       _Line(
-        'Périodicité des commandes',
+        'Périodicité de commande',
         _months(project['order_period_months']),
       ),
       _Line(

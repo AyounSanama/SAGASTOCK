@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/widgets/app_button.dart';
 import '../data/organization_service.dart';
 import 'mission_form_sheet.dart';
+import '../../users/presentation/coordination_account_sheet.dart';
 
 class MissionsPage extends StatefulWidget {
   const MissionsPage({
@@ -15,6 +16,8 @@ class MissionsPage extends StatefulWidget {
     this.allowedCountries = const [],
     this.readOnly = false,
     this.canCreateProject = false,
+    this.canCreateAccount = false,
+    this.accessReadOnly = false,
     this.initialCoordination,
     super.key,
   });
@@ -24,6 +27,12 @@ class MissionsPage extends StatefulWidget {
   final List<Map<String, dynamic>> allowedCountries;
   final bool readOnly;
   final bool canCreateProject;
+
+  /// Création de comptes Admin Projet / Admin Coordination (lecture seule).
+  final bool canCreateAccount;
+
+  /// Compte en lecture seule : bandeau d'information.
+  final bool accessReadOnly;
   final Map<String, dynamic>? initialCoordination;
 
   @override
@@ -40,6 +49,13 @@ class _MissionsPageState extends State<MissionsPage> {
   String _status = '';
   String _countryId = '';
   String? _error;
+
+  /// Coordination (mission) de l'Admin Coordination.
+  String? get _coordinationId {
+    final id =
+        '${widget.initialCoordination?['id'] ?? (_missions.isNotEmpty ? _missions.first['id'] : '')}';
+    return id.isEmpty ? null : id;
+  }
 
   @override
   void initState() {
@@ -252,11 +268,43 @@ class _MissionsPageState extends State<MissionsPage> {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+            if (widget.accessReadOnly) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Accès en lecture seule : vous consultez les informations de la coordination sans pouvoir les modifier.',
+              ),
+            ],
             if (widget.readOnly && widget.canCreateProject) ...[
               const SizedBox(height: 14),
               AppButton.add(
                 label: 'Créer un projet',
                 onPressed: () => context.push('/projects?create=1'),
+              ),
+            ],
+            if (widget.readOnly &&
+                widget.canCreateAccount &&
+                _coordinationId != null) ...[
+              const SizedBox(height: 10),
+              AppButton(
+                label: 'Créer un compte',
+                icon: Icons.person_add_alt_1_outlined,
+                variant: AppButtonVariant.edit,
+                onPressed: () async {
+                  final created = await openCoordinationAccountSheet(
+                    context,
+                    organizationId: widget.organizationId,
+                    missionId: _coordinationId!,
+                  );
+                  if (created && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Compte créé. L’utilisateur devra changer son mot de passe à la première connexion.',
+                        ),
+                      ),
+                    );
+                  }
+                },
               ),
             ],
             const SizedBox(height: 16),

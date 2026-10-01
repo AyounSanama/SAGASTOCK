@@ -210,7 +210,13 @@ abstract final class ApplicationAccess {
           .toSet();
 
   static bool allows(Map<String, dynamic>? user, String? permission) =>
-      permission == null || permissions(user).contains(permission);
+      permission == null ||
+      (permissions(user).contains(permission) &&
+          (!isReadOnly(user) || permission.endsWith('.view')));
+
+  /// Compte Admin Coordination en lecture seule (appliqué aussi côté serveur).
+  static bool isReadOnly(Map<String, dynamic>? user) =>
+      user?['read_only'] == true;
 
   /// Availability gate for the staged V1. It complements RBAC: a permission
   /// alone must not expose a module hidden for the current role.

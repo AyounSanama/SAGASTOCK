@@ -245,6 +245,7 @@ Future<bool?> showMedicalConfigurationEditor(
             children: [
               _EditorTitle(
                 '1. Niveaux de soins',
+                addLabel: 'Ajouter un service',
                 onAdd: saving
                     ? null
                     : () => addReference('care_level', 'Niveau de soins'),
@@ -420,9 +421,12 @@ String _errorMessage(DioException error) {
 }
 
 class _EditorTitle extends StatelessWidget {
-  const _EditorTitle(this.title, {this.onAdd});
+  const _EditorTitle(this.title, {this.onAdd, this.addLabel});
   final String title;
   final VoidCallback? onAdd;
+
+  /// Libellé visible du bouton d'ajout (sinon icône seule).
+  final String? addLabel;
   @override
   Widget build(BuildContext context) => Row(
     children: [
@@ -432,11 +436,18 @@ class _EditorTitle extends StatelessWidget {
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
       ),
-      IconButton(
-        tooltip: 'Ajouter au référentiel',
-        onPressed: onAdd,
-        icon: const Icon(Icons.add_circle_outline),
-      ),
+      if (addLabel != null)
+        TextButton.icon(
+          onPressed: onAdd,
+          icon: const Icon(Icons.add_circle_outline),
+          label: Text(addLabel!),
+        )
+      else
+        IconButton(
+          tooltip: 'Ajouter au référentiel',
+          onPressed: onAdd,
+          icon: const Icon(Icons.add_circle_outline),
+        ),
     ],
   );
 }

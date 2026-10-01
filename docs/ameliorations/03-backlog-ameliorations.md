@@ -28,13 +28,15 @@ Mis à jour le 30/09/2026. Source principale :
 | AM-142 | P2 | CONF | Paramètres projet / site (remplace les placeholders) | Proposée | AM-114 |
 | AM-143 | P2 | SEC | Journal d'activité consultable (global et local) | Proposée | AM-101 |
 | AM-150 | P2 | DOC | Mettre `docs/03` et `docs/04` en cohérence avec le modèle réel | Proposée | AM-112 |
-| AM-160 | P1 | UI | Charte couleurs et typographie Web + mobile (lot a, audit `06`) | **En recette** (30/09) | — |
+| AM-160 | P1 | UI | Charte couleurs et typographie Web + mobile (lot a, audit `06`) | **Livrée** (01/10) | — |
 | AM-161 | P1 | UI | Structure commune Admin Projet : menu 4 entrées, barre supérieure, navigation mobile (lot b) | Validée | AM-160 |
 | AM-162 | P1 | STRUCT | Fiche FOSA complète, Form Request commun, tableau de bord, export Excel (lot c1) | Validée (DEC-08, 09, 11) | AM-161 |
 | AM-163 | P1 | UI | Écrans Web Admin Projet 01–04 (lot c2) | Validée | AM-162 |
 | AM-164 | P1 | UI | Écrans mobiles Admin Projet 05–08, tablette (lot c3) | Validée | AM-162 |
 | AM-165 | P1 | SYNC | Hors ligne Admin Projet : conflits, opérations en échec, chiffrement local (lot d) | Validée (DEC-10 à préciser) | AM-164 |
 | AM-166 | P1 | QA | Tests et scénarios de l'interface Admin Projet (lot e) | Validée | AM-165 |
+| AM-170 | P1 | CONF | Configuration Mission — Créer un projet (bailleur unique, libellés, 1–12 mois, populations, « Ajouter un service ») | **Livrée** (01/10) | AM-114 |
+| AM-171 | P1 | GOUV | Configuration Mission — Comptes : Admin Projet et Admin Coordination en lecture seule | **Livrée** (01/10) | — |
 
 ---
 

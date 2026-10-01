@@ -20,7 +20,8 @@
 
  @if($canManage)
  <x-app-card>
-  <h3 class="med-title">Ajouter un élément</h3>
+  <h3 class="med-title" id="ajouter-un-service">Ajouter un service (niveau, catégorie ou programme)</h3>
+  <p class="mc-muted">Le service ajouté est propre à votre organisation ; le référentiel commun reste inchangé.</p>
   <form method="post" action="{{ route('projects.medical-references.care-levels.store') }}" class="med-form">@csrf
    <label>Rattacher à
     <select name="parent_id">

@@ -93,7 +93,10 @@ class ProjectController extends Controller
         $project = $result['project'];
         $this->audit->record($request, 'project.created', $project, [], $project->only(['organization_id', 'mission_id', 'code', 'name', 'status', 'is_active']));
 
-        return back()->with('status', $result['admin'] ? 'Projet et premier Admin Projet créés avec succès.' : 'Projet créé avec succès.');
+        // Configuration Mission : la création enchaîne sur la configuration
+        // de la Liste Standard (niveaux de soins, populations, pathologies).
+        return redirect()->route('projects.medical-configuration', $project)
+            ->with('status', $result['admin'] ? 'Projet et premier Admin Projet créés avec succès.' : 'Projet créé avec succès.');
     }
 
     public function update(SaveProjectRequest $request, Organization $organization, Project $project): RedirectResponse

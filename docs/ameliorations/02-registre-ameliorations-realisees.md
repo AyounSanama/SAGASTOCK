@@ -24,7 +24,8 @@ Les entrées suivantes seront ajoutées au fil des livraisons.
 | 9 | 08–23/09/2026 | `c440807`, `7a3c584` | Refonte UI Web (Tailwind) et mobile | AM-053 → AM-056 |
 | 10 | 30/09/2026 | `bbbf9f1` → `d42c7ea` | Stabilisation : tests au vert, commit de la refonte | AM-101, AM-102 |
 | 11 | 30/09/2026 | `bce20dd`, `126aa74` | Configuration du projet (cahier des charges Mission / Projet) | AM-110 → AM-114 |
-| 12 | 30/09/2026 | `193a7bd` (en recette) | Charte couleurs et typographie (interface Admin Projet, lot a) | AM-160 |
+| 12 | 30/09 → 01/10/2026 | `193a7bd` → `7c45e25` | Charte couleurs et typographie (lot a), corrections de recette | AM-160 |
+| 13 | 01/10/2026 | voir lot | Configuration Mission : Créer un projet et Comptes de la Coordination | AM-170, AM-171 |
 
 ---
 
@@ -182,6 +183,31 @@ comparaison).
 **Numérotation** : le plan de l'audit `06` utilisait AM-120 → AM-126, déjà attribués ; il est renuméroté AM-160 → AM-166.
 
 **Restant (lots suivants)** : barre supérieure trop large sur téléphone (lot b) ; onglets du catalogue visibles sur la Liste Standard de l'Admin Projet (lot c2) ; couleurs de catégories des graphiques SAGO conservées (données, pas des états).
+
+### Corrections de recette du lot a (01/10/2026)
+
+| Point | Résultat |
+|---|---|
+| Bordure noire du « + » mobile | Artefact du test Flutter (`debugDisableShadows` remplace les ombres par un contour) ; capture refaite avec ombres réelles. Aucune modification de l'application. |
+| Slogan de connexion | Traduit FR/EN sur le Web (page de connexion entière) et le mobile ; la dernière langue choisie est mémorisée (cookie Web, stockage sécurisé mobile). |
+| Textes orange | Audit automatisé de toutes les pages des rôles Admin Projet, Coordination, Admin Site, Utilisateur Site : plus aucun texte `#F57C00` sur fond clair. |
+| Mode sombre | Masqué par `pharmacare_v1.features.dark_mode` (code conservé, choix mémorisé ignoré). |
+| Lancement | Scripts `serve-demo.ps1` / `stop-demo.ps1` (base de test isolée uniquement) ; adresse du serveur configurable sur mobile (`--dart-define` ou écran « Paramètres serveur » des builds de test). |
+
+## Lot 13 — Configuration Mission (Admin Coordination) · 01/10/2026
+
+Source : captures « Configuration Mission » validées par le porteur.
+
+| ID | Domaine | Amélioration | Tests |
+|---|---|---|---|
+| AM-170 | CONF | Créer un projet : un projet par bailleur (code bailleur = projet) ; exemples de codes (GFFO5, FH4, PNLT) ; libellés « Périodicité de commande » et « Stock de sécurité » partout ; durées de 1 à 12 mois (Web, mobile) ; populations cibles par défaut (Adultes, Femmes enceintes, Enfants < 5 ans) dans le référentiel commun ; bouton « Ajouter un service » dans la configuration du projet (service propre à l'organisation) ; la création enchaîne sur la configuration de la Liste Standard | `ConfigurationMissionProjectTest` (4), `CareLevelHierarchyTest` |
+| AM-171 | GOUV | Comptes créés par la Coordination : Admin Projet (projet choisi dans la liste des projets de la coordination) et Admin Coordination **en lecture seule** ; « Formation sanitaire » masqué (`pharmacare_v1.features.coordination_creates_site_admin`). Lecture seule appliquée côté backend : permissions d'écriture retirées et middleware `EnforceReadOnlyAccount` (403 sur toute écriture Web et API, sauf la gestion de son propre compte). Formulaire « Créer un compte » sur le Web (Ma Coordination) et le mobile ; badge « Lecture seule » | `ReadOnlyCoordinationAccountTest` (7), `GovernanceMatrixTest`, `V1ModuleAvailabilityTest`, `coordination_accounts_test.dart` |
+
+**Changements de comportement à connaître**
+
+- La Coordination ne peut plus créer de comptes de formation sanitaire (Admin Site) ; le Projet le fait (Équipe FOSA).
+- Un projet ne peut plus être rattaché à plusieurs bailleurs : un projet existant qui en a plusieurs devra n'en garder qu'un à sa prochaine modification.
+- Six tests existants encodaient l'ancienne règle (« la Coordination ne crée pas de comptes ») ; ils sont mis à jour selon la spécification validée, sans relâcher les autres contrôles.
 
 ## Modèle d'entrée pour les prochaines livraisons
 

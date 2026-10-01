@@ -250,6 +250,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                         controller: donorCode,
                         decoration: const InputDecoration(
                           labelText: 'Code bailleur',
+                          hintText: 'ex. GFFO5, FH4',
                         ),
                       ),
                     ),
@@ -258,7 +259,8 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                       child: TextFormField(
                         controller: mohCode,
                         decoration: const InputDecoration(
-                          labelText: 'Code programme MoH',
+                          labelText: 'Code programme du Ministère de la Santé',
+                          hintText: 'ex. PNLT',
                         ),
                       ),
                     ),
@@ -343,7 +345,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   DropdownButtonFormField<int>(
                     initialValue: orderPeriodMonths,
                     decoration: const InputDecoration(
-                      labelText: 'Périodicité des commandes',
+                      labelText: 'Périodicité de commande',
                     ),
                     items: _monthOptions,
                     validator: (value) => status == 'active' && value == null
@@ -398,7 +400,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   DropdownButtonFormField<int>(
                     initialValue: orderPeriodMonths,
                     decoration: const InputDecoration(
-                      labelText: 'Périodicité des commandes',
+                      labelText: 'Périodicité de commande',
                     ),
                     items: _monthOptions,
                     validator: (value) => status == 'active' && value == null
@@ -453,6 +455,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                       child: Text('Aucun bailleur actif disponible.'),
                     )
                   else
+                    // Un projet par code bailleur : un seul bailleur sélectionnable.
                     ...donors.map(
                       (donor) => CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
@@ -462,9 +465,10 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                         onChanged: saving
                             ? null
                             : (checked) => setSheetState(() {
-                                checked == true
-                                    ? selectedDonors.add('${donor['id']}')
-                                    : selectedDonors.remove('${donor['id']}');
+                                selectedDonors.clear();
+                                if (checked == true) {
+                                  selectedDonors.add('${donor['id']}');
+                                }
                               }),
                       ),
                     ),
@@ -730,13 +734,10 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
     'closed': 'Clôturé',
   };
 
-  static const _monthOptions = <DropdownMenuItem<int>>[
-    DropdownMenuItem(value: 1, child: Text('1 mois')),
-    DropdownMenuItem(value: 2, child: Text('2 mois')),
-    DropdownMenuItem(value: 3, child: Text('3 mois')),
-    DropdownMenuItem(value: 4, child: Text('4 mois')),
-    DropdownMenuItem(value: 6, child: Text('6 mois')),
-    DropdownMenuItem(value: 12, child: Text('12 mois')),
+  /// Durées en mois (1 = 1 mois), de 1 à 12, comme sur le Web.
+  static final _monthOptions = <DropdownMenuItem<int>>[
+    for (var month = 1; month <= 12; month++)
+      DropdownMenuItem(value: month, child: Text('$month mois')),
   ];
 
   Future<void> _changeArchiveState(Map<String, dynamic> project) async {
@@ -851,12 +852,12 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
           if ('${project['donor_reference_code'] ?? ''}'.isNotEmpty)
             Text('Code bailleur : ${project['donor_reference_code']}'),
           if ('${project['moh_program_code'] ?? ''}'.isNotEmpty)
-            Text('Code programme MoH : ${project['moh_program_code']}'),
+            Text('Code programme du Ministère de la Santé : ${project['moh_program_code']}'),
           const SizedBox(height: 8),
-          Text('Bailleur(s) : ${_names(project['donors'])}'),
+          Text('Bailleur : ${_names(project['donors'])}'),
           Text('Programme(s) : ${_names(project['programs'])}'),
           Text(
-            'Périodicité des commandes : ${_months(project['order_period_months'])}',
+            'Périodicité de commande : ${_months(project['order_period_months'])}',
           ),
           Text(
             'Délai de livraison : ${_months(project['delivery_lead_time_months'])}',

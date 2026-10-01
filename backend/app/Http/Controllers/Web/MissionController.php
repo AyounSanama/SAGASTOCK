@@ -104,6 +104,14 @@ class MissionController extends Controller
             'canManageProjects' => $request->user()->hasPermission('projects.manage'),
             'canManageProjectAdmins' => $request->user()->hasPermission('users.manage'),
             'projectAdminRole' => Role::where('code', 'project_admin')->where('is_active', true)->first(),
+            // Configuration Mission : la Coordination crée des Admins Projet et
+            // des Admins Coordination en lecture seule (rôles selon la gouvernance).
+            'accountRoles' => app(\App\Services\UserScopeService::class)->assignableRoles($request->user())
+                ->whereIn('code', ['project_admin', 'coordination_admin'])->orderByDesc('code')->get(),
+            'readOnlyCoordinators' => User::where('read_only', true)
+                ->whereHas('roles', fn ($query) => $query->where('roles.code', 'coordination_admin')
+                    ->where('role_user.scope_type', 'mission')->where('role_user.scope_id', $mission->id))
+                ->orderBy('name')->get(),
             'projectAdmins' => User::with(['roles' => fn ($query) => $query
                 ->where('roles.code', 'project_admin')->wherePivot('scope_type', 'project')->wherePivotIn('scope_id', $projectIds)])
                 ->where('organization_id', $organization->id)

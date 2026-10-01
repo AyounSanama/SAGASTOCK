@@ -74,7 +74,7 @@ class SaveProjectRequest extends FormRequest
             'delivery_lead_time_months' => ['nullable', 'required_if:status,active', 'integer', 'min:1', 'max:24'],
             'safety_stock_months' => ['nullable', 'required_if:status,active', 'integer', 'min:1', 'max:24'],
             'status' => ['required', Rule::in(array_keys(Project::STATUSES))],
-            'donor_ids' => ['nullable', 'array'],
+            'donor_ids' => ['nullable', 'array', 'max:1'],
             'donor_ids.*' => ['uuid', Rule::exists('donors', 'id')->where('organization_id', $organization->id)],
             'program_ids' => ['nullable', 'array'],
             'program_ids.*' => ['uuid', Rule::exists('programs', 'id')->where('organization_id', $organization->id)],
@@ -85,6 +85,7 @@ class SaveProjectRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'donor_ids.max' => 'Un projet est rattaché à un seul bailleur : créez un projet par code bailleur.',
             'required_if' => 'Le champ :attribute est obligatoire pour un projet actif.',
             'status.in' => 'Le statut doit être Brouillon, Actif, Suspendu ou Clôturé.',
         ];
@@ -99,7 +100,7 @@ class SaveProjectRequest extends FormRequest
             'responsible_name' => 'responsable du projet',
             'responsible_contact' => 'contact du responsable',
             'status' => 'statut',
-            'order_period_months' => 'périodicité des commandes',
+            'order_period_months' => 'périodicité de commande',
             'delivery_lead_time_months' => 'délai de livraison',
             'safety_stock_months' => 'stock de sécurité',
         ];

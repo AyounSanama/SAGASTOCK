@@ -187,6 +187,7 @@ class AuthController extends Controller
             'password' => $password,
             'is_active' => $request->boolean('is_active', true),
             'must_change_password' => $generated || $request->boolean('must_change_password'),
+            'read_only' => $this->governance->createsReadOnlyAccount($request->user(), $role),
         ]);
         $user->roles()->sync([$data['role_id'] => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]);
         if ($this->governance->roleCode($request->user()) === GovernanceService::SITE_ADMIN) {

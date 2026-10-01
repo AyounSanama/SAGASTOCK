@@ -17,12 +17,12 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, HasUuids, Notifiable, SoftDeletes;
 
-    protected $fillable = ['organization_id', 'name', 'first_name', 'last_name', 'username', 'email', 'phone', 'preferred_locale', 'password', 'is_active', 'must_change_password', 'last_login_at', 'password_changed_at', 'failed_login_attempts', 'locked_until'];
+    protected $fillable = ['organization_id', 'name', 'first_name', 'last_name', 'username', 'email', 'phone', 'preferred_locale', 'password', 'is_active', 'must_change_password', 'read_only', 'last_login_at', 'password_changed_at', 'failed_login_attempts', 'locked_until'];
     protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'is_active' => 'boolean', 'must_change_password' => 'boolean', 'last_login_at' => 'datetime', 'password_changed_at' => 'datetime', 'failed_login_attempts' => 'integer', 'locked_until' => 'datetime'];
+        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'is_active' => 'boolean', 'must_change_password' => 'boolean', 'read_only' => 'boolean', 'last_login_at' => 'datetime', 'password_changed_at' => 'datetime', 'failed_login_attempts' => 'integer', 'locked_until' => 'datetime'];
     }
 
     public function uniqueIds(): array
@@ -45,8 +45,17 @@ class User extends Authenticatable
     {
         return $this->hasMany(Device::class);
     }
+    /** Permission de consultation (seules permissions d'un compte en lecture seule). */
+    public static function isReadPermission(string $permission): bool
+    {
+        return str_ends_with($permission, '.view');
+    }
+
     public function hasPermission(string $permission): bool
     {
+        if ($this->read_only && ! self::isReadPermission($permission)) {
+            return false;
+        }
         $codes = collect([$permission])->merge($this->permissionAliases($permission));
 
         return $this->directPermissions()->whereIn('code', $codes)->exists()

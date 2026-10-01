@@ -38,10 +38,10 @@ class GovernanceMatrixTest extends TestCase
         $governance = app(GovernanceService::class);
         $scopes = app(UserScopeService::class);
 
-        $this->assertSame(['project_admin', 'site_admin'], $governance->assignableCodes($coordination));
+        $this->assertSame(['project_admin', 'coordination_admin'], $governance->assignableCodes($coordination));
         $this->assertSame(['site_admin'], $governance->assignableCodes($projectAdmin));
         $this->assertSame(['site_user'], $governance->assignableCodes($siteAdmin));
-        $this->assertEqualsCanonicalizing(['project_admin', 'site_admin'], $scopes->assignableRoles($coordination)->pluck('code')->all());
+        $this->assertEqualsCanonicalizing(['project_admin', 'coordination_admin'], $scopes->assignableRoles($coordination)->pluck('code')->all());
         $this->assertSame(['site_admin'], $scopes->assignableRoles($projectAdmin)->pluck('code')->all());
         $this->assertSame(['site_user'], $scopes->assignableRoles($siteAdmin)->pluck('code')->all());
     }
@@ -52,7 +52,7 @@ class GovernanceMatrixTest extends TestCase
         $coordination = $this->actor('coordination_admin', 'platform', $organization->id);
 
         $this->assertEqualsCanonicalizing(
-            ['project_admin', 'site_admin'],
+            ['project_admin', 'coordination_admin'],
             app(UserScopeService::class)->assignableRoles($coordination)->pluck('code')->all(),
         );
     }
@@ -92,7 +92,10 @@ class GovernanceMatrixTest extends TestCase
         [$organization, $project, , $site] = $this->hierarchy('R');
 
         Sanctum::actingAs($this->actor('coordination_admin', 'organization', $organization->id));
-        $this->getJson('/api/v1/assignable-roles')->assertForbidden();
+        $this->assertEqualsCanonicalizing(
+            ['project_admin', 'coordination_admin'],
+            collect($this->getJson('/api/v1/assignable-roles')->assertOk()->json('roles'))->pluck('code')->all(),
+        );
 
         Sanctum::actingAs($this->actor('project_admin', 'project', $project->id));
         $this->getJson('/api/v1/assignable-roles')
@@ -124,11 +127,14 @@ class GovernanceMatrixTest extends TestCase
     public function test_assignable_roles_api_never_returns_an_inactive_target_role(): void
     {
         [$organization] = $this->hierarchy('INACTIVE-ASSIGNABLE');
-        Role::where('code', 'site_admin')->update(['is_active' => false]);
+        Role::where('code', 'project_admin')->update(['is_active' => false]);
 
         Sanctum::actingAs($this->actor('coordination_admin', 'organization', $organization->id));
 
-        $this->getJson('/api/v1/assignable-roles')->assertForbidden();
+        $this->assertSame(
+            ['coordination_admin'],
+            collect($this->getJson('/api/v1/assignable-roles')->assertOk()->json('roles'))->pluck('code')->all(),
+        );
     }
 
     public function test_assignable_roles_api_requires_authentication(): void
@@ -362,7 +368,7 @@ class GovernanceMatrixTest extends TestCase
         $this->postJson('/api/v1/users', [
             'name' => 'Admin Projet Créé', 'email' => 'project.created@example.org',
             'role_id' => $projectRole->id, 'scope_type' => 'project', 'scope_id' => $project->id,
-        ])->assertForbidden();
+        ])->assertCreated();
         $this->postJson('/api/v1/users', [
             'name' => 'Admin Site Créé', 'email' => 'site.by.coordination@example.org',
             'role_id' => $siteRole->id, 'scope_type' => 'site', 'scope_id' => $site->id,
@@ -395,7 +401,12 @@ class GovernanceMatrixTest extends TestCase
         $this->actingAs($projectAdmin)->get('/users')->assertOk();
     }
 
-    public function test_coordination_admin_cannot_use_hidden_user_sidebar_module_in_v1(): void
+    /**
+     * Configuration Mission (rubrique Comptes) : le module Utilisateurs reste
+     * masqué pour la Coordination, mais elle crée des Admins Projet depuis
+     * « Ma Coordination ». Les comptes de formation sanitaire restent refusés.
+     */
+    public function test_coordination_admin_creates_project_admins_but_not_facility_accounts_in_v1(): void
     {
         [$organization, $project, $facility, $site] = $this->hierarchy('WEB-COORD');
         $mission = $project->mission;
@@ -410,7 +421,7 @@ class GovernanceMatrixTest extends TestCase
             'email' => 'alice.project@example.org', 'role_id' => $projectRole->id,
             'organization_id' => $organization->id, 'mission_id' => $mission->id,
             'project_id' => $project->id,
-        ])->assertForbidden();
+        ])->assertRedirect();
 
         $this->actingAs($coordination)->post('/users', [
             'first_name' => 'Brice', 'last_name' => 'Site', 'username' => 'brice_site',
@@ -418,9 +429,9 @@ class GovernanceMatrixTest extends TestCase
             'organization_id' => $organization->id, 'mission_id' => $mission->id,
             'project_id' => $project->id, 'health_facility_id' => $facility->id,
             'dispensing_site_id' => $site->id,
-        ])->assertForbidden();
+        ])->assertStatus(404);
 
-        $this->assertDatabaseMissing('users', ['email' => 'alice.project@example.org']);
+        $this->assertDatabaseHas('users', ['email' => 'alice.project@example.org', 'read_only' => false]);
         $this->assertDatabaseMissing('users', ['email' => 'brice.site@example.org']);
     }
 

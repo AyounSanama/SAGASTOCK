@@ -196,6 +196,7 @@ class AuthController extends Controller
             'access_scope' => $navigation->scope($user),
             'navigation' => $navigation->mobileItems($user),
             'must_change_password' => $user->must_change_password,
+            'read_only' => (bool) $user->read_only,
         ];
     }
 }

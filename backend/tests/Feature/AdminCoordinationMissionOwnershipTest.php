@@ -136,7 +136,7 @@ class AdminCoordinationMissionOwnershipTest extends TestCase
         }
         $this->get(route('organizations.missions.show', [$organization, $mission]))->assertOk()->assertSee('Jean Projet')->assertSee('Marie Projet');
         $this->post(route('organizations.projects.store', $other), ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 'mission_id' => $foreignMission->id, 'code' => 'INTRUS', 'name' => 'Interdit'])->assertNotFound();
-        $this->post(route('users.store'), ['email' => 'intrus@example.test'])->assertForbidden();
+        $this->post(route('users.store'), ['email' => 'intrus@example.test'])->assertSessionHasErrors(['first_name', 'role_id']);
         $this->assertDatabaseMissing('projects', ['code' => 'INTRUS']);
         $this->assertDatabaseMissing('users', ['email' => 'intrus@example.test']);
     }

@@ -91,13 +91,28 @@ class GovernanceService
     /** @return list<string> */
     public function assignableCodes(User $actor): array
     {
+        if ($actor->read_only) {
+            return [];
+        }
+
         return match ($this->roleCode($actor)) {
             self::SAGO_ADMIN => [self::COORDINATION_ADMIN],
-            self::COORDINATION_ADMIN => [self::PROJECT_ADMIN, self::SITE_ADMIN],
+            self::COORDINATION_ADMIN => array_values(array_filter([
+                self::PROJECT_ADMIN,
+                self::COORDINATION_ADMIN,
+                config('pharmacare_v1.features.coordination_creates_site_admin') ? self::SITE_ADMIN : null,
+            ])),
             self::PROJECT_ADMIN => [self::SITE_ADMIN],
             self::SITE_ADMIN => [self::SITE_USER],
             default => [],
         };
+    }
+
+    /** Un Admin Coordination créé par une Coordination est en lecture seule. */
+    public function createsReadOnlyAccount(User $actor, Role $role): bool
+    {
+        return $this->roleCode($actor) === self::COORDINATION_ADMIN
+            && $this->canonicalCode($role->code) === self::COORDINATION_ADMIN;
     }
 
     public function assignableCode(User $actor): ?string

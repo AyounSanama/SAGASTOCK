@@ -115,6 +115,7 @@ class UserController extends Controller
             'organization_id' => $this->organizationIdForScope($scopeType, $scopeId),
             'password' => $password, 'is_active' => true,
             'must_change_password' => $generated || ($data['must_change_password'] ?? false),
+            'read_only' => collect($roleIds)->contains(fn ($id) => $this->governance->createsReadOnlyAccount($request->user(), Role::findOrFail($id))),
         ]);
         $user->roles()->sync(collect($roleIds)->mapWithKeys(fn ($id) => [$id => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]));
         $this->syncDelegatedPermissions($request, $user, $data['permission_ids'] ?? []);

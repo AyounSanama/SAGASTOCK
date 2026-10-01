@@ -31,6 +31,14 @@ class EnforceV1ModuleAvailability
     private function isAllowed(Request $request, string $role, string $path): bool
     {
         if (str_starts_with($path, 'api/')) {
+            // Comptes créés depuis « Ma Coordination » (mobile) : rôles
+            // proposés et création seule, sans le module Utilisateurs.
+            if ($role === GovernanceService::COORDINATION_ADMIN
+                && (($path === 'api/v1/users' && $request->isMethod('post'))
+                    || ($path === 'api/v1/assignable-roles' && $request->isMethodSafe()))) {
+                return true;
+            }
+
             return collect(config("pharmacare_v1.api_patterns.$role", []))->contains(fn ($pattern) => preg_match($pattern, $path) === 1);
         }
 
@@ -39,6 +47,9 @@ class EnforceV1ModuleAvailability
             return true;
         }
         if ($role === GovernanceService::COORDINATION_ADMIN && preg_match('#^organizations/[^/]+/projects(?:/|$)#', $path)) return true;
+        // Comptes créés depuis « Ma Coordination » : création seule, sans
+        // ouvrir le module Utilisateurs (absent du menu V1 de la Coordination).
+        if ($role === GovernanceService::COORDINATION_ADMIN && $path === 'users' && $request->isMethod('post')) return true;
         if (preg_match('#^organizations/[^/]+/catalog$#', $path)) {
             return $request->query('section', 'lists') === 'lists';
         }

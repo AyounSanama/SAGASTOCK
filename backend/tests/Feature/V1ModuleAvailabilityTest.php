@@ -56,11 +56,14 @@ class V1ModuleAvailabilityTest extends TestCase
     {
         $coordination = $this->actor('coordination_admin', 'mission');
         Sanctum::actingAs($coordination);
-        foreach (['/api/v1/users', '/api/v1/assignable-roles', '/api/v1/organizations/'.$coordination->id.'/stocks'] as $path) {
+        foreach (['/api/v1/users', '/api/v1/organizations/'.$coordination->id.'/stocks'] as $path) {
             $this->getJson($path)
                 ->assertForbidden()
                 ->assertJsonPath('code', 'module_not_available_v1');
         }
+        // Formulaire « Créer un compte » de Ma Coordination : rôles proposés seulement.
+        $codes = collect($this->getJson('/api/v1/assignable-roles')->assertOk()->json('roles'))->pluck('code')->sort()->values()->all();
+        $this->assertSame(['coordination_admin', 'project_admin'], $codes);
 
         $project = $this->actor('project_admin', 'project');
         Sanctum::actingAs($project);
