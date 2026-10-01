@@ -254,6 +254,21 @@ Tests : `HealthFacilityConfigurationTest` (8). Suite backend complète : 316 tes
 - Quatre tests existants encodaient l'ancienne règle (FOSA sans classification, Admin Projet limité à l'Admin Site) ; ils passent maintenant par la configuration du projet et la validation (helper `Tests\Support\V1FacilityFixtures`).
 - Le stock de sécurité du **projet** reste un entier tant que le rapport R1 sur la base réelle n'a pas été lu.
 
+## Lot 16 — Gestion des comptes, rapports base réelle, audit de sécurité · 01/10/2026
+
+| Élément | Réalisation |
+|---|---|
+| Comptes (correction validée) | Un compte sans rôle officiel ne crée ni ne modifie plus aucun compte (API et Web). Admin Site et Utilisateur Site jamais à la plateforme. Personne n'attribue un rôle supérieur au sien, ni à soi-même. Modifier, réinitialiser, archiver ou restaurer un compte : seulement un compte de rang inférieur, dans son périmètre, jamais le sien (`GovernanceService::canManageUser`). |
+| Tests | `AccountHierarchyTest` (5). Les 6 fichiers qui utilisaient un ancien rôle personnalisé passent sur des rôles officiels : Admin Coordination (utilisateurs, projets, financements, catalogue) et Admin Sago (organisations). Les écrans masqués en V1 sont testés avec le masquage désactivé, ce qui est commenté dans chaque test. Suite backend : 321 tests OK. |
+| Rapports base réelle | R1 à R6 en lecture seule (`backend/tools/rapport-lecture-seule.php`) ; base réelle inchangée (date et empreinte vérifiées). |
+| Mobile | Adresse de développement d'`app_config` : `http://192.168.137.1:8000/api/v1` (point d'accès PC-SERGE). |
+| Sécurité | Audit `09-audit-securite.md` (2 critiques, 5 élevées) ; vérification de sécurité ajoutée au modèle de lot. |
+
+**À traiter (constatés pendant ce lot)**
+
+- « Configuration des projets » (Web, Coordination) : ses formulaires visent `/organizations/...`, que le masquage V1 bloque. Doublon à retirer (check-up des maquettes).
+- Aucun rôle officiel n'a `catalog.manage` : la codification par la Coordination est à ouvrir au lot f (AM-173).
+
 ## Modèle d'entrée pour les prochaines livraisons
 
 ```markdown

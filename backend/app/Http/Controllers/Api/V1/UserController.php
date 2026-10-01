@@ -64,6 +64,7 @@ class UserController extends Controller
     public function restore(Request $request, string $user): JsonResponse
     {
         $managedUser = $this->scopes->users($request->user(), User::onlyTrashed())->findOrFail($user);
+        $this->governance->assertCanManageUser($request->user(), $managedUser);
         $archivedAt = $managedUser->deleted_at?->toISOString();
         $managedUser->restore();
         $managedUser->update(['is_active' => true]);
@@ -139,6 +140,7 @@ class UserController extends Controller
     {
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
         $this->authorizeSiteAccountManagement($request, $user, 'users.update_site_admin');
+        $this->governance->assertCanManageUser($request->user(), $user);
         $old = $user->only(['name', 'email', 'phone', 'is_active']);
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:120'],
@@ -179,6 +181,7 @@ class UserController extends Controller
     {
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
         $this->authorizeSiteAccountManagement($request, $user, 'users.update_site_admin');
+        $this->governance->assertCanManageUser($request->user(), $user);
         $temporary = Str::password(16, symbols: true);
         $user->update(['password' => Hash::make($temporary), 'must_change_password' => true]);
         $user->tokens()->delete();
@@ -194,6 +197,7 @@ class UserController extends Controller
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
         $this->authorizeSiteAccountManagement($request, $user, 'users.suspend_site_admin');
         abort_if($request->user()->is($user), 422, 'Vous ne pouvez pas archiver votre propre compte.');
+        $this->governance->assertCanManageUser($request->user(), $user);
         if ($user->roles()->whereIn('code', ['sago_admin', 'owner', 'platform_owner'])->exists()) {
             $otherOwners = User::where('is_active', true)->whereKeyNot($user->id)
                 ->whereHas('roles', fn ($query) => $query->whereIn('code', ['sago_admin', 'owner', 'platform_owner']))->exists();

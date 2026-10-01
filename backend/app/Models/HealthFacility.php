@@ -23,7 +23,7 @@ class HealthFacility extends Model
     public const STATUS_SUSPENDED = 'suspended';
 
     public const STATUS_LABELS = [
-        self::STATUS_PENDING => 'En attente',
+        self::STATUS_PENDING => 'En attente de validation',
         self::STATUS_VALIDATED => 'Validée',
         self::STATUS_REFUSED => 'Refusée',
         self::STATUS_SUSPENDED => 'Suspendue',

@@ -82,6 +82,38 @@ $queries = [
            OR (r.code IN ('site_admin', 'site_user', 'facility_manager', 'pharmacist', 'clinician', 'supervisor') AND ru.scope_type <> 'site')
         ORDER BY r.code, u.name
         SQL,
+    'R6a — Rôles non officiels (hors sago_admin, coordination_admin, project_admin, site_admin, site_user) : permissions et titulaires' => <<<'SQL'
+        SELECT r.code AS role, r.name AS libelle,
+               CASE r.code
+                   WHEN 'owner' THEN 'ancien code de sago_admin'
+                   WHEN 'platform_owner' THEN 'ancien code de sago_admin'
+                   WHEN 'organization_admin' THEN 'ancien code de coordination_admin'
+                   WHEN 'project_coordinator' THEN 'ancien code de project_admin'
+                   WHEN 'facility_manager' THEN 'ancien code de site_admin'
+                   WHEN 'pharmacist' THEN 'ancien code de site_user'
+                   WHEN 'clinician' THEN 'ancien code de site_user'
+                   WHEN 'supervisor' THEN 'ancien code de site_user'
+                   ELSE 'rôle personnalisé'
+               END AS nature,
+               (SELECT GROUP_CONCAT(p.code, ', ') FROM permission_role pr JOIN permissions p ON p.id = pr.permission_id WHERE pr.role_id = r.id) AS permissions,
+               (SELECT GROUP_CONCAT(u.email || ' [' || ru.scope_type || CASE WHEN u.deleted_at IS NOT NULL THEN ', archivé' WHEN u.is_active = 1 THEN ', actif' ELSE ', inactif' END || ']', ' ; ')
+                  FROM role_user ru JOIN users u ON u.id = ru.user_id WHERE ru.role_id = r.id) AS titulaires
+        FROM roles r
+        WHERE r.code NOT IN ('sago_admin', 'coordination_admin', 'project_admin', 'site_admin', 'site_user')
+        ORDER BY r.code
+        SQL,
+    'R6b — Comptes créés, modifiés, archivés ou restaurés par les titulaires de ces rôles (journal d’audit)' => <<<'SQL'
+        SELECT acteur.email AS par, r.code AS role_acteur, a.event AS action,
+               COALESCE(cible.email, '(compte #' || a.auditable_id || ')') AS compte_concerne, a.created_at AS date
+        FROM audit_logs a
+        JOIN users acteur ON acteur.id = a.user_id
+        JOIN role_user ru ON ru.user_id = acteur.id
+        JOIN roles r ON r.id = ru.role_id
+        LEFT JOIN users cible ON CAST(cible.id AS TEXT) = a.auditable_id
+        WHERE r.code NOT IN ('sago_admin', 'coordination_admin', 'project_admin', 'site_admin', 'site_user')
+          AND a.event IN ('user.created', 'user.updated', 'user.archived', 'user.restored', 'user.password_reset', 'configuration.user.created')
+        ORDER BY a.created_at
+        SQL,
 ];
 
 foreach ($queries as $title => $sql) {

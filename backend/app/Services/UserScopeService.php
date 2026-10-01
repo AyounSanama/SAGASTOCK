@@ -288,60 +288,8 @@ class UserScopeService
                     ->whereIn('code', $assignableCodes);
         }
 
-        // Les anciens rôles administratifs personnalisés restent pilotés par
-        // leurs permissions explicites, sans contourner le périmètre plateforme.
-        if ($this->isPlatform($actor) && $actor->hasPermission('users.manage')) {
-            return Role::query()->where('is_active', true);
-        }
-
-        $roleCodes = $actor->roles()->pluck('roles.code');
-        $allowedSystemCodes = collect();
-
-        if ($roleCodes->contains('organization_admin')) {
-            $allowedSystemCodes = $allowedSystemCodes->merge([
-                'organization_admin', 'project_coordinator', 'facility_manager',
-                'pharmacist', 'clinician', 'supervisor',
-            ]);
-        }
-        if ($roleCodes->contains('project_coordinator')) {
-            $allowedSystemCodes = $allowedSystemCodes->merge([
-                'project_coordinator', 'facility_manager', 'pharmacist',
-                'clinician', 'supervisor',
-            ]);
-        }
-        if ($roleCodes->contains('facility_manager')) {
-            $allowedSystemCodes = $allowedSystemCodes->merge([
-                'facility_manager', 'pharmacist', 'clinician',
-            ]);
-        }
-
-        $organizations = $this->organizationIds($actor);
-        $projects = $this->projectIds($actor);
-        $facilities = $this->facilityIds($actor);
-        $sites = $this->siteIds($actor);
-
-        return Role::where(function (Builder $query) use ($allowedSystemCodes, $organizations, $projects, $facilities, $sites) {
-            $query->where(fn (Builder $system) => $system
-                ->where('is_system', true)
-                ->whereIn('code', $allowedSystemCodes->unique()))
-                ->orWhere(function (Builder $custom) use ($organizations, $projects, $facilities, $sites) {
-                    $custom->where('is_system', false)
-                        ->where(function (Builder $scopes) use ($organizations, $projects, $facilities, $sites) {
-                            $scopes->where(fn (Builder $q) => $q
-                                ->where('scope_type', 'organization')
-                                ->whereIn('scope_id', $organizations))
-                                ->orWhere(fn (Builder $q) => $q
-                                    ->where('scope_type', 'project')
-                                    ->whereIn('scope_id', $projects))
-                                ->orWhere(fn (Builder $q) => $q
-                                    ->where('scope_type', 'facility')
-                                    ->whereIn('scope_id', $facilities))
-                                ->orWhere(fn (Builder $q) => $q
-                                    ->where('scope_type', 'site')
-                                    ->whereIn('scope_id', $sites));
-                        });
-                });
-        });
+        // Un compte sans rôle officiel n'attribue aucun rôle (correction validée le 01/10).
+        return Role::query()->whereRaw('1 = 0');
     }
 
     public function canManageRole(User $actor, Role $role): bool

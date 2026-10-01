@@ -230,6 +230,7 @@ class AuthController extends Controller
         ]);
         [$scopeType, $scopeId] = $this->parseScope($data['scope']);
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
+        $this->governance->assertCanManageUser($request->user(), $user);
         abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
         $role = $this->scopes->assignableRoles($request->user())->findOrFail($data['role_id']);
         abort_unless($this->governance->canAssign($request->user(), $role, $scopeType, $scopeId), 403);
@@ -255,6 +256,7 @@ class AuthController extends Controller
     {
         $this->authorizeUsers('users.manage');
         abort_unless($this->scopes->canAccess(request()->user(), $user), 404);
+        $this->governance->assertCanManageUser($request->user(), $user);
         $temporary = Str::password(16, symbols: true);
         $user->update(['password' => $temporary, 'must_change_password' => true]);
         $user->tokens()->delete();

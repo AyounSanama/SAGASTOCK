@@ -2,10 +2,15 @@
 
 namespace Tests\Feature\Api;
 
+use App\Http\Middleware\EnforceV1ModuleAvailability;
+use App\Models\Country;
+use App\Models\Mission;
 use App\Models\Organization;
 use App\Models\Permission;
+use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -14,19 +19,18 @@ class CatalogArchiveAndNavigationTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function administrator(): User
+    /** Admin Coordination de l'organisation (codification du catalogue réservée à la Coordination). */
+    private function administrator(Organization $organization): User
     {
-        $permissions = collect([
-            'catalog.view', 'catalog.manage', 'products.view', 'products.manage',
-            'standard_lists.view', 'standard_lists.manage',
-        ])->map(fn (string $code) => Permission::firstOrCreate(
-            ['code' => $code],
-            ['name' => $code],
-        ));
-        $role = Role::create(['code' => 'catalog_navigation_admin', 'name' => 'Administrateur catalogue']);
-        $role->permissions()->attach($permissions->pluck('id'));
-        $user = User::factory()->create(['is_active' => true]);
-        $user->roles()->attach($role, ['scope_type' => 'platform']);
+        $this->seed(DatabaseSeeder::class);
+        // Codification du catalogue par la Coordination : permission prévue au lot f
+        // (AM-173) ; écrans catalogue masqués en V1. On vérifie ici la logique conservée.
+        $this->withoutMiddleware(EnforceV1ModuleAvailability::class);
+        Role::where('code', 'coordination_admin')->firstOrFail()->permissions()
+            ->syncWithoutDetaching(Permission::whereIn('code', ['catalog.manage', 'products.manage'])->pluck('id'));
+        $mission = Mission::create(['organization_id' => $organization->id, 'country_id' => Country::where('iso2', 'CM')->value('id'), 'code' => 'M-'.$organization->code, 'name' => 'Mission', 'is_active' => true]);
+        $user = User::factory()->create(['organization_id' => $organization->id, 'is_active' => true, 'must_change_password' => false]);
+        $user->roles()->attach(Role::where('code', 'coordination_admin')->firstOrFail(), ['scope_type' => 'mission', 'scope_id' => $mission->id]);
 
         return $user;
     }
@@ -34,7 +38,7 @@ class CatalogArchiveAndNavigationTest extends TestCase
     public function test_archived_records_are_listed_and_can_be_restored(): void
     {
         $organization = Organization::create(['code' => 'ARCH', 'name' => 'Catalogue archives']);
-        Sanctum::actingAs($this->administrator());
+        Sanctum::actingAs($this->administrator($organization));
         $reference = $organization->catalogReferences()->create([
             'reference_type' => 'category', 'code' => 'MED', 'name' => 'Medicaments',
         ]);
@@ -42,8 +46,9 @@ class CatalogArchiveAndNavigationTest extends TestCase
             'code' => 'PARA', 'name' => 'Paracetamol', 'product_type' => 'medicine',
         ]);
         $list = $organization->standardLists()->create([
-            'code' => 'ESS', 'name' => 'Liste essentielle', 'scope_type' => 'organization',
-            'scope_id' => $organization->id,
+            // Liste d'un projet de la mission : hors plateforme, seules les listes de projet sont visibles.
+            'code' => 'ESS', 'name' => 'Liste essentielle', 'scope_type' => 'project',
+            'scope_id' => Project::create(['organization_id' => $organization->id, 'mission_id' => Mission::where('organization_id', $organization->id)->value('id'), 'code' => 'P-ARCH', 'name' => 'Projet'])->id,
         ]);
 
         $this->deleteJson("/api/v1/organizations/{$organization->id}/catalog/references/{$reference->id}")->assertNoContent();
@@ -62,7 +67,7 @@ class CatalogArchiveAndNavigationTest extends TestCase
     public function test_general_routes_open_the_real_catalog(): void
     {
         $organization = Organization::create(['code' => 'HOME', 'name' => 'Catalogue principal']);
-        $user = $this->administrator();
+        $user = $this->administrator($organization);
 
         $this->actingAs($user)->get('/products')
             ->assertRedirect(route('organizations.catalog.index', [$organization, 'section' => 'products']));

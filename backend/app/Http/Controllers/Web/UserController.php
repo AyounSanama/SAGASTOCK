@@ -90,6 +90,7 @@ class UserController extends Controller
     {
         $this->allow('users.manage');
         $managedUser = $this->scopes->users($request->user(), User::onlyTrashed())->findOrFail($user);
+        app(GovernanceService::class)->assertCanManageUser($request->user(), $managedUser);
         $archivedAt = $managedUser->deleted_at?->toISOString();
         $managedUser->restore();
         $managedUser->update(['is_active' => true]);
@@ -110,6 +111,7 @@ class UserController extends Controller
     {
         $this->allow('users.manage');
         abort_unless($this->scopes->canAccess(Auth::user(), $user), 404);
+        app(GovernanceService::class)->assertCanManageUser(Auth::user(), $user);
 
         return view('users.edit', [
             'expectedScope' => $this->expectedScope(Auth::user()),
@@ -168,6 +170,7 @@ class UserController extends Controller
     {
         $this->allow('users.manage');
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
+        app(GovernanceService::class)->assertCanManageUser($request->user(), $user);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'first_name' => ['nullable', 'string', 'max:80'],
@@ -233,6 +236,7 @@ class UserController extends Controller
         $this->allow('users.manage');
         abort_unless($this->scopes->canAccess($request->user(), $user), 404);
         abort_if($request->user()->is($user), 422, 'Vous ne pouvez pas archiver votre propre compte.');
+        app(GovernanceService::class)->assertCanManageUser($request->user(), $user);
         if ($user->roles()->whereIn('code', ['sago_admin', 'owner', 'platform_owner'])->exists()) {
             $otherOwners = User::where('is_active', true)->whereKeyNot($user->id)
                 ->whereHas('roles', fn ($query) => $query->whereIn('code', ['sago_admin', 'owner', 'platform_owner']))->exists();

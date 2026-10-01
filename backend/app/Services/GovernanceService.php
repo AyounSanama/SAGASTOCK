@@ -136,15 +136,22 @@ class GovernanceService
         return $this->assignableCodes($actor)[0] ?? null;
     }
 
+    /**
+     * Attribution d'un rôle. Seuls les rôles officiels créent des comptes, et
+     * uniquement pour les rôles placés sous eux dans la matrice (assignableCodes) ;
+     * un compte sans rôle officiel ne crée et ne modifie plus aucun compte.
+     */
     public function canAssign(User $actor, Role $role, string $scopeType, ?string $scopeId): bool
     {
-        if ($this->roleCode($actor) === null
-            && $actor->hasPermission('users.manage')
-            && app(UserScopeService::class)->isPlatform($actor)) {
-            return $scopeType === 'platform' && $scopeId === null;
+        if ($this->roleCode($actor) === null) {
+            return false;
         }
 
         $targetCode = $this->canonicalCode($role->code);
+        // Comptes FOSA : toujours rattachés à un site, jamais à la plateforme.
+        if (in_array($targetCode, [self::SITE_ADMIN, self::SITE_USER], true) && $scopeType !== 'site') {
+            return false;
+        }
         if (! in_array($targetCode, $this->assignableCodes($actor), true)) {
             return false;
         }
@@ -160,6 +167,31 @@ class GovernanceService
         }
 
         return app(UserScopeService::class)->allowsScope($actor, $scopeType, $scopeId);
+    }
+
+    /**
+     * Modification, réinitialisation, archivage ou restauration d'un compte :
+     * uniquement par un rôle officiel, sur un compte de son périmètre dont le rôle
+     * est placé sous le sien, et jamais sur son propre compte (géré par le Profil).
+     */
+    public function canManageUser(User $actor, User $target): bool
+    {
+        $actorCode = $this->roleCode($actor);
+        if ($actorCode === null || $actor->read_only || $actor->is($target)) {
+            return false;
+        }
+        $targetCode = $this->roleCode($target);
+        // Ancien compte sans rôle officiel : seul l'Admin Sago peut le traiter.
+        $allowed = $targetCode === null
+            ? $actorCode === self::SAGO_ADMIN
+            : in_array($targetCode, $this->assignableCodes($actor), true);
+
+        return $allowed && app(UserScopeService::class)->canAccess($actor, $target);
+    }
+
+    public function assertCanManageUser(User $actor, User $target): void
+    {
+        abort_unless($this->canManageUser($actor, $target), 403, 'Vous ne pouvez pas gérer ce compte.');
     }
 
     public function siteBelongsToProject(string $siteId, string $projectId): bool

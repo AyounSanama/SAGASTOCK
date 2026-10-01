@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\Permission;
 use App\Models\Country;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -14,15 +14,13 @@ class OrganizationManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** Admin Sago (rôle officiel qui crée les organisations). */
     private function administrator(): User
     {
-        $view = Permission::create(['code' => 'organizations.view', 'name' => 'Consulter les organisations']);
-        $manage = Permission::create(['code' => 'organizations.manage', 'name' => 'Gérer les organisations']);
-        $role = Role::create(['code' => 'owner', 'name' => 'Propriétaire plateforme']);
-        Role::firstOrCreate(['code' => 'coordination_admin'], ['name' => 'Admin Coordination', 'is_active' => true]);
-        $role->permissions()->attach([$view->id, $manage->id]);
-        $user = User::factory()->create(['is_active' => true]);
-        $user->roles()->attach($role->id, ['scope_type' => 'platform']);
+        $this->seed(DatabaseSeeder::class);
+        $user = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $user->roles()->attach(Role::where('code', 'sago_admin')->firstOrFail(), ['scope_type' => 'platform']);
+
         return $user;
     }
 

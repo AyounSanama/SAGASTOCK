@@ -42,3 +42,7 @@ Reprend `docs/17-criteres-acceptation-officiels.md` :
 - hors ligne et synchronisation testés lorsque concernés ;
 - aucune régression ;
 - validation explicite du porteur avant l'étape suivante.
+
+## Vérification de sécurité (obligatoire à chaque lot)
+
+Reprendre la liste « Vérification de sécurité de chaque lot » de `09-audit-securite.md` et la cocher dans le rapport du lot.

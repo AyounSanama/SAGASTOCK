@@ -5,10 +5,10 @@ namespace Tests\Feature\Api;
 use App\Models\Country;
 use App\Models\Mission;
 use App\Models\Organization;
-use App\Models\Permission;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -17,20 +17,18 @@ class FundingManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function administrator(): User
+    /** Admin Coordination de la mission du projet (rôle officiel qui configure les projets). */
+    private function administrator(Project $project): User
     {
-        $view = Permission::create(['code' => 'funding.view', 'name' => 'Consulter les financements']);
-        $manage = Permission::create(['code' => 'funding.manage', 'name' => 'Gérer les financements']);
-        $projects = Permission::firstOrCreate(['code' => 'projects.view'], ['name' => 'Consulter les projets']);
-        $role = Role::create(['code' => 'funding_admin', 'name' => 'Administrateur financements']);
-        $role->permissions()->attach([$view->id, $manage->id, $projects->id]);
-        $user = User::factory()->create();
-        $user->roles()->attach($role->id, ['scope_type' => 'platform']);
+        $user = User::factory()->create(['organization_id' => $project->organization_id, 'is_active' => true, 'must_change_password' => false]);
+        $user->roles()->attach(Role::where('code', 'coordination_admin')->firstOrFail(), ['scope_type' => 'mission', 'scope_id' => $project->mission_id]);
+
         return $user;
     }
 
     private function context(): array
     {
+        $this->seed(DatabaseSeeder::class);
         $organization = Organization::create(['code' => 'ONG', 'name' => 'ONG']);
         $country = Country::firstOrCreate(['iso2' => 'CM'], ['name' => 'Cameroun']);
         $mission = Mission::create(['organization_id' => $organization->id, 'country_id' => $country->id, 'code' => 'MISSION', 'name' => 'Mission']);
@@ -40,8 +38,8 @@ class FundingManagementTest extends TestCase
 
     public function test_donor_and_program_can_be_created_and_attached_to_project(): void
     {
-        Sanctum::actingAs($this->administrator());
         [$organization, $project] = $this->context();
+        Sanctum::actingAs($this->administrator($project));
 
         $donor = $this->postJson("/api/v1/organizations/{$organization->id}/donors", [
             'code' => 'UE', 'name' => 'Union européenne',
@@ -84,11 +82,12 @@ class FundingManagementTest extends TestCase
 
     public function test_cross_organization_donor_cannot_be_attached(): void
     {
-        Sanctum::actingAs($this->administrator());
         [$organization, $project] = $this->context();
+        Sanctum::actingAs($this->administrator($project));
         $other = Organization::create(['code' => 'OTHER', 'name' => 'Autre']);
-        $donor = $this->postJson("/api/v1/organizations/{$other->id}/donors", ['code' => 'BAD', 'name' => 'Autre bailleur'])
-            ->assertCreated()->json('donor');
+        $donor = $other->donors()->create(['code' => 'BAD', 'name' => 'Autre bailleur'])->toArray();
+        // La Coordination ne peut pas non plus créer de bailleur dans une autre organisation.
+        $this->assertContains($this->postJson("/api/v1/organizations/{$other->id}/donors", ['code' => 'BAD2', 'name' => 'Intrus'])->status(), [403, 404]);
         $this->postJson("/api/v1/organizations/{$organization->id}/projects/{$project->id}/donors", [
             'donor_id' => $donor['id'],
         ])->assertUnprocessable();
@@ -96,8 +95,12 @@ class FundingManagementTest extends TestCase
 
     public function test_sidebar_funding_module_opens_real_workspace_and_persists_web_forms(): void
     {
-        $admin = $this->administrator();
+        // « Configuration des projets » (Web) : doublon à retirer du menu (check-up des
+        // maquettes, 01/10). Ses formulaires visent /organizations/..., bloqué par le
+        // masquage V1 pour la Coordination : on vérifie ici la logique conservée.
+        $this->withoutMiddleware(\App\Http\Middleware\EnforceV1ModuleAvailability::class);
         [$organization, $project] = $this->context();
+        $admin = $this->administrator($project);
 
         $this->actingAs($admin)->get('/funding')
             ->assertOk()
@@ -143,14 +146,9 @@ class FundingManagementTest extends TestCase
 
     public function test_sidebar_funding_workspace_rejects_an_organization_outside_user_scope(): void
     {
-        [$organization] = $this->context();
+        [$organization, $project] = $this->context();
         $other = Organization::create(['code' => 'OTHER-SCOPE', 'name' => 'Organisation hors périmètre']);
-        $role = Role::create(['code' => 'scoped_funding', 'name' => 'Financement organisation']);
-        $role->permissions()->attach([
-            Permission::firstOrCreate(['code' => 'funding.view'], ['name' => 'Consulter les financements'])->id,
-        ]);
-        $user = User::factory()->create();
-        $user->roles()->attach($role->id, ['scope_type' => 'organization', 'scope_id' => $organization->id]);
+        $user = $this->administrator($project);
 
         $this->actingAs($user)->get('/funding?organization_id='.$other->id)->assertNotFound();
     }

@@ -11,7 +11,8 @@ abstract final class AppConfig {
   );
   static const _developmentBaseUrl = String.fromEnvironment(
     'DEVELOPMENT_API_BASE_URL',
-    defaultValue: 'http://192.168.137.234:8000/api/v1',
+    // Point d'accès Windows « PC-SERGE » : le PC y a toujours l'adresse 192.168.137.1.
+    defaultValue: 'http://192.168.137.1:8000/api/v1',
   );
   static const _stagingBaseUrl = String.fromEnvironment(
     'STAGING_API_BASE_URL',

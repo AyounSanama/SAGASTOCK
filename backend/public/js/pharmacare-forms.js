@@ -42,7 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       [...grid.children].forEach(field => {
         const name = field.querySelector('[name]')?.name;
-        const step = ['facility_type', 'care_level'].includes(name) ? 1
+        // AM-162 : champs V1 de l'Admin Projet regroupés dans « Classification ».
+        const step = ['facility_type', 'care_level', 'care_level_id', 'facility_category_id', 'target_population_ids[]',
+          'pathology_ids[]', 'order_period_months'].includes(name) ? 1
           : ['phone', 'email', 'address', 'region', 'district', 'locality', 'latitude', 'longitude'].includes(name) ? 2 : 0;
         steps[step].append(field);
       });
@@ -73,6 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
           const summary = document.createElement('dl'); summary.className = 'form-summary';
           steps.slice(0, 3).forEach(step => step.querySelectorAll('label.field,fieldset.field').forEach(label => {
             if (label.tagName === 'FIELDSET') {
+              // Bloc de champs (paramètres d'approvisionnement) : ses champs sont résumés un par un.
+              if (!label.querySelector('input[type=checkbox],input[type=radio]')) return;
               const term = document.createElement('dt');
               term.textContent = label.querySelector('legend')?.textContent || 'Sélection';
               const value = document.createElement('dd');

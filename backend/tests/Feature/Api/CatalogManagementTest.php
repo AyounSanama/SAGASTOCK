@@ -2,13 +2,17 @@
 
 namespace Tests\Feature\Api;
 
+use App\Http\Middleware\EnforceV1ModuleAvailability;
+use App\Models\Country;
 use App\Models\HealthFacility;
+use App\Models\Mission;
 use App\Models\ModuleActivation;
 use App\Models\Organization;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\UserScopeService;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Laravel\Sanctum\Sanctum;
@@ -20,16 +24,24 @@ class CatalogManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function administrator(string $scope = 'platform', ?string $scopeId = null): User
+    /**
+     * Admin Coordination de l'organisation. Codification du catalogue par la
+     * Coordination : permissions prévues au lot f (AM-173) ; écrans catalogue
+     * masqués en V1. On vérifie ici la logique conservée avec un rôle officiel.
+     */
+    private function administrator(Organization $organization): User
     {
-        $permissions = collect([
-            'catalog.view' => 'Consulter le catalogue', 'catalog.manage' => 'Gérer le catalogue',
-            'catalog.publish' => 'Publier les listes', 'batches.manage' => 'Gérer les lots',
-        ])->map(fn ($name, $code) => Permission::create(compact('code', 'name')));
-        $role = Role::create(['code' => 'catalog_admin_'.uniqid(), 'name' => 'Administrateur catalogue']);
-        $role->permissions()->attach($permissions->pluck('id'));
-        $user = User::factory()->create(['is_active' => true]);
-        $user->roles()->attach($role->id, ['scope_type' => $scope, 'scope_id' => $scopeId]);
+        $this->seed(DatabaseSeeder::class);
+        $this->withoutMiddleware(EnforceV1ModuleAvailability::class);
+        Role::where('code', 'coordination_admin')->firstOrFail()->permissions()->syncWithoutDetaching(
+            Permission::whereIn('code', ['catalog.manage', 'catalog.publish', 'batches.manage', 'products.manage'])->pluck('id'),
+        );
+        $mission = Mission::firstOrCreate(
+            ['organization_id' => $organization->id, 'code' => 'M-'.$organization->code],
+            ['country_id' => Country::where('iso2', 'CM')->value('id'), 'name' => 'Mission', 'is_active' => true],
+        );
+        $user = User::factory()->create(['organization_id' => $organization->id, 'is_active' => true, 'must_change_password' => false]);
+        $user->roles()->attach(Role::where('code', 'coordination_admin')->firstOrFail(), ['scope_type' => 'mission', 'scope_id' => $mission->id]);
 
         return $user;
     }
@@ -37,7 +49,7 @@ class CatalogManagementTest extends TestCase
     public function test_complete_catalog_product_batch_kit_and_standard_list_cycle(): void
     {
         $organization = Organization::create(['code' => 'CAT', 'name' => 'Catalogue ONG']);
-        Sanctum::actingAs($this->administrator());
+        Sanctum::actingAs($this->administrator($organization));
         $unit = $this->postJson("/api/v1/organizations/{$organization->id}/catalog/references", [
             'reference_type' => 'unit', 'code' => 'TAB', 'name' => 'Comprimé',
         ])->assertCreated()->json('reference');
@@ -91,7 +103,7 @@ class CatalogManagementTest extends TestCase
     {
         $inside = Organization::create(['code' => 'IN', 'name' => 'Interne']);
         $outside = Organization::create(['code' => 'OUT', 'name' => 'Externe']);
-        Sanctum::actingAs($this->administrator('organization', $inside->id));
+        Sanctum::actingAs($this->administrator($inside));
         $this->getJson("/api/v1/organizations/{$outside->id}/catalog/products")->assertNotFound();
         $outsideReference = $outside->catalogReferences()->create(['reference_type' => 'unit', 'code' => 'BOX', 'name' => 'Boîte']);
         $this->postJson("/api/v1/organizations/{$inside->id}/catalog/products", [
@@ -105,7 +117,7 @@ class CatalogManagementTest extends TestCase
         $inside = Organization::create(['code' => 'IN', 'name' => 'Interne']);
         $outside = Organization::create(['code' => 'OUT', 'name' => 'Externe']);
         $facility = HealthFacility::create(['organization_id' => $outside->id, 'code' => 'FOSA', 'name' => 'FOSA externe', 'facility_type' => 'clinic']);
-        Sanctum::actingAs($this->administrator());
+        Sanctum::actingAs($this->administrator($inside));
         $this->postJson("/api/v1/organizations/{$inside->id}/catalog/lists", [
             'code' => 'BAD_LIST', 'name' => 'Liste invalide', 'scope_type' => 'facility', 'scope_id' => $facility->id,
         ])->assertUnprocessable();
@@ -114,7 +126,7 @@ class CatalogManagementTest extends TestCase
     public function test_web_catalog_and_excel_compatible_csv_exchange(): void
     {
         $organization = Organization::create(['code' => 'WEB_CAT', 'name' => 'Catalogue Web']);
-        $user = $this->administrator();
+        $user = $this->administrator($organization);
         $this->assertTrue(app(UserScopeService::class)->organizations($user)->whereKey($organization->id)->exists());
         $this->actingAs($user)->get("/organizations/{$organization->id}/catalog")
             ->assertOk()
@@ -161,7 +173,7 @@ class CatalogManagementTest extends TestCase
             'target_type' => 'organization', 'target_id' => $organization->id,
             'module_code' => 'references', 'is_enabled' => false,
         ]);
-        $user = $this->administrator();
+        $user = $this->administrator($organization);
         Sanctum::actingAs($user);
         $this->getJson("/api/v1/organizations/{$organization->id}/catalog/products")->assertForbidden();
         $this->actingAs($user)->get("/organizations/{$organization->id}/catalog")->assertForbidden();
