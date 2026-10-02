@@ -252,6 +252,8 @@ Justification : une seule unité (le mois) ; le stock de sécurité joue son rô
 
 ## 7. Plan de lots V1, ordonné (révisé le 01/10)
 
+> **Remplacé le 02/10/2026 par `docs/feuille-de-route-v1.md` (niveaux 0 à 12).** Ce plan est conservé pour l'historique.
+
 | Ordre | Lot | ID | Contenu | Dépend de |
 |---|---|---|---|---|
 | 1 | b | AM-161 | Structure Admin Projet : menu 4 entrées, barre supérieure, barre basse mobile ; **masquage des éléments EN TROP** (section 2) côté menu, route et API. | — |

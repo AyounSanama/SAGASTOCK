@@ -22,6 +22,15 @@ class AuthService {
       _authenticatedAtKey = 'authenticated_at',
       _offlineVerifierKey = 'offline_password_verifier';
   static const _pendingLocaleKey = 'pending_preferred_locale';
+
+  /// Clé de chiffrement de la base locale (DEC-10, lot d) : liée à
+  /// l'installation, jamais au compte ni au PIN.
+  static const localDatabaseKeyName = 'local_database_key';
+
+  /// Valeurs conservées quand la session est fermée (déconnexion, PIN oublié,
+  /// 5 codes faux, jeton expiré) : sans elles, les opérations en attente
+  /// deviendraient illisibles ou orphelines.
+  static const preservedStorageKeys = {_deviceKey, localDatabaseKeyName};
   static const _maximumOfflineSession = Duration(days: 30);
 
   Future<bool> hasSession() async {
@@ -319,8 +328,8 @@ class AuthService {
       await AppDatabase.shared.clearIdentityData('${previousUser!['id']}');
     }
     final values = await _storage.readAll();
-    for (final key in values.keys) {
-      if (key != _deviceKey) {
+    for (final key in values.keys.toList()) {
+      if (!preservedStorageKeys.contains(key)) {
         await _storage.delete(key: key);
       }
     }

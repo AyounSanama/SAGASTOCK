@@ -57,3 +57,36 @@ Un téléphone perdu, ou accessible en mode débogage, expose donc les données 
 1. Valider l'option A (SQLite3 Multiple Ciphers, sans nouvelle librairie).
 2. Valider le rangement des photos d'ordonnances dans la base chiffrée jusqu'à leur envoi.
 3. Faire la mesure de taille `sqlite3mc` pendant la même fenêtre de compilation que la mesure OpenCV.
+
+## 7. Réponses aux questions du 02/10
+
+### Où est conservée la clé ?
+
+- Dans le **coffre sécurisé du téléphone**, via `flutter_secure_storage` (déjà utilisé pour le jeton) : clé protégée par l'**Android Keystore** sur Android, entrée du **Keychain** sur iOS. Accessibilité iOS prévue : « après le premier déverrouillage, cet appareil uniquement », donc jamais copiée dans une sauvegarde iCloud ni sur un autre téléphone.
+- **Jamais** dans le code, dans un fichier, dans la base elle-même, dans les journaux, ni envoyée au serveur.
+- **Le PIN n'est pas la protection de la clé.** La clé est aléatoire (256 bits), générée par le téléphone, et protégée par le coffre matériel. Le PIN ajoute une barrière d'usage (verrouillage de l'écran). Les deux sont indépendants, donc oublier le PIN ne fait pas perdre la clé.
+- La clé fait partie des valeurs **jamais effacées** à la fermeture de session (`AuthService.preservedStorageKeys`, en place depuis le 02/10).
+
+### Quelle licence ?
+
+| Moteur | Licence | Remarque |
+|---|---|---|
+| **SQLite3 Multiple Ciphers** (recommandé) | **MIT** | Aucune dépendance OpenSSL ; lit et écrit aussi le format SQLCipher |
+| SQLCipher Community Edition | BSD (Zetetic), mention de copyright à conserver | Embarque **OpenSSL** (licence Apache 2.0) sur Android, dont les mises à jour de sécurité sont à suivre |
+
+**DÉCISION NÉCESSAIRE** : votre validation mentionne « SQLCipher ». Je recommande SQLite3 Multiple Ciphers : même paquet `sqlite3`, même principe, chiffrement de même niveau (AES-256), licence MIT et pas d'OpenSSL à maintenir. Si vous préférez SQLCipher, il suffit de changer une option de configuration (`source: sqlcipher`), sans autre changement de code.
+
+### Opérations en attente si le PIN est oublié ou après 5 codes faux
+
+- La session est fermée : jeton, profil et empreinte du PIN sont effacés.
+- La **base locale n'est pas effacée** : les opérations en attente y restent (chiffrées au niveau 10), avec la clé de la base et l'identifiant de l'installation.
+- Après une **nouvelle connexion en ligne** du même utilisateur, l'utilisateur crée un nouveau PIN, puis la synchronisation envoie toutes les opérations, sans doublon (clés d'idempotence).
+- Si un autre utilisateur se connecte sur le téléphone, les opérations du premier restent en attente pour lui et ne sont jamais envoyées sous un autre compte.
+- **Tests ajoutés** (`pin_lockout_pending_operations_test.dart`) : « 5 codes faux » et « code oublié ». Dans les deux cas, les opérations sont conservées, la clé et l'identifiant restent, le reste de la session est effacé, et tout est envoyé après reconnexion.
+- Défaut corrigé au passage : la fermeture de session supprimait les clés pendant qu'elle les parcourait. Elle parcourt maintenant une copie.
+
+### Taille des photos d'ordonnances
+
+- Réglage actuel : qualité 88 %, largeur maximale 2 200 px, soit **environ 0,6 à 1,2 Mo par photo** (estimation, à confirmer sur le téléphone).
+- Réglage proposé au niveau 8 : largeur maximale 1 600 px, qualité 70 %, soit **environ 200 à 350 Ko** par ordonnance photographiée (texte lisible ; à confirmer sur le vrai téléphone avec une dizaine de documents de test imprimés, jamais de vraie ordonnance).
+- Constat : l'écran actuel propose aussi un bouton « Galerie », contraire à la règle « appareil photo uniquement ». Il sera masqué au niveau 8.
