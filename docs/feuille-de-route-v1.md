@@ -103,6 +103,7 @@ Réception : 100 % de conformité aux maquettes Admin Projet, dans les deux mode
 ## Niveau 8 — Capture par téléphone
 
 - Ordonnance : photo ou scan de document (opencv_dart + camera), appareil photo uniquement, compression, stockage dans la base chiffrée, suppression après confirmation du serveur.
+- Compression validée le 02/10 : 1 600 px de large, qualité 70 %. Mesure de la taille réelle sur le téléphone avec des documents imprimés de test uniquement, jamais une vraie ordonnance. Bouton « Galerie » masqué.
 - Codes-barres : flutter_zxing, scan simple à l'entrée, à la dispensation et à l'inventaire ; code inconnu = message clair et recherche manuelle.
 - Retrait de mobile_scanner seulement après essais réussis sur Android et iOS.
 - Taille de l'APK et découpage par architecture.
@@ -118,8 +119,7 @@ Réception : 100 % de conformité aux maquettes Admin Projet, dans les deux mode
 
 ## Niveau 10 — Hors ligne et chiffrement (d)
 
-- Chiffrement SQLCipher de la base locale, migration sans perte des téléphones existants (copie, chiffrement, contrôle, retour arrière).
-  - DÉCISION NÉCESSAIRE (02/10) : l'étude recommande SQLite3 Multiple Ciphers (licence MIT, sans OpenSSL, compatible avec le format SQLCipher), fournie par le même paquet `sqlite3`. SQLCipher Community reste possible (licence BSD, OpenSSL sur Android). Voir `ameliorations/10-etude-chiffrement-mobile.md`, section 7.
+- Chiffrement de la base locale avec **SQLite3 Multiple Ciphers** (validé le 02/10 : licence MIT, sans OpenSSL), configuré au **format compatible SQLCipher v4** (`PRAGMA cipher = 'sqlcipher'` et `PRAGMA legacy = 4` avant `PRAGMA key`), pour pouvoir passer plus tard à SQLCipher sans migration lourde. Clé aléatoire de 256 bits dans le coffre du téléphone (Android Keystore / iOS Keychain), indépendante du PIN, jamais effacée à la fermeture de session. Migration sans perte des téléphones existants (copie, chiffrement, contrôle, retour arrière).
 - Détection des conflits (pas d'écrasement silencieux), écran des opérations en échec (corriger / abandonner).
 - Bandeau hors ligne sur le Web.
 - Policies : appareils.

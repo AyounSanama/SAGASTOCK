@@ -284,6 +284,21 @@ Détail et état : `09-audit-securite.md` (section « État des corrections »).
 
 Suites : backend 325 tests OK, mobile 98 tests OK, `flutter analyze` sans remarque.
 
+## Niveau 1 — Modifications de la base réelle · 02/10/2026
+
+Sur demande du porteur, après sauvegarde : serveurs arrêtés, deux copies, trois empreintes SHA256 identiques (`F5FECB4D02A27B50DD8F32B8745CB576C26D5C82E0B3BC2CD7C88A7490AAFC7B`) :
+- `backend/database/database.backup-avant-rapports-20261001.sqlite` ;
+- `D:/Sauvegardes/PharmaCare/database.backup-avant-rapports-20261001.sqlite`.
+
+Script `backend/tools/correction-2026-10-02-r1-r8.php` : une transaction, comptes de lignes contrôlés, simulation préalable, chaque changement inscrit au journal d'audit.
+
+| Point | Modification |
+|---|---|
+| R1 | PSM-2026 « PROJET Santé Maternelle » : stock de sécurité 4 → **2 mois** (1 ligne) |
+| R8 | Programmes MSM01 01-H « HELP » (UNICEF, lié à TSIDA) et 37-S « SOS » : **archivés** (inactifs, masqués, non supprimés, liens conservés), non migrés |
+
+Vérification en lecture seule : R1 vide, R8 « archivé ». Nouvelle empreinte de la base réelle : `e85697a9021f1b0d…`.
+
 ## Modèle d'entrée pour les prochaines livraisons
 
 ```markdown

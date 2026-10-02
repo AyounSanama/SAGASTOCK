@@ -90,3 +90,9 @@ Un téléphone perdu, ou accessible en mode débogage, expose donc les données 
 - Réglage actuel : qualité 88 %, largeur maximale 2 200 px, soit **environ 0,6 à 1,2 Mo par photo** (estimation, à confirmer sur le téléphone).
 - Réglage proposé au niveau 8 : largeur maximale 1 600 px, qualité 70 %, soit **environ 200 à 350 Ko** par ordonnance photographiée (texte lisible ; à confirmer sur le vrai téléphone avec une dizaine de documents de test imprimés, jamais de vraie ordonnance).
 - Constat : l'écran actuel propose aussi un bouton « Galerie », contraire à la règle « appareil photo uniquement ». Il sera masqué au niveau 8.
+
+## 8. Décisions du porteur (02/10)
+
+- **SQLite3 Multiple Ciphers validé**, au format compatible SQLCipher v4 (`PRAGMA cipher = 'sqlcipher'`, `PRAGMA legacy = 4`, puis `PRAGMA key`), pour pouvoir changer plus tard sans migration lourde.
+- Photos dans la base chiffrée, compressées (1 600 px, 70 %), supprimées du téléphone dès que le serveur confirme leur réception.
+- Mesure de taille : dans la même compilation que la mesure OpenCV.
