@@ -130,7 +130,7 @@ $queries = [
         SELECT o.code AS organisation, pg.code AS programme, pg.name AS intitule,
                COALESCE(d.name, '(aucun bailleur)') AS bailleur, pg.starts_on AS debut, pg.ends_on AS fin,
                CASE WHEN pg.deleted_at IS NOT NULL THEN 'archivé' WHEN pg.is_active = 1 THEN 'actif' ELSE 'inactif' END AS etat,
-               (SELECT GROUP_CONCAT(p.code, ', ') FROM project_programs pp JOIN projects p ON p.id = pp.project_id WHERE pp.program_id = pg.id) AS projets_rattaches
+               (SELECT GROUP_CONCAT(p.code, ', ') FROM program_project pp JOIN projects p ON p.id = pp.project_id WHERE pp.program_id = pg.id) AS projets_rattaches
         FROM programs pg
         JOIN organizations o ON o.id = pg.organization_id
         LEFT JOIN donors d ON d.id = pg.donor_id
