@@ -126,6 +126,16 @@ $queries = [
         GROUP BY event
         ORDER BY entrees DESC
         SQL,
+    'R8 — Programmes de l’ancien module « Bailleurs & Programmes » (fusion projet / programme : aucune migration sans décision)' => <<<'SQL'
+        SELECT o.code AS organisation, pg.code AS programme, pg.name AS intitule,
+               COALESCE(d.name, '(aucun bailleur)') AS bailleur, pg.starts_on AS debut, pg.ends_on AS fin,
+               CASE WHEN pg.deleted_at IS NOT NULL THEN 'archivé' WHEN pg.is_active = 1 THEN 'actif' ELSE 'inactif' END AS etat,
+               (SELECT GROUP_CONCAT(p.code, ', ') FROM project_programs pp JOIN projects p ON p.id = pp.project_id WHERE pp.program_id = pg.id) AS projets_rattaches
+        FROM programs pg
+        JOIN organizations o ON o.id = pg.organization_id
+        LEFT JOIN donors d ON d.id = pg.donor_id
+        ORDER BY o.code, pg.code
+        SQL,
 ];
 
 foreach ($queries as $title => $sql) {
