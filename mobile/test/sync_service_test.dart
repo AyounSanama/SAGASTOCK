@@ -51,6 +51,51 @@ void main() {
     expect(await database.operationById('operation-1'), isNull);
   });
 
+  test(
+    'S-03 : jeton expiré (401) — opérations conservées en attente, sans tentative comptée, puis envoyées après reconnexion',
+    () async {
+      SyncService.authenticationRequired.value = false;
+      await enqueue('operation-auth-1');
+      await enqueue('operation-auth-2');
+      var tokenValid = false;
+      final sent = <String>[];
+      final service = SyncService(
+        database: database,
+        ownerUserId: 'user-a',
+        connectivity: _OnlineConnectivity(),
+        sender: (operation) async {
+          if (!tokenValid) {
+            throw DioException(
+              requestOptions: RequestOptions(path: operation.endpoint),
+              response: Response(
+                requestOptions: RequestOptions(path: operation.endpoint),
+                statusCode: 401,
+                data: {'message': 'Unauthenticated.'},
+              ),
+              type: DioExceptionType.badResponse,
+            );
+          }
+          sent.add(operation.operationId);
+          return null;
+        },
+      );
+
+      final expired = await service.syncNow();
+      final kept = await database.operationById('operation-auth-1');
+      expect(expired.authenticationRequired, isTrue);
+      expect(SyncService.authenticationRequired.value, isTrue);
+      expect(kept?.status, 'pending');
+      expect(kept?.attemptCount, 0);
+      expect(await database.operationById('operation-auth-2'), isNotNull);
+
+      tokenValid = true;
+      final resumed = await service.syncNow();
+      expect(resumed.succeeded, 2);
+      expect(sent, ['operation-auth-1', 'operation-auth-2']);
+      SyncService.authenticationRequired.value = false;
+    },
+  );
+
   test('conserve et marque un conflit serveur', () async {
     await enqueue('operation-2');
     final service = SyncService(

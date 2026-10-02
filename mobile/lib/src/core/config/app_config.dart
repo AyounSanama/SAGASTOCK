@@ -61,6 +61,14 @@ abstract final class AppConfig {
                   'Environnement API inconnu : $environment',
                 ),
               });
+    return validateBaseUrl(configured, environment: environment);
+  }
+
+  /// Vérifie et normalise une adresse d'API pour un environnement donné.
+  static String validateBaseUrl(
+    String configured, {
+    required String environment,
+  }) {
     if (configured.isEmpty) {
       throw StateError(
         'URL API absente pour l’environnement $environment. '
@@ -70,6 +78,10 @@ abstract final class AppConfig {
     final uri = Uri.tryParse(configured);
     if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
       throw StateError('URL API invalide : $configured');
+    }
+    // S-06 : HTTPS obligatoire en production (HTTP réservé aux versions de test).
+    if (environment == 'production' && uri.scheme != 'https') {
+      throw StateError('HTTPS obligatoire en production : $configured');
     }
     return configured.endsWith('/')
         ? configured.substring(0, configured.length - 1)

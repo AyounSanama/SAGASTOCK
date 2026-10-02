@@ -34,7 +34,8 @@ Route::get('/', function () {
 });
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'create'])->name('login');
-    Route::post('/login', [AuthController::class, 'store'])->name('login.store');
+    // S-09 : 6 essais par minute et par adresse IP (en plus du verrou par compte).
+    Route::post('/login', [AuthController::class, 'store'])->middleware('throttle:6,1')->name('login.store');
     Route::get('/forgot-password', [PasswordResetController::class, 'request'])->name('password.request');
     Route::post('/forgot-password', [PasswordResetController::class, 'email'])->name('password.email');
     Route::get('/reset-password/{token}', [PasswordResetController::class, 'resetForm'])->name('password.reset');

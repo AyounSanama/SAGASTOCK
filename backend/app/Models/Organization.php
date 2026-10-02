@@ -25,6 +25,21 @@ class Organization extends Model
         return ['is_active' => 'boolean', 'additional_languages' => 'array'];
     }
 
+    /** S-01 : organisation désactivée ou archivée → jetons de ses comptes révoqués. */
+    protected static function booted(): void
+    {
+        $revoke = fn (Organization $organization) => \Laravel\Sanctum\PersonalAccessToken::query()
+            ->where('tokenable_type', User::class)
+            ->whereIn('tokenable_id', $organization->users()->withTrashed()->pluck('id'))
+            ->delete();
+        static::updated(function (Organization $organization) use ($revoke): void {
+            if ($organization->wasChanged('is_active') && ! $organization->is_active) {
+                $revoke($organization);
+            }
+        });
+        static::deleted($revoke);
+    }
+
     public function missions(): HasMany
     {
         return $this->hasMany(Mission::class);

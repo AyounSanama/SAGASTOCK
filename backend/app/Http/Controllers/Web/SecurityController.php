@@ -41,7 +41,7 @@ class SecurityController extends Controller
             'projects' => 'Projets',
             'funding' => 'Bailleurs et programmes',
         ];
-        $logs = AuditLog::with('user:id,name,email')
+        $logs = AuditLog::with('user:id,name,email')->withoutHealthData()
             ->when($request->string('event')->toString(), fn ($query, $event) => $query->where('event', 'like', "{$event}%"))
             ->latest()->paginate(30);
         $roles = $this->scopes->roles($request->user())

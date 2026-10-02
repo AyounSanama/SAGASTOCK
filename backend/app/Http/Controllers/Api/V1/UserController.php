@@ -154,8 +154,9 @@ class UserController extends Controller
             'scope_type' => ['nullable', Rule::in(['platform', 'organization', 'mission', 'project', 'facility', 'site'])], 'scope_id' => ['nullable', 'uuid'],
             'permission_ids' => ['nullable', 'array'], 'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ]);
-        $user->update(collect($data)->only(['name', 'first_name', 'last_name', 'username', 'email', 'phone', 'is_active'])->all());
-        if (array_key_exists('role_id', $data) || array_key_exists('role_ids', $data)) {
+        $changesRole = array_key_exists('role_id', $data) || array_key_exists('role_ids', $data);
+        if ($changesRole) {
+            // Toutes les vérifications avant la moindre écriture.
             [$scopeType, $scopeId] = $this->scope($data['scope_type'] ?? 'platform', $data['scope_id'] ?? null);
             abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
             $roleIds = isset($data['role_id']) ? [$data['role_id']] : ($data['role_ids'] ?? []);
@@ -166,6 +167,9 @@ class UserController extends Controller
                 $scopeType,
                 $scopeId,
             )), 403);
+        }
+        $user->update(collect($data)->only(['name', 'first_name', 'last_name', 'username', 'email', 'phone', 'is_active'])->all());
+        if ($changesRole) {
             $user->roles()->sync(collect($roleIds)->mapWithKeys(fn ($id) => [$id => ['scope_type' => $scopeType, 'scope_id' => $scopeId]]));
             $user->update(['organization_id' => $this->organizationIdForScope($scopeType, $scopeId)]);
         }

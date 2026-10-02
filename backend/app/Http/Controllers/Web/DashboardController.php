@@ -22,7 +22,7 @@ class DashboardController extends Controller
         if (app(GovernanceService::class)->roleCode($user) === GovernanceService::SAGO_ADMIN) {
             $organizations = Organization::query()->with('countries')
                 ->orderBy('name')->get();
-            $activities = AuditLog::with('user')->latest()->limit(8)->get();
+            $activities = AuditLog::with('user')->withoutHealthData()->latest()->limit(8)->get();
             $countries = $organizations->flatMap->countries->unique('id');
             $interventions = OrganizationEffectiveConfiguration::with(['organization:id,name,geographic_access_type', 'appliedBy:id,name'])
                 ->latest('effective_at')->limit(8)->get();
@@ -52,7 +52,7 @@ class DashboardController extends Controller
         $siteIds = $context['siteIds'];
 
         $activities = $user->hasPermission('audit.view')
-            ? AuditLog::with('user')->latest()->limit(8)->get()
+            ? AuditLog::with('user')->withoutHealthData()->latest()->limit(8)->get()
             : AuditLog::with('user')->where('user_id', $user->id)->latest()->limit(8)->get();
         $recentMovements = $user->hasPermission('stocks.view')
             ? StockMovement::with(['product', 'site'])->whereIn('site_id', $siteIds)->latest('validated_at')->limit(6)->get()

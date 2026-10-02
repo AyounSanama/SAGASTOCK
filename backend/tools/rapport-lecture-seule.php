@@ -114,6 +114,18 @@ $queries = [
           AND a.event IN ('user.created', 'user.updated', 'user.archived', 'user.restored', 'user.password_reset', 'configuration.user.created')
         ORDER BY a.created_at
         SQL,
+    'R7 — Journal d’audit : entrées contenant des valeurs liées aux patients, ordonnances ou dispensations (S-05), par événement' => <<<'SQL'
+        SELECT event AS evenement, COUNT(*) AS entrees,
+               SUM(CASE WHEN old_values IS NOT NULL THEN 1 ELSE 0 END) AS avec_valeurs_avant,
+               SUM(CASE WHEN new_values IS NOT NULL AND new_values NOT LIKE '{"champs_modifies":%' THEN 1 ELSE 0 END) AS avec_valeurs_apres,
+               MIN(created_at) AS premiere, MAX(created_at) AS derniere
+        FROM audit_logs
+        WHERE (auditable_type IN ('App\Models\Patient', 'App\Models\Prescription', 'App\Models\Dispensation')
+               OR event LIKE 'patient.%' OR event LIKE 'prescription.%' OR event LIKE 'dispensation.%')
+          AND (old_values IS NOT NULL OR new_values IS NOT NULL)
+        GROUP BY event
+        ORDER BY entrees DESC
+        SQL,
 ];
 
 foreach ($queries as $title => $sql) {

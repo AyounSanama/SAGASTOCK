@@ -13,10 +13,12 @@ use App\Models\StockMovement;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\OfficialModuleActor;
 use Tests\TestCase;
 
 class StockManagementTest extends TestCase
 {
+    use OfficialModuleActor;
     use RefreshDatabase;
 
     private function data(): array
@@ -34,11 +36,10 @@ class StockManagementTest extends TestCase
 
     private function login(): User
     {
-        $permissions = collect(['stocks.view', 'stocks.manage', 'stocks.adjust', 'transfers.manage', 'receipts.manage'])->map(fn ($code) => Permission::firstOrCreate(['code' => $code], ['name' => $code]));
-        $role = Role::create(['code' => 'stock_admin', 'name' => 'Gestionnaire stock']);
-        $role->permissions()->attach($permissions);
-        $user = User::factory()->create(['is_active' => true]);
-        $user->roles()->attach($role, ['scope_type' => 'platform']);
+        $organization = Organization::where('code', 'STK')->firstOrFail();
+        $user = $this->officialProjectAdmin($organization,
+            ['stocks.view', 'stocks.manage', 'stocks.adjust', 'transfers.manage', 'receipts.manage'],
+            HealthFacility::where('organization_id', $organization->id)->get()->all());
         Sanctum::actingAs($user);
 
         return $user;
@@ -95,8 +96,7 @@ class StockManagementTest extends TestCase
     {
         $d = $this->data();
         $other = Organization::create(['code' => 'OTHER', 'name' => 'Autre ONG']);
-        $user = $this->login();
-        $user->roles()->updateExistingPivot($user->roles()->first()->id, ['scope_type' => 'organization', 'scope_id' => $d['organization']->id]);
+        $this->login();
         $this->postJson("/api/v1/organizations/{$d['organization']->id}/stocks/movements", [
             'site_id' => $d['source']->id, 'batch_id' => $d['early']->id, 'movement_type' => 'issue', 'quantity' => 1,
         ])->assertUnprocessable()->assertJsonValidationErrors('quantity');

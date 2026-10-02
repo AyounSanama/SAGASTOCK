@@ -36,6 +36,9 @@ class CompleteConfigurationWizardTest extends TestCase
         $organization = $this->createOfficialOrganization();
         $mission = $organization->missions()->firstOrFail();
         $coordination = User::where('email', 'coordination@stabilisation.example')->firstOrFail();
+        // S-04 : compte créé avec un mot de passe temporaire, bloqué jusqu'à son remplacement.
+        $this->actingAs($coordination)->get('/projects')->assertRedirect(route('profile.show'));
+        $coordination->update(['must_change_password' => false]);
         $this->assertSame($organization->id, $coordination->organization_id);
         $this->actingAs($coordination)->post(route('organizations.projects.store', $organization), ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
             'mission_id' => $mission->id, 'code' => 'HEALTH', 'name' => 'Projet Santé',
@@ -44,6 +47,8 @@ class CompleteConfigurationWizardTest extends TestCase
         $project = $organization->projects()->firstOrFail();
         $projectAdmin = User::where('email', 'health@example.test')->firstOrFail();
         $this->assertDatabaseHas('role_user', ['user_id' => $projectAdmin->id, 'scope_type' => 'project', 'scope_id' => $project->id]);
+        $this->actingAs($projectAdmin)->get('/health-facilities')->assertRedirect(route('profile.show'));
+        $projectAdmin->update(['must_change_password' => false]);
         $this->actingAs($projectAdmin)->get('/health-facilities')->assertOk()->assertSee('FOSA');
         $this->actingAs($sago)->post(route('configuration.step.save', 'summary'), ['confirmation' => '1'])->assertForbidden();
         $this->assertDatabaseHas('audit_logs', ['event' => 'configuration.organization.created', 'auditable_id' => $organization->id]);
@@ -59,6 +64,9 @@ class CompleteConfigurationWizardTest extends TestCase
         $progress = SetupProgress::query()->firstOrFail();
         $before = $progress->getAttributes();
         $coordination = User::where('email', 'coordination@stabilisation.example')->firstOrFail();
+        // S-04 : compte créé avec un mot de passe temporaire, bloqué jusqu'à son remplacement.
+        $this->actingAs($coordination)->get('/projects')->assertRedirect(route('profile.show'));
+        $coordination->update(['must_change_password' => false]);
         $this->actingAs($coordination)->delete(route('organizations.projects.destroy', [$organization, $project]))->assertRedirect();
         $this->assertSoftDeleted('projects', ['id' => $project->id]);
         $this->post(route('organizations.projects.restore', [$organization, $project->id]))->assertRedirect();

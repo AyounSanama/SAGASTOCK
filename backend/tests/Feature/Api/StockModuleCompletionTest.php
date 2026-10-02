@@ -12,10 +12,12 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\OfficialModuleActor;
 use Tests\TestCase;
 
 class StockModuleCompletionTest extends TestCase
 {
+    use OfficialModuleActor;
     use RefreshDatabase;
 
     private function context(): array
@@ -38,13 +40,8 @@ class StockModuleCompletionTest extends TestCase
             'batch_number' => 'LOT-001', 'expires_on' => now()->addYear(),
             'status' => 'available',
         ]);
-        $permissions = collect([
-            'stocks.view', 'stocks.manage', 'stocks.adjust', 'catalog.view', 'batches.view', 'batches.manage',
-        ])->map(fn (string $code) => Permission::firstOrCreate(['code' => $code], ['name' => $code]));
-        $role = Role::create(['code' => 'stock_completion', 'name' => 'Gestionnaire stock']);
-        $role->permissions()->attach($permissions->pluck('id'));
-        $user = User::factory()->create(['is_active' => true]);
-        $user->roles()->attach($role, ['scope_type' => 'platform']);
+        $user = $this->officialProjectAdmin($organization,
+            ['stocks.view', 'stocks.manage', 'stocks.adjust', 'catalog.view', 'batches.view', 'batches.manage'], [$facility]);
 
         return compact('organization', 'site', 'product', 'batch', 'user');
     }

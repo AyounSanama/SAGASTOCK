@@ -30,6 +30,11 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            // Compte ordinaire : actif, mot de passe déjà personnalisé. Les tests
+            // qui vérifient un compte inactif ou un mot de passe temporaire le
+            // précisent explicitement (S-01, S-04).
+            'is_active' => true,
+            'must_change_password' => false,
         ];
     }
 

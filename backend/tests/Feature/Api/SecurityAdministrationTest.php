@@ -18,7 +18,8 @@ class SecurityAdministrationTest extends TestCase
     {
         $manage = Permission::create(['code' => 'roles.manage', 'name' => 'Gérer les rôles']);
         $audit = Permission::create(['code' => 'audit.view', 'name' => 'Voir audit']);
-        $role = Role::create(['code' => 'security_admin', 'name' => 'Sécurité']);
+        // S-07 : seul l'Admin Sago (rôle officiel) a le périmètre plateforme.
+        $role = Role::firstOrCreate(['code' => 'sago_admin'], ['name' => 'Admin Sago', 'is_system' => true, 'is_active' => true]);
         $role->permissions()->attach([$manage->id, $audit->id]);
         $user = User::factory()->create();
         $user->roles()->attach($role->id, ['scope_type' => 'platform']);

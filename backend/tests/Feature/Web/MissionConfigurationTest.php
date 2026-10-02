@@ -35,6 +35,9 @@ class MissionConfigurationTest extends TestCase
         $this->assertSame(Country::where('iso2', 'CM')->value('id'), $mission->country_id);
         $this->assertTrue($mission->is_active);
         $admin = User::where('email', 'coordination@stabilisation.example')->firstOrFail();
+        // S-04 : compte créé avec un mot de passe temporaire, bloqué jusqu'à son remplacement.
+        $this->actingAs($admin)->get('/projects')->assertRedirect(route('profile.show'));
+        $admin->update(['must_change_password' => false]);
         $this->assertDatabaseHas('role_user', ['user_id' => $admin->id, 'scope_type' => 'mission', 'scope_id' => $mission->id]);
         $this->actingAs($admin)->get('/projects')->assertOk()->assertSee('project-create-sheet');
     }
@@ -84,6 +87,9 @@ class MissionConfigurationTest extends TestCase
         $this->post(route('configuration.mission.restore', $mission->id))->assertForbidden();
         $this->assertDatabaseHas('missions', ['id' => $mission->id, 'deleted_at' => null, 'is_active' => true]);
         $admin = User::where('email', 'coordination@stabilisation.example')->firstOrFail();
+        // S-04 : compte créé avec un mot de passe temporaire, bloqué jusqu'à son remplacement.
+        $this->actingAs($admin)->get('/projects')->assertRedirect(route('profile.show'));
+        $admin->update(['must_change_password' => false]);
         $this->actingAs($admin)->delete(route('organizations.missions.destroy', [$organization, $mission]))->assertForbidden();
         $this->assertDatabaseHas('missions', ['id' => $mission->id, 'deleted_at' => null]);
     }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../connectivity/connectivity_service.dart';
@@ -19,18 +20,23 @@ class SyncReport {
     required this.succeeded,
     required this.failed,
     required this.conflicts,
+    this.authenticationRequired = false,
   });
 
   const SyncReport.empty()
     : processed = 0,
       succeeded = 0,
       failed = 0,
-      conflicts = 0;
+      conflicts = 0,
+      authenticationRequired = false;
 
   final int processed;
   final int succeeded;
   final int failed;
   final int conflicts;
+
+  /// Jeton expiré ou révoqué : les opérations restent en attente (S-03).
+  final bool authenticationRequired;
 }
 
 class SyncService {
@@ -56,6 +62,22 @@ class SyncService {
   StreamSubscription<bool>? _networkSubscription;
   bool _isSynchronizing = false;
 
+  /// S-03 : passe à `true` quand le serveur refuse le jeton (expiré, révoqué)
+  /// ou exige un nouveau mot de passe. L'application redemande la connexion ;
+  /// les opérations en attente sont conservées et repartent ensuite.
+  static final ValueNotifier<bool> authenticationRequired = ValueNotifier(
+    false,
+  );
+
+  static bool requiresAuthentication(DioException error) {
+    final status = error.response?.statusCode;
+    if (status == 401) return true;
+    final data = error.response?.data;
+    return status == 403 &&
+        data is Map &&
+        data['code'] == 'password_change_required';
+  }
+
   Future<void> start() async {
     await _networkSubscription?.cancel();
     _networkSubscription = _connectivity.networkChanges.listen((online) {
@@ -78,6 +100,7 @@ class SyncService {
     var succeeded = 0;
     var failed = 0;
     var conflicts = 0;
+    var authenticationRequired = false;
     try {
       final operations = await database.pendingOperations(
         ownerUserId: ownerUserId,
@@ -91,6 +114,19 @@ class SyncService {
           await database.completeOperationWithResponse(operation, response);
           succeeded++;
         } on DioException catch (error) {
+          if (requiresAuthentication(error)) {
+            // L'opération repart telle quelle après reconnexion : aucune
+            // tentative comptée, aucune perte.
+            await database.failOperation(
+              operationId: operation.operationId,
+              status: 'pending',
+              attemptCount: operation.attemptCount,
+              error: 'Reconnexion nécessaire',
+            );
+            authenticationRequired = true;
+            SyncService.authenticationRequired.value = true;
+            break;
+          }
           final result = await _handleDioFailure(operation, error);
           failed++;
           if (result == 'conflict') conflicts++;
@@ -105,6 +141,7 @@ class SyncService {
         succeeded: succeeded,
         failed: failed,
         conflicts: conflicts,
+        authenticationRequired: authenticationRequired,
       );
     } finally {
       _isSynchronizing = false;

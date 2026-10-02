@@ -20,6 +20,17 @@ class User extends Authenticatable
     protected $fillable = ['organization_id', 'name', 'first_name', 'last_name', 'username', 'email', 'phone', 'preferred_locale', 'password', 'is_active', 'must_change_password', 'read_only', 'last_login_at', 'password_changed_at', 'failed_login_attempts', 'locked_until'];
     protected $hidden = ['password', 'remember_token'];
 
+    /** S-01 : un compte désactivé ou archivé perd immédiatement ses jetons. */
+    protected static function booted(): void
+    {
+        static::updated(function (User $user): void {
+            if ($user->wasChanged('is_active') && ! $user->is_active) {
+                $user->tokens()->delete();
+            }
+        });
+        static::deleted(fn (User $user) => $user->tokens()->delete());
+    }
+
     protected function casts(): array
     {
         return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'is_active' => 'boolean', 'must_change_password' => 'boolean', 'read_only' => 'boolean', 'last_login_at' => 'datetime', 'password_changed_at' => 'datetime', 'failed_login_attempts' => 'integer', 'locked_until' => 'datetime'];

@@ -18,7 +18,9 @@ class UserScopeService
     {
         $officialRole = app(GovernanceService::class)->roleCode($user);
 
-        return in_array($officialRole, [GovernanceService::SAGO_ADMIN, null], true)
+        // S-07 : périmètre plateforme réservé à l'Admin Sago (un rôle non officiel
+        // à la plateforme ne voit plus toutes les organisations).
+        return $officialRole === GovernanceService::SAGO_ADMIN
             && $user->roles()
                 ->wherePivot('scope_type', 'platform')
                 ->exists();

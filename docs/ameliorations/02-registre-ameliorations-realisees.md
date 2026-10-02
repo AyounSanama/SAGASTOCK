@@ -269,6 +269,21 @@ Tests : `HealthFacilityConfigurationTest` (8). Suite backend complète : 316 tes
 - « Configuration des projets » (Web, Coordination) : ses formulaires visent `/organizations/...`, que le masquage V1 bloque. Doublon à retirer (check-up des maquettes).
 - Aucun rôle officiel n'a `catalog.manage` : la codification par la Coordination est à ouvrir au lot f (AM-173).
 
+## Lot 17 — Corrections de sécurité critiques et élevées · 02/10/2026
+
+Détail et état : `09-audit-securite.md` (section « État des corrections »). Étude S-02 : `10-etude-chiffrement-mobile.md`.
+
+| Élément | Réalisation |
+|---|---|
+| S-01, S-04, S-05, S-07, S-09 | Corrigés, avec un test chacun (`SecurityHardeningTest`, 8 tests, vrais jetons) |
+| S-03 | Jeton de 30 jours prolongé ; code PIN et verrouillage après 5 min ; opérations conservées si le jeton expire hors ligne |
+| S-06 | HTTP réservé aux versions de test, HTTPS obligatoire en production |
+| S-11 | Dépendances mises à jour, audits à 0 |
+| Android | Sauvegarde automatique désactivée (données locales non chiffrées) |
+| Tests existants | 16 tests utilisaient un ancien rôle personnalisé à la plateforme. Les tests stock passent par l'Admin Projet du projet de la FOSA (helper `OfficialModuleActor`), la sécurité par l'Admin Sago, les structures par un rôle limité à une organisation (à passer sur un rôle officiel avec les Policies). Les comptes créés avec un mot de passe temporaire sont d'abord bloqués (S-04), puis débloqués après le changement. |
+
+Suites : backend 325 tests OK, mobile 98 tests OK, `flutter analyze` sans remarque.
+
 ## Modèle d'entrée pour les prochaines livraisons
 
 ```markdown

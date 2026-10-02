@@ -77,7 +77,7 @@ class AuthController extends Controller
             'token' => $user->createToken(
                 $data['device_id'],
                 ['*'],
-                now()->addDays(30),
+                now()->addDays(\App\Http\Middleware\ExtendMobileTokenLifetime::LIFETIME_DAYS),
             )->plainTextToken,
             'user' => $payload,
             'role' => strtoupper((string) $payload['role']),

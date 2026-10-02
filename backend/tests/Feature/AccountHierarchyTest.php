@@ -77,9 +77,15 @@ class AccountHierarchyTest extends TestCase
             $this->postJson('/api/v1/users', ['name' => 'X', 'email' => "$code@example.test", 'role_id' => $this->roleId($code), 'scope_type' => 'platform'])->assertForbidden();
         }
         $this->getJson('/api/v1/assignable-roles')->assertOk()->assertJsonCount(0, 'roles');
-        $this->putJson("/api/v1/users/{$target->id}", ['name' => 'Modifié'])->assertForbidden();
-        $this->postJson("/api/v1/users/{$target->id}/reset-password")->assertForbidden();
-        $this->deleteJson("/api/v1/users/{$target->id}")->assertForbidden();
+        // Hors de sa vue depuis S-07 (404) ou refusé (403) : jamais modifié.
+        foreach ([
+            fn () => $this->putJson("/api/v1/users/{$target->id}", ['name' => 'Modifié']),
+            fn () => $this->postJson("/api/v1/users/{$target->id}/reset-password"),
+            fn () => $this->deleteJson("/api/v1/users/{$target->id}"),
+        ] as $call) {
+            $this->assertContains($call()->status(), [403, 404]);
+        }
+        $this->assertNotSame('Modifié', $target->fresh()->name);
         $this->assertNotSoftDeleted('users', ['id' => $target->id]);
         $this->assertSame(0, User::whereIn('email', ['sago_admin@example.test', 'coordination_admin@example.test', 'site_user@example.test'])->count());
 
@@ -88,7 +94,7 @@ class AccountHierarchyTest extends TestCase
             'first_name' => 'A', 'last_name' => 'B', 'username' => 'ab', 'email' => 'ab@example.test',
             'role_id' => $this->roleId('site_user'), 'scope' => 'platform',
         ])->assertStatus(404);
-        $this->actingAs($legacy)->delete("/users/{$target->id}")->assertForbidden();
+        $this->assertContains($this->actingAs($legacy)->delete("/users/{$target->id}")->status(), [403, 404]);
     }
 
     public function test_site_accounts_never_receive_a_platform_scope(): void

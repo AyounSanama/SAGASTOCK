@@ -50,7 +50,7 @@ class DashboardController extends Controller
             ]);
         }
         $context = $this->dashboard->build($user);
-        $activities = ($user->hasPermission('audit.view') ? AuditLog::query() : AuditLog::where('user_id', $user->id))
+        $activities = ($user->hasPermission('audit.view') ? AuditLog::query()->withoutHealthData() : AuditLog::where('user_id', $user->id))
             ->latest()->limit(8)->get(['id', 'event', 'created_at']);
         $movements = $user->hasPermission('stocks.view')
             ? StockMovement::with(['product:id,name', 'site:id,name'])->whereIn('site_id', $context['siteIds'])->latest('validated_at')->limit(6)->get()

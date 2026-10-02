@@ -15,7 +15,8 @@ class StructureManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function user(string $scopeType = 'platform', ?string $scopeId = null): User
+    /** S-07 : plus de rôle non officiel à la plateforme ; rôle de test limité à une organisation. */
+    private function user(string $scopeType, ?string $scopeId): User
     {
         $permissions = collect([
             'structures.view' => 'Consulter les structures',
@@ -34,7 +35,7 @@ class StructureManagementTest extends TestCase
     public function test_complete_structure_lifecycle_and_module_activation(): void
     {
         $organization = Organization::create(['code' => 'ONG_CM', 'name' => 'ONG Cameroun']);
-        Sanctum::actingAs($this->user());
+        Sanctum::actingAs($this->user('organization', $organization->id));
 
         $facility = $this->postJson("/api/v1/organizations/{$organization->id}/facilities", [
             'code' => 'FOSA_01', 'name' => 'Hôpital central', 'facility_type' => 'hospital',
@@ -94,7 +95,7 @@ class StructureManagementTest extends TestCase
     public function test_cross_facility_relations_are_rejected(): void
     {
         $organization = Organization::create(['code' => 'ORG', 'name' => 'Organisation']);
-        Sanctum::actingAs($this->user());
+        Sanctum::actingAs($this->user('organization', $organization->id));
         $first = HealthFacility::create(['organization_id' => $organization->id, 'code' => 'F1', 'name' => 'FOSA 1', 'facility_type' => 'clinic']);
         $second = HealthFacility::create(['organization_id' => $organization->id, 'code' => 'F2', 'name' => 'FOSA 2', 'facility_type' => 'clinic']);
         $department = $first->departments()->create(['code' => 'D1', 'name' => 'Service 1', 'department_type' => 'clinical']);
@@ -107,7 +108,7 @@ class StructureManagementTest extends TestCase
     public function test_web_structure_interface_is_connected_and_responsive_ready(): void
     {
         $organization = Organization::create(['code' => 'WEB_ORG', 'name' => 'Organisation Web']);
-        $user = $this->user();
+        $user = $this->user('organization', $organization->id);
 
         $this->actingAs($user)->get("/organizations/{$organization->id}/structures")
             ->assertOk()->assertSee('Ajouter une formation sanitaire')->assertSee('pharmacare-logo.png');
@@ -144,7 +145,7 @@ class StructureManagementTest extends TestCase
     public function test_web_has_a_dedicated_professional_facility_creation_page(): void
     {
         $organization = Organization::create(['code' => 'CREATE_ORG', 'name' => 'Organisation création']);
-        $user = $this->user();
+        $user = $this->user('organization', $organization->id);
 
         $this->actingAs($user)
             ->get("/organizations/{$organization->id}/facilities/create")
