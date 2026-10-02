@@ -43,6 +43,19 @@ abstract final class AppConfig {
         : null;
   }
 
+  /// Délais réseau. Production : 5 s (connexion) / 12 s (réponse).
+  /// Versions de test : 10 s / 60 s, car le serveur de démonstration sur le PC
+  /// peut mettre près de 50 s à répondre au premier appel quand le PC est chargé.
+  static Duration get connectTimeout => connectTimeoutFor(environment);
+
+  static Duration get receiveTimeout => receiveTimeoutFor(environment);
+
+  static Duration connectTimeoutFor(String environment) =>
+      Duration(seconds: environment == 'production' ? 5 : 10);
+
+  static Duration receiveTimeoutFor(String environment) =>
+      Duration(seconds: environment == 'production' ? 12 : 60);
+
   /// Adresse fixée à la compilation (--dart-define), sans réglage d'exécution.
   static String get buildBaseUrl => _resolve(null);
 

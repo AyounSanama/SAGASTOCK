@@ -33,4 +33,25 @@ void main() {
       'http://192.168.137.1:8000/api/v1',
     );
   });
+
+  test('délais réseau allongés en version de test uniquement', () {
+    expect(
+      AppConfig.connectTimeoutFor('production'),
+      const Duration(seconds: 5),
+    );
+    expect(
+      AppConfig.receiveTimeoutFor('production'),
+      const Duration(seconds: 12),
+    );
+    for (final environment in ['development', 'staging']) {
+      expect(
+        AppConfig.connectTimeoutFor(environment),
+        const Duration(seconds: 10),
+      );
+      expect(
+        AppConfig.receiveTimeoutFor(environment),
+        const Duration(seconds: 60),
+      );
+    }
+  });
 }

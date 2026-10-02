@@ -55,8 +55,8 @@ abstract final class ServerSettings {
         dio ??
         Dio(
           BaseOptions(
-            connectTimeout: const Duration(seconds: 5),
-            receiveTimeout: const Duration(seconds: 5),
+            connectTimeout: AppConfig.connectTimeout,
+            receiveTimeout: AppConfig.receiveTimeout,
           ),
         );
     try {
