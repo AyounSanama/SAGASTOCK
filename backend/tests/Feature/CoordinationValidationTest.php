@@ -197,7 +197,10 @@ class CoordinationValidationTest extends TestCase
         $this->getJson('/api/v1/coordination/overview')->assertOk()
             ->assertJsonPath('stats.pending', 1)
             ->assertJsonPath('projects.0.code', 'GFF05')
-            ->assertJsonPath('facilities.0.validation_status', HealthFacility::STATUS_PENDING);
+            ->assertJsonPath('facilities.0.validation_status', HealthFacility::STATUS_PENDING)
+            ->assertJsonPath('facilities.0.target_populations.0', 'Adultes')
+            ->assertJsonPath('facilities.0.pathologies.0', 'Paludisme simple')
+            ->assertJsonPath('can_act', true);
         $this->getJson('/api/v1/coordination/journal')->assertOk()->assertJsonPath('data.0.event', 'facility.created');
     }
 }

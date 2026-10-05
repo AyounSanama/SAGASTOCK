@@ -14,9 +14,10 @@ List<ApplicationNavigationItem> mobilePrimaryNavigation(
 ) {
   final keys = switch (role) {
     'sago_admin' => const ['dashboard', 'organizations', 'history', 'profile'],
+    // M-03 : Accueil, Coordination, Liste, Profil (« Analyses » au niveau 9).
     'coordination_admin' => const [
       'dashboard',
-      'projects',
+      'missions',
       'standard-lists',
       'profile',
     ],
@@ -280,9 +281,11 @@ class _NavigationItem extends StatelessWidget {
   String _compactLabel(ApplicationNavigationItem item) => switch (item.key) {
     'dashboard' => 'Accueil',
     'projects' => item.label == 'Mon projet' ? 'Mon projet' : 'Projets',
-    'standard-lists' => 'Liste standard',
+    // Libellés courts des maquettes (barre basse).
+    'missions' => 'Coordination',
+    'standard-lists' => 'Liste',
     'facilities' => 'FOSA',
-    'profile' => 'Mon profil',
+    'profile' => 'Profil',
     _ => item.label,
   };
 }

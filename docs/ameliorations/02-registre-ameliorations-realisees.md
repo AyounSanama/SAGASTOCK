@@ -322,6 +322,20 @@ Captures (base de test) : `.tmp/ui-screenshots/lot-ma-coordination/`.
 - M-04 : opérations hors ligne créées avant la suspension, acceptées et signalées (niveau 10). Aujourd'hui, elles restent en attente sur le téléphone et partent après réactivation.
 - Affichage du motif de refus dans l'écran Admin Projet (niveau 5 ; déjà renvoyé par l'API).
 
+## Niveau 3 — Lot 2 : « Ma Coordination » mobile (AM-172) · 05/10/2026
+
+| Élément | Réalisation |
+|---|---|
+| Écran mobile | `CoordinationPage` selon les maquettes Coordination mobiles : en-tête sombre (Admin Coordination, pays, coordination), onglets *Projets* (bandeau des FOSA en attente, cartes projet : type, bailleur, Admin Projet, FOSA validées / en attente, bouton « + » vers « Créer un projet / programme »), *À valider* (Refuser avec motif / Valider, détail complet), *FOSA* (statut, motifs, comptes, Suspendre / Réactiver), *Comptes* (création, suspension). |
+| Hors ligne | Données de « Ma Coordination » gardées sur le téléphone (lecture hors ligne, bandeau « données de la dernière synchronisation ») ; valider, refuser, suspendre exigent le réseau (message de la maquette). |
+| Lecture seule | Tout visible, aucun bouton d'action (`can_act` renvoyé par le serveur, règle appliquée côté serveur). |
+| Barre basse Coordination | Accueil, Coordination, Liste, Profil (décision M-03 ; « Analyses » au niveau 9). Libellés courts « Liste » et « Profil » pour tous les rôles, comme dans les maquettes. |
+| API | `GET /api/v1/coordination/overview` complétée : détail des FOSA (populations, pathologies, approvisionnement, déclarant, Liste Standard générée pour les FOSA en attente), comptes de chaque FOSA, rôle des comptes de la coordination. |
+
+Tests : `coordination_page_test.dart` (4 : onglets, validation, hors ligne, lecture seule), barre basse Coordination ; mobile 106 tests OK, `flutter analyze` sans remarque. Backend : `CoordinationValidationTest` (7) OK.
+
+Captures (police Inter, taille Galaxy A15, données d'exemple) : `mobile/test_captures/captures/` (`flutter test test_captures --update-goldens`). Captures sur le vrai téléphone : à faire dès qu'il est branché (APK à recompiler).
+
 ## Modèle d'entrée pour les prochaines livraisons
 
 ```markdown

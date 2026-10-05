@@ -58,4 +58,22 @@ void main() {
       ['dashboard', 'facilities', 'standard-lists', 'profile'],
     );
   });
+
+  test('barre basse Coordination : Accueil, Coordination, Liste, Profil (M-03)', () {
+    final items = ApplicationAccess.navigation({
+      'role': 'coordination_admin',
+      'permissions': ['missions.view', 'projects.view', 'standard_lists.view'],
+      'navigation': [
+        {'key': 'dashboard', 'label': 'Tableau de bord', 'path': '/home', 'permission': null},
+        {'key': 'missions', 'label': 'Ma Coordination', 'path': '/missions', 'permission': 'missions.view'},
+        {'key': 'projects', 'label': 'Projets', 'path': '/projects', 'permission': 'projects.view'},
+        {'key': 'standard-lists', 'label': 'Liste standard', 'path': '/standard-lists', 'permission': 'standard_lists.view'},
+        {'key': 'profile', 'label': 'Mon profil', 'path': '/profile', 'permission': null},
+      ],
+    });
+    expect(
+      mobilePrimaryNavigation('coordination_admin', items).map((item) => item.key),
+      ['dashboard', 'missions', 'standard-lists', 'profile'],
+    );
+  });
 }

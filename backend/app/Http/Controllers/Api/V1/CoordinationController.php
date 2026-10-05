@@ -22,22 +22,46 @@ class CoordinationController extends Controller
         $mission = Mission::with('country')->findOrFail($request->query('mission_id', $missionIds->first()));
         abort_unless($missionIds->contains($mission->id), 404);
         $data = $this->coordination->overview($request->user(), $mission);
+        $facilities = $data['facilities']->load(['targetPopulations:id,name', 'pathologies:id,name']);
+        $sites = \App\Models\Site::whereIn('health_facility_id', $facilities->pluck('id'))->pluck('health_facility_id', 'id');
+        $accountsByFacility = $data['facility_accounts']->groupBy(fn (User $user) => $sites[$user->roles->first()?->pivot?->scope_id] ?? null);
+        $declarers = User::whereIn('id', $facilities->pluck('declared_by')->filter()->unique())->pluck('name', 'id');
+        $management = app(\App\Services\HealthFacilityManagementService::class);
+        $projectCodes = $data['projects']->pluck('code', 'id');
 
         return response()->json([
             'mission' => $mission->only(['id', 'code', 'name']) + ['country' => $mission->country?->name],
+            'can_act' => ! $request->user()->read_only,
             'stats' => $data['stats'],
             'projects' => $data['projects']->map(fn ($project) => $project->only(['id', 'code', 'name', 'type', 'type_label', 'status', 'status_label',
                 'donor_name', 'admin_name', 'validated_facilities_count', 'pending_facilities_count']))->values(),
-            'facilities' => $data['facilities']->map(fn ($facility) => [
-                ...$facility->only(['id', 'code', 'name', 'validation_status', 'validation_status_label', 'refusal_reason', 'suspension_reason', 'created_at']),
+            'facilities' => $facilities->map(fn ($facility) => [
+                ...$facility->only(['id', 'code', 'name', 'validation_status', 'validation_status_label', 'refusal_reason', 'suspension_reason', 'created_at',
+                    'order_period_months', 'delivery_lead_time_months', 'safety_stock_months', 'region', 'district', 'locality']),
                 'category' => $facility->facilityCategory?->name,
                 'care_level' => $facility->careLevel?->name,
+                'declared_by' => $declarers[$facility->declared_by] ?? null,
+                'target_populations' => $facility->targetPopulations->pluck('name')->values(),
+                'pathologies' => $facility->pathologies->pluck('name')->values(),
+                // Coût de génération limité aux FOSA en attente (écran « À valider »).
+                'standard_list_count' => $facility->validation_status === \App\Models\HealthFacility::STATUS_PENDING ? $management->standardList($facility)->count() : null,
                 'projects' => $facility->projects->map->only(['id', 'code', 'name'])->values(),
+                'accounts' => ($accountsByFacility[$facility->id] ?? collect())->map(fn (User $user) => [
+                    ...$user->only(['id', 'name', 'username', 'is_active']),
+                    'role' => $user->roles->first()?->code === 'site_admin' ? 'Admin Site' : 'Utilisateur Site',
+                    'status' => CoordinationService::accountStatus($user)['label'],
+                    'last_login_at' => $user->last_login_at?->toIso8601String(),
+                ])->values(),
             ])->values(),
-            'accounts' => $data['coordination_accounts']->map(fn (User $user) => [
-                ...$user->only(['id', 'name', 'username', 'email', 'is_active', 'read_only']),
-                'status' => CoordinationService::accountStatus($user)['label'],
-            ])->values(),
+            'accounts' => $data['coordination_accounts']->map(function (User $user) use ($projectCodes) {
+                $projectRole = $user->roles->firstWhere('code', 'project_admin');
+
+                return [
+                    ...$user->only(['id', 'name', 'username', 'email', 'is_active', 'read_only']),
+                    'role' => $projectRole ? 'Admin Projet, '.($projectCodes[$projectRole->pivot->scope_id] ?? '—') : 'Coordination (lecture seule)',
+                    'status' => CoordinationService::accountStatus($user)['label'],
+                ];
+            })->values(),
         ]);
     }
 

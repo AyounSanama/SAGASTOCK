@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../auth/data/auth_service.dart';
 import '../../../core/access/application_access.dart';
+import '../../coordination/presentation/coordination_page.dart';
 import 'missions_page.dart';
 
 class ScopedMissionsPage extends StatelessWidget {
@@ -27,6 +28,13 @@ class ScopedMissionsPage extends StatelessWidget {
           ? Map<String, dynamic>.from(user['coordination'] as Map)
           : null;
       final role = '${user['role'] ?? ''}'.toLowerCase();
+      // AM-172 — « Ma Coordination » selon les maquettes (onglets Projets,
+      // À valider, FOSA, Comptes).
+      if (role == 'coordination_admin') {
+        return CoordinationPage(
+          organizationId: organizationId.isEmpty ? null : organizationId,
+        );
+      }
       if (organizationId.isEmpty) {
         return const Scaffold(
           body: Center(

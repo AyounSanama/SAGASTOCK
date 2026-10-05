@@ -1,0 +1,117 @@
+// Captures des écrans mobiles « Ma Coordination » avec la vraie police Inter
+// (taille Galaxy A15). Hors suite : flutter test test_captures --update-goldens
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:sagastock_mobile/src/core/connectivity/connectivity_service.dart';
+import 'package:sagastock_mobile/src/core/theme/app_theme.dart';
+import 'package:sagastock_mobile/src/features/coordination/data/coordination_service.dart';
+import 'package:sagastock_mobile/src/features/coordination/presentation/coordination_page.dart';
+
+class _FakeConnectivity implements ConnectivityService {
+  _FakeConnectivity(this.online);
+  final bool online;
+  @override
+  Future<bool> get hasNetwork async => online;
+  @override
+  Stream<bool> get networkChanges => const Stream.empty();
+}
+
+class _FakeService implements CoordinationService {
+  _FakeService({this.canAct = true, this.failWith});
+  final bool canAct;
+  final String? failWith;
+  final validated = <String>[];
+  String pendingStatus = 'pending';
+
+  @override
+  Future<Map<String, dynamic>> overview() async => {
+    'mission': {'id': 'm1', 'name': 'Coordination Yaoundé', 'country': 'Cameroun'},
+    'can_act': canAct,
+    'stats': {'projects': 1, 'pending': pendingStatus == 'pending' ? 1 : 0},
+    'projects': [
+      {
+        'id': 'p1', 'code': 'GFFO5', 'name': 'Appui aux soins de santé primaire',
+        'type': 'donor_project', 'type_label': 'Projet bailleur', 'status': 'active',
+        'status_label': 'Actif', 'donor_name': 'Bailleur A', 'admin_name': 'M. Atangana',
+        'validated_facilities_count': 6, 'pending_facilities_count': 1,
+      },
+    ],
+    'facilities': [
+      {
+        'id': 'f1', 'code': 'FOSA-015', 'name': 'CSI d’Ekoumdoum',
+        'validation_status': pendingStatus, 'category': 'Centre de santé intégré (CSI)',
+        'care_level': 'Soins de santé primaire', 'declared_by': 'M. Atangana',
+        'created_at': '2026-09-28T10:00:00Z', 'standard_list_count': 186,
+        'projects': [{'id': 'p1', 'code': 'GFFO5'}], 'accounts': [],
+        'target_populations': ['Adultes'], 'pathologies': ['Paludisme simple'],
+      },
+    ],
+    'accounts': [
+      {'id': 'u1', 'name': 'M. Atangana Joseph', 'username': 'j.atangana', 'is_active': true, 'role': 'Admin Projet, GFFO5', 'status': 'Actif'},
+    ],
+  };
+
+  @override
+  Future<void> validateFacility(String id) async {
+    if (failWith != null) throw CoordinationActionException(failWith!);
+    validated.add(id);
+    pendingStatus = 'validated';
+  }
+
+  @override
+  Future<void> refuseFacility(String id, String reason) async {}
+  @override
+  Future<void> suspendFacility(String id, String reason) async {}
+  @override
+  Future<void> reactivateFacility(String id) async {}
+  @override
+  Future<void> setAccountActive(String userId, {required bool active}) async {}
+}
+
+
+Future<void> _fonts() async {
+  ByteData bytes(String path) => ByteData.view(Uint8List.fromList(File(path).readAsBytesSync()).buffer);
+  final inter = FontLoader('Inter');
+  for (final weight in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+    inter.addFont(Future.value(bytes('assets/fonts/Inter-$weight.ttf')));
+  }
+  await inter.load();
+  final flutterRoot = Platform.environment['FLUTTER_ROOT'] ?? 'C:/flutter';
+  final icons = FontLoader('MaterialIcons')
+    ..addFont(Future.value(bytes('$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf')));
+  await icons.load();
+}
+
+void main() {
+  for (final (name, tab, canAct) in [
+    ('01-projets', 0, true),
+    ('02-a-valider', 1, true),
+    ('03-fosa', 2, true),
+    ('04-comptes', 3, true),
+    ('05-lecture-seule-a-valider', 1, false),
+  ]) {
+    testWidgets('capture $name', (tester) async {
+      await _fonts();
+      tester.view.physicalSize = const Size(1080, 2340);
+      tester.view.devicePixelRatio = 2.77;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: RepaintBoundary(
+          child: CoordinationPage(organizationId: 'o1', service: _FakeService(canAct: canAct), connectivity: _FakeConnectivity(true)),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      if (tab > 0) {
+        await tester.tap(find.text(['Projets', 'À valider', 'FOSA', 'Comptes'][tab]));
+        await tester.pumpAndSettle();
+      }
+      await expectLater(find.byType(RepaintBoundary).first, matchesGoldenFile('captures/$name.png'));
+    });
+  }
+}
