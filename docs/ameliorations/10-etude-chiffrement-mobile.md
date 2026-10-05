@@ -96,3 +96,24 @@ Un téléphone perdu, ou accessible en mode débogage, expose donc les données 
 - **SQLite3 Multiple Ciphers validé**, au format compatible SQLCipher v4 (`PRAGMA cipher = 'sqlcipher'`, `PRAGMA legacy = 4`, puis `PRAGMA key`), pour pouvoir changer plus tard sans migration lourde.
 - Photos dans la base chiffrée, compressées (1 600 px, 70 %), supprimées du téléphone dès que le serveur confirme leur réception.
 - Mesure de taille : dans la même compilation que la mesure OpenCV.
+
+## 9. Mesure de taille de l'APK (niveau 1, 05/10)
+
+Compilations `release --split-per-abi`, version `1aa1c79`, copie isolée `.tmp/essai-taille` (jamais commitée). OpenCV limité aux modules `core`, `imgproc` et `imgcodecs` ; `camera` 0.11.0 (0.12.x exige Dart 3.12).
+
+| Version | arm64-v8a | armeabi-v7a | x86_64 (émulateurs) |
+|---|---|---|---|
+| Actuelle | 30,7 Mo | 27,0 Mo | 33,0 Mo |
+| + chiffrement (`sqlite3mc`) | 32,6 Mo (+1,9) | 28,9 Mo (+1,9) | 35,0 Mo (+2,0) |
+| + chiffrement + OpenCV + `camera` | **42,8 Mo** (+12,1) | **36,1 Mo** (+9,1) | non compilé |
+
+Bibliothèques natives les plus lourdes (arm64) : `libflutter` 11,3 Mo, `libdartcv` (OpenCV) 10,5 Mo, `libapp` 9,1 Mo, `libbarhopper_v3` (lecteur de codes-barres) 4,9 Mo, `libsqlite3mc` 2,0 Mo, `libsqlite3` 1,7 Mo.
+
+Constats :
+- **Un APK par architecture est indispensable** : un APK unique cumulerait les trois architectures (environ 110 Mo avec OpenCV).
+- `libsqlite3` (moteur non chiffré, apporté par `sqlite3_flutter_libs`, en fin de vie) reste inclus à côté de `libsqlite3mc` : le retirer au niveau 10 économise environ 1,7 Mo.
+- OpenCV est l'ajout le plus lourd (+9 à +12 Mo selon l'architecture), dans l'ordre de grandeur annoncé dans `08-evaluation-librairies-capture.md`.
+
+Proposition : distribuer `app-arm64-v8a-release.apk` (téléphones récents, dont le téléphone de test) et `app-armeabi-v7a-release.apk` (anciens téléphones 32 bits) ; sur Google Play, un « App Bundle » (`.aab`) fait ce découpage automatiquement. Option B (OpenCV) maintenue : environ 43 Mo, acceptable pour une installation unique. Repli C (`camera` seul) si ce poids est jugé trop lourd pour les FOSA à faible connexion.
+
+Compilation : le PC a 7,7 Go de mémoire, alors que `mobile/android/gradle.properties` réserve 8 Go à Gradle. Deux compilations ont échoué faute de mémoire le 05/10. La mesure a réussi avec 3 Go, 2 tâches en parallèle et sans démon (33 min).
