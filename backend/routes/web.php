@@ -96,6 +96,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/projects/{project}/standard-list', [ProjectStandardListController::class, 'save'])->middleware('permission:standard_lists.manage')->name('projects.standard-list.save');
     Route::post('/projects/{project}/standard-list/{list}/publish', [ProjectStandardListController::class, 'publish'])->middleware('permission:standard_lists.manage')->name('projects.standard-list.publish');
     Route::get('/missions', [MissionController::class, 'home'])->middleware('permission:missions.view')->name('modules.missions');
+    // AM-172 — « Ma Coordination » : validation, refus, suspension des FOSA et des comptes.
+    Route::middleware('permission:missions.view')->prefix('coordination')->name('coordination.')->group(function (): void {
+        Route::post('/facilities/{facility}/validate', [\App\Http\Controllers\Web\CoordinationController::class, 'validateFacility'])->name('facilities.validate');
+        Route::post('/facilities/{facility}/refuse', [\App\Http\Controllers\Web\CoordinationController::class, 'refuseFacility'])->name('facilities.refuse');
+        Route::post('/facilities/{facility}/suspend', [\App\Http\Controllers\Web\CoordinationController::class, 'suspendFacility'])->name('facilities.suspend');
+        Route::post('/facilities/{facility}/reactivate', [\App\Http\Controllers\Web\CoordinationController::class, 'reactivateFacility'])->name('facilities.reactivate');
+        Route::post('/accounts/{user}/suspend', [\App\Http\Controllers\Web\CoordinationController::class, 'suspendAccount'])->name('accounts.suspend');
+        Route::post('/accounts/{user}/reactivate', [\App\Http\Controllers\Web\CoordinationController::class, 'reactivateAccount'])->name('accounts.reactivate');
+    });
     Route::get('/funding', [FundingController::class, 'home'])->middleware('permission:funding.view')->name('modules.funding');
     Route::get('/health-facilities', [StructureController::class, 'home'])->middleware('permission:health_facilities.view')->name('modules.health-facilities');
     Route::get('/dispensing-sites', [StructureController::class, 'sites'])->middleware('permission:dispensing_sites.view')->name('modules.dispensing-sites');

@@ -67,6 +67,9 @@ class AuthController extends Controller
         if ($user->organization_id && ! $user->organization()->where('is_active', true)->exists()) {
             return back()->withErrors(['login' => 'L’organisation rattachée à ce compte est désactivée.'])->onlyInput('login');
         }
+        if ($reason = \App\Http\Middleware\EnsureAccountIsActive::blockingReason($user)) {
+            return back()->withErrors(['login' => $reason])->onlyInput('login');
+        }
         Auth::login($user, $request->boolean('remember'));
         $user->update(['last_login_at' => now(), 'failed_login_attempts' => 0, 'locked_until' => null]);
         $request->session()->regenerate();

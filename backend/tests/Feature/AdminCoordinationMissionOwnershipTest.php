@@ -91,8 +91,8 @@ class AdminCoordinationMissionOwnershipTest extends TestCase
         $coordination = $this->actor('coordination_admin', 'organization', $organization);
 
         $this->actingAs($coordination)->get(route('organizations.missions.show', [$organization, $mission]))
-            ->assertOk()->assertSee('Projets de la mission')->assertSee('Ajouter un projet')
-            ->assertSee('name="mission_id" value="'.$mission->id.'"', false);
+            // « Ma Coordination » (AM-172) : onglets des maquettes, création par le bouton unique.
+            ->assertOk()->assertSee('Projets et programmes')->assertSee('Créer un projet / programme');
 
         $this->post(route('organizations.projects.store', $organization), ['order_period_months' => 1, 'delivery_lead_time_months' => 1, 'safety_stock_months' => 1, 
             'mission_id' => $mission->id,

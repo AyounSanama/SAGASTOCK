@@ -56,6 +56,9 @@ class AuthController extends Controller
         if ($user->organization_id && ! $user->organization()->where('is_active', true)->exists()) {
             throw ValidationException::withMessages(['login' => ['L’organisation rattachée à ce compte est désactivée.']]);
         }
+        if ($reason = \App\Http\Middleware\EnsureAccountIsActive::blockingReason($user)) {
+            throw ValidationException::withMessages(['login' => [$reason]]);
+        }
         $knownDevice = Device::where('fingerprint', $data['device_id'])->first();
         if ($knownDevice?->revoked_at) {
             throw ValidationException::withMessages(['device_id' => ['Cet appareil a été révoqué. Contactez un administrateur.']]);

@@ -95,8 +95,12 @@ class MissionController extends Controller
         }
 
         $projectIds = $mission->projects()->pluck('id');
+        $isCoordination = app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN;
+        $coordination = $isCoordination ? $this->coordinationData($request, $mission) : null;
 
-        return view('missions.show', [
+        return view($coordination ? 'missions.coordination' : 'missions.show', [
+            'coordination' => $coordination,
+            'tab' => $coordination ? $coordination['tab'] : 'projects',
             'organization' => $organization,
             'mission' => $mission->load('country'),
             'projects' => $mission->projects()->orderBy('name')->get(),
@@ -190,6 +194,52 @@ class MissionController extends Controller
         $data['is_active'] = $request->boolean('is_active', true);
 
         return $data;
+    }
+
+    /**
+     * AM-172 — Onglets de « Ma Coordination » (maquettes Coordination 01 à 06) :
+     * projets et programmes, FOSA à valider, FOSA et comptes, comptes, journal.
+     *
+     * @return array<string, mixed>
+     */
+    private function coordinationData(Request $request, Mission $mission): array
+    {
+        $service = app(\App\Services\CoordinationService::class);
+        $data = $service->overview($request->user(), $mission);
+        $tab = in_array($request->query('tab'), ['projects', 'pending', 'facilities', 'accounts', 'journal'], true) ? $request->query('tab') : 'projects';
+        $pending = $data['facilities']->where('validation_status', \App\Models\HealthFacility::STATUS_PENDING)->values();
+        $selected = $pending->firstWhere('id', $request->query('facility')) ?? $pending->first();
+        $selectedDetails = null;
+        if ($tab === 'pending' && $selected) {
+            $selected->load(['targetPopulations:id,name', 'pathologies:id,name']);
+            $declarer = $selected->declared_by ? \App\Models\User::find($selected->declared_by) : null;
+            $selectedDetails = [
+                'declared_by' => $declarer?->name,
+                'standard_list_count' => app(\App\Services\HealthFacilityManagementService::class)->standardList($selected)->count(),
+            ];
+        }
+        $sites = \App\Models\Site::whereIn('health_facility_id', $data['facilities']->pluck('id'))->pluck('health_facility_id', 'id');
+        $accountsByFacility = $data['facility_accounts']->groupBy(fn ($account) => $sites[$account->roles->first()?->pivot?->scope_id] ?? null);
+        $search = mb_strtolower(trim((string) $request->query('search')));
+        $facilities = $data['facilities']
+            ->when($search !== '', fn ($items) => $items->filter(fn ($facility) => str_contains(mb_strtolower($facility->name.' '.$facility->code), $search)
+                || ($accountsByFacility[$facility->id] ?? collect())->contains(fn ($account) => str_contains(mb_strtolower($account->name.' '.$account->username), $search))))
+            ->when($request->filled('project'), fn ($items) => $items->filter(fn ($facility) => $facility->projects->contains('id', $request->query('project'))))
+            ->when($request->filled('status'), fn ($items) => $items->where('validation_status', $request->query('status')))
+            ->values();
+
+        return [
+            ...$data,
+            'tab' => $tab,
+            'pending' => $pending,
+            'selected' => $selected,
+            'selected_details' => $selectedDetails,
+            'filtered_facilities' => $facilities,
+            'accounts_by_facility' => $accountsByFacility,
+            'filters' => ['search' => trim((string) $request->query('search')), 'project' => $request->query('project'), 'status' => $request->query('status')],
+            'journal' => $service->journal($request->user(), $tab === 'journal' ? null : 7, $tab === 'journal' ? 100 : 6),
+            'can_act' => ! $request->user()->read_only,
+        ];
     }
 
     private function allow(string $permission): void

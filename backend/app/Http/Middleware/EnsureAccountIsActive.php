@@ -49,6 +49,12 @@ class EnsureAccountIsActive
         if ($user->organization_id && ! $user->organization()->where('is_active', true)->exists()) {
             return 'L’organisation de ce compte est désactivée.';
         }
+        // AM-172 : les comptes d'une FOSA suspendue par la Coordination perdent l'accès.
+        $siteIds = $user->roles()->wherePivot('scope_type', 'site')->pluck('role_user.scope_id');
+        if ($siteIds->isNotEmpty() && \App\Models\Site::whereIn('id', $siteIds)
+            ->whereHas('healthFacility', fn ($query) => $query->where('validation_status', \App\Models\HealthFacility::STATUS_SUSPENDED))->exists()) {
+            return 'Votre FOSA est suspendue par la Coordination. Contactez votre Admin Projet.';
+        }
 
         return null;
     }

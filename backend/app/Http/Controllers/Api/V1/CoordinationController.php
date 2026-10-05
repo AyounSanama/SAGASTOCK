@@ -1,0 +1,104 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Models\Mission;
+use App\Models\User;
+use App\Services\CoordinationService;
+use App\Services\UserScopeService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+/** AM-172 — « Ma Coordination » (API, pour le mobile). Mêmes règles que le Web. */
+class CoordinationController extends Controller
+{
+    public function __construct(private readonly CoordinationService $coordination, private readonly UserScopeService $scopes) {}
+
+    public function overview(Request $request): JsonResponse
+    {
+        $this->coordination->assertCoordinator($request->user());
+        $missionIds = $this->scopes->coordinationMissionIds($request->user());
+        $mission = Mission::with('country')->findOrFail($request->query('mission_id', $missionIds->first()));
+        abort_unless($missionIds->contains($mission->id), 404);
+        $data = $this->coordination->overview($request->user(), $mission);
+
+        return response()->json([
+            'mission' => $mission->only(['id', 'code', 'name']) + ['country' => $mission->country?->name],
+            'stats' => $data['stats'],
+            'projects' => $data['projects']->map(fn ($project) => $project->only(['id', 'code', 'name', 'type', 'type_label', 'status', 'status_label',
+                'donor_name', 'admin_name', 'validated_facilities_count', 'pending_facilities_count']))->values(),
+            'facilities' => $data['facilities']->map(fn ($facility) => [
+                ...$facility->only(['id', 'code', 'name', 'validation_status', 'validation_status_label', 'refusal_reason', 'suspension_reason', 'created_at']),
+                'category' => $facility->facilityCategory?->name,
+                'care_level' => $facility->careLevel?->name,
+                'projects' => $facility->projects->map->only(['id', 'code', 'name'])->values(),
+            ])->values(),
+            'accounts' => $data['coordination_accounts']->map(fn (User $user) => [
+                ...$user->only(['id', 'name', 'username', 'email', 'is_active', 'read_only']),
+                'status' => CoordinationService::accountStatus($user)['label'],
+            ])->values(),
+        ]);
+    }
+
+    public function journal(Request $request): JsonResponse
+    {
+        $this->coordination->assertCoordinator($request->user());
+
+        return response()->json(['data' => $this->coordination->journal($request->user(), $request->integer('days') ?: null)]);
+    }
+
+    public function validateFacility(Request $request, string $facility): JsonResponse
+    {
+        $model = $this->coordination->facility($request->user(), $facility);
+        $this->coordination->validate($request, $model);
+
+        return response()->json(['facility' => $model->fresh()]);
+    }
+
+    public function refuseFacility(Request $request, string $facility): JsonResponse
+    {
+        $model = $this->coordination->facility($request->user(), $facility);
+        $this->coordination->refuse($request, $model, $this->reason($request));
+
+        return response()->json(['facility' => $model->fresh()]);
+    }
+
+    public function suspendFacility(Request $request, string $facility): JsonResponse
+    {
+        $model = $this->coordination->facility($request->user(), $facility);
+        $this->coordination->suspend($request, $model, $this->reason($request));
+
+        return response()->json(['facility' => $model->fresh()]);
+    }
+
+    public function reactivateFacility(Request $request, string $facility): JsonResponse
+    {
+        $model = $this->coordination->facility($request->user(), $facility);
+        $this->coordination->reactivate($request, $model);
+
+        return response()->json(['facility' => $model->fresh()]);
+    }
+
+    public function suspendAccount(Request $request, User $user): JsonResponse
+    {
+        $this->coordination->setAccountActive($request, $user, false);
+
+        return response()->json(['user' => $user->fresh()->only(['id', 'username', 'is_active'])]);
+    }
+
+    public function reactivateAccount(Request $request, User $user): JsonResponse
+    {
+        $this->coordination->setAccountActive($request, $user, true);
+
+        return response()->json(['user' => $user->fresh()->only(['id', 'username', 'is_active'])]);
+    }
+
+    private function reason(Request $request): string
+    {
+        return $request->validate(['reason' => ['required', 'string', 'min:5', 'max:1000']], [
+            'reason.required' => 'Le motif est obligatoire.',
+            'reason.min' => 'Le motif doit contenir au moins 5 caractères.',
+        ])['reason'];
+    }
+}

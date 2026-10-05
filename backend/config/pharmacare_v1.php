@@ -21,7 +21,7 @@ return [
         'project_admin' => ['dashboard', 'projects', 'standard-lists', 'profile'],
     ],
     'web_paths' => [
-        'coordination_admin' => ['dashboard', 'missions', 'projects', 'funding', 'standard-lists', 'profile'],
+        'coordination_admin' => ['dashboard', 'missions', 'coordination', 'projects', 'funding', 'standard-lists', 'profile'],
         'project_admin' => ['dashboard', 'projects', 'health-facilities', 'users', 'standard-lists', 'profile'],
     ],
     'api_patterns' => [
@@ -31,6 +31,7 @@ return [
             '#^api/v1/organizations/[^/]+/?$#',
             '#^api/v1/organizations/[^/]+/missions(?:/|$)#',
             '#^api/v1/missions(?:/|$)#',
+            '#^api/v1/coordination(?:/|$)#',
             '#^api/v1/projects(?:/|$)#',
             '#^api/v1/organizations/[^/]+/projects(?:/|$)#',
             '#^api/v1/organizations/[^/]+/projects-setup(?:/|$)#',

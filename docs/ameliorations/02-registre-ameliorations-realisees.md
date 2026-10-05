@@ -299,6 +299,29 @@ Script `backend/tools/correction-2026-10-02-r1-r8.php` : une transaction, compte
 
 Vérification en lecture seule : R1 vide, R8 « archivé ». Nouvelle empreinte de la base réelle : `e85697a9021f1b0d…`.
 
+## Niveau 3 — Lot 1 : « Ma Coordination » Web (AM-172) · 05/10/2026
+
+Demandé par le porteur le 05/10 après le constat maquettes / application (« mets en place ce qui n'est pas encore fait »). Couleurs : charte orange conservée pour tous les rôles (les maquettes vertes de l'Admin Projet servent pour la disposition).
+
+| Élément | Réalisation |
+|---|---|
+| Valider / refuser une FOSA | Seule une FOSA en attente ; refus avec motif obligatoire (5 caractères minimum), visible par l'Admin Projet ; une FOSA refusée et corrigée repasse en attente (règle existante). |
+| Suspendre / réactiver une FOSA | Motif obligatoire. Les comptes de la FOSA perdent l'accès : jetons révoqués, connexion refusée (Web et mobile), vérification à chaque requête (`EnsureAccountIsActive`). |
+| Suspendre / réactiver un compte | Admins Projet et Coordination (lecture seule) de la mission, comptes de ses FOSA ; jamais son propre compte. Statut « À activer » calculé (M-05). |
+| Règles serveur | `CoordinationService`, partagé par le Web (`/coordination/...`) et l'API (`/api/v1/coordination/...`, avec `overview` et `journal` pour le mobile). Limité aux missions de la Coordination (404 sinon) ; refusé à l'Admin Projet et à la Coordination en lecture seule (403) ; chaque action inscrite au journal. |
+| Écran Web | « Ma Coordination » refait selon les maquettes Coordination 01 à 05 : 4 indicateurs, bandeau des FOSA en attente, onglets *Projets et programmes* (type, bailleur, Admin Projet, FOSA validées / en attente), *FOSA à valider* (liste + détail, Liste Standard générée), *FOSA et comptes* (recherche, filtres, comptes dépliables), *Comptes de la coordination* + journal des 7 derniers jours, *Journal des actions*. Lecture seule : tout visible, aucun bouton d'action. |
+
+Tests : `CoordinationValidationTest` (7, vrais jetons pour la suspension). `AdminCoordinationMissionOwnershipTest` adapté au nouvel écran (bouton unique « Créer un projet / programme »). Suite backend : 300 tests OK.
+
+Captures (base de test) : `.tmp/ui-screenshots/lot-ma-coordination/`.
+
+**Reporté (prochains lots)**
+
+- Mobile Coordination (onglets Projets, À valider, FOSA, Comptes) : l'API est prête, les écrans Flutter restent à faire.
+- Menu du niveau 2 (« Référentiels », retrait de « Configuration des projets ») et fusion projet / programme.
+- M-04 : opérations hors ligne créées avant la suspension, acceptées et signalées (niveau 10). Aujourd'hui, elles restent en attente sur le téléphone et partent après réactivation.
+- Affichage du motif de refus dans l'écran Admin Projet (niveau 5 ; déjà renvoyé par l'API).
+
 ## Modèle d'entrée pour les prochaines livraisons
 
 ```markdown

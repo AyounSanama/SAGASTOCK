@@ -185,6 +185,17 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/organizations/{organization}/projects/{project}/donors/{donor}', [FundingController::class, 'detachDonor'])->middleware('permission:funding.manage');
         Route::delete('/organizations/{organization}/projects/{project}/programs/{program}', [FundingController::class, 'detachProgram'])->middleware('permission:funding.manage');
         Route::get('/organizations/{organization}/structures', [StructureController::class, 'index'])->middleware('permission:structures.view|health_facilities.view');
+        // AM-172 — « Ma Coordination » (mobile) : mêmes règles que le Web.
+        Route::middleware('permission:missions.view')->prefix('coordination')->group(function (): void {
+            Route::get('/overview', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'overview']);
+            Route::get('/journal', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'journal']);
+            Route::post('/facilities/{facility}/validate', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'validateFacility']);
+            Route::post('/facilities/{facility}/refuse', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'refuseFacility']);
+            Route::post('/facilities/{facility}/suspend', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'suspendFacility']);
+            Route::post('/facilities/{facility}/reactivate', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'reactivateFacility']);
+            Route::post('/accounts/{user}/suspend', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'suspendAccount']);
+            Route::post('/accounts/{user}/reactivate', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'reactivateAccount']);
+        });
         // AM-162 : choix limités à la configuration validée du projet (avant {facility}).
         Route::get('/organizations/{organization}/facilities/options', [StructureController::class, 'facilityOptions'])->middleware('permission:structures.view|health_facilities.view');
         Route::post('/organizations/{organization}/facilities', [StructureController::class, 'storeFacility'])->middleware('permission:structures.manage|health_facilities.manage');
