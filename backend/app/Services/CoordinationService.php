@@ -196,6 +196,117 @@ class CoordinationService
         ];
     }
 
+    /** Délai au-delà duquel une FOSA sans contact est « à surveiller » (maquettes). */
+    public const SYNC_LATE_DAYS = 3;
+
+    /** Fenêtre de comptage des opérations refusées par le serveur. */
+    public const SYNC_FAILURE_DAYS = 7;
+
+    /**
+     * Tableau de bord de la Coordination (maquettes Coordination 07 et 08) :
+     * chiffres réels pour les FOSA et la synchronisation. Les ruptures,
+     * péremptions et graphiques arrivent avec les analyses de base (niveau 9).
+     *
+     * Synchronisation d'une FOSA, calculée côté serveur :
+     * - dernier contact = dernier appel de l'API par un de ses comptes (jeton) ou dernière connexion ;
+     * - échec = au moins une opération refusée par le serveur depuis 7 jours ;
+     * - à surveiller = aucun contact depuis plus de 3 jours.
+     *
+     * @return array<string, mixed>
+     */
+    public function dashboard(User $actor, Mission $mission): array
+    {
+        $overview = $this->overview($actor, $mission);
+        $facilities = $overview['facilities'];
+        $sites = Site::whereIn('health_facility_id', $facilities->pluck('id'))->pluck('health_facility_id', 'id');
+        $accountsByFacility = $overview['facility_accounts']->groupBy(fn (User $user) => $sites[$user->roles->first()?->pivot?->scope_id] ?? null);
+        $userIds = $overview['facility_accounts']->pluck('id');
+        $lastTokenUse = DB::table('personal_access_tokens')->where('tokenable_type', User::class)->whereIn('tokenable_id', $userIds)
+            ->groupBy('tokenable_id')->selectRaw('tokenable_id, max(last_used_at) as last_used_at')->pluck('last_used_at', 'tokenable_id');
+        $failures = \App\Models\ApiIdempotencyKey::whereIn('user_id', $userIds)->where('response_status', '>=', 400)
+            ->where('created_at', '>=', now()->subDays(self::SYNC_FAILURE_DAYS))
+            ->groupBy('user_id')->selectRaw('user_id, count(*) as total')->pluck('total', 'user_id');
+
+        $rows = $facilities->whereIn('validation_status', [HealthFacility::STATUS_VALIDATED, HealthFacility::STATUS_SUSPENDED])->map(function (HealthFacility $facility) use ($accountsByFacility, $lastTokenUse, $failures) {
+            $accounts = $accountsByFacility[$facility->id] ?? collect();
+            $lastContact = $accounts->flatMap(fn (User $user) => [$user->last_login_at, isset($lastTokenUse[$user->id]) ? \Illuminate\Support\Carbon::parse($lastTokenUse[$user->id]) : null])
+                ->filter()->max();
+            $failed = (int) $accounts->sum(fn (User $user) => $failures[$user->id] ?? 0);
+            $status = match (true) {
+                $facility->validation_status === HealthFacility::STATUS_SUSPENDED => 'suspended',
+                $failed > 0 => 'failed',
+                $lastContact === null => 'never',
+                $lastContact->lt(now()->subDays(self::SYNC_LATE_DAYS)) => 'late',
+                default => 'ok',
+            };
+
+            return [
+                'id' => $facility->id, 'code' => $facility->code, 'name' => $facility->name,
+                'category' => $facility->facilityCategory?->name,
+                'projects' => $facility->projects->pluck('code')->values(),
+                'project_ids' => $facility->projects->pluck('id')->values(),
+                'last_contact_at' => $lastContact?->toIso8601String(),
+                'last_contact_days' => $lastContact ? (int) $lastContact->diffInDays(now()) : null,
+                'failed_operations' => $failed,
+                'sync_status' => $status,
+                'sync_label' => [
+                    'ok' => 'À jour', 'late' => 'À surveiller', 'failed' => 'Échec de synchro',
+                    'never' => 'Jamais synchronisée', 'suspended' => 'Suspendue',
+                ][$status],
+            ];
+        })->values();
+
+        $projects = $overview['projects']->map(function (Project $project) use ($facilities, $rows) {
+            $projectFacilities = $facilities->filter(fn ($facility) => $facility->projects->contains('id', $project->id));
+            $projectRows = $rows->filter(fn ($row) => $row['project_ids']->contains($project->id));
+            $failed = $projectRows->where('sync_status', 'failed')->count();
+            $late = $projectRows->whereIn('sync_status', ['late', 'never'])->count();
+
+            return [
+                'id' => $project->id, 'code' => $project->code, 'name' => $project->name,
+                'validated' => $projectFacilities->where('validation_status', HealthFacility::STATUS_VALIDATED)->count(),
+                'total' => $projectFacilities->whereIn('validation_status', [HealthFacility::STATUS_VALIDATED, HealthFacility::STATUS_PENDING, HealthFacility::STATUS_SUSPENDED])->count(),
+                'sync_status' => $projectRows->isEmpty() ? 'none' : ($failed > 0 ? 'failed' : ($late > 0 ? 'late' : 'ok')),
+                'sync_label' => $projectRows->isEmpty() ? 'Aucune FOSA'
+                    : ($failed > 0 ? $failed.' FOSA en échec' : ($late > 0 ? $late.' FOSA à surveiller' : 'À jour')),
+            ];
+        })->values();
+
+        $pending = $facilities->where('validation_status', HealthFacility::STATUS_PENDING);
+        $todo = collect();
+        if ($pending->isNotEmpty()) {
+            $todo->push(['tone' => 'info', 'action' => 'validate',
+                'title' => $pending->count().' '.($pending->count() > 1 ? 'FOSA attendent' : 'FOSA attend').' votre validation',
+                'detail' => 'Projets '.$pending->flatMap->projects->pluck('code')->unique()->join(' et ')]);
+        }
+        foreach ($rows->where('sync_status', 'failed') as $row) {
+            $todo->push(['tone' => 'danger', 'action' => 'facility', 'facility_id' => $row['id'],
+                'title' => $row['name'].' : '.$row['failed_operations'].' '.($row['failed_operations'] > 1 ? 'opérations refusées' : 'opération refusée').' par le serveur',
+                'detail' => 'Projet '.$row['projects']->join(', ').', '.self::SYNC_FAILURE_DAYS.' derniers jours']);
+        }
+        foreach ($rows->where('sync_status', 'late') as $row) {
+            $todo->push(['tone' => 'danger', 'action' => 'facility', 'facility_id' => $row['id'],
+                'title' => $row['name'].' ne s’est pas synchronisée depuis '.$row['last_contact_days'].' jours',
+                'detail' => 'Projet '.$row['projects']->join(', ')]);
+        }
+
+        return [
+            'generated_at' => now()->toIso8601String(),
+            'stats' => [
+                'validated' => $facilities->where('validation_status', HealthFacility::STATUS_VALIDATED)->count(),
+                'total' => $facilities->whereIn('validation_status', [HealthFacility::STATUS_VALIDATED, HealthFacility::STATUS_PENDING, HealthFacility::STATUS_SUSPENDED])->count(),
+                'pending' => $pending->count(),
+                'sync_failed' => $rows->where('sync_status', 'failed')->count(),
+                'sync_late' => $rows->whereIn('sync_status', ['late', 'never'])->count(),
+            ],
+            'projects' => $projects,
+            'facilities' => $rows->map(fn ($row) => collect($row)->except('project_ids')->all())->values(),
+            'todo' => $todo->values(),
+            // Indicateurs prévus au niveau 9 (analyses de base) : jamais de chiffre inventé.
+            'analyses_available' => false,
+        ];
+    }
+
     /** Journal des actions de la Coordination : FOSA, comptes et projets de son périmètre. */
     public function journal(User $actor, ?int $days = null, int $limit = 50): Collection
     {

@@ -203,4 +203,43 @@ class CoordinationValidationTest extends TestCase
             ->assertJsonPath('can_act', true);
         $this->getJson('/api/v1/coordination/journal')->assertOk()->assertJsonPath('data.0.event', 'facility.created');
     }
+
+    public function test_dashboard_shows_real_facility_and_sync_figures_only(): void
+    {
+        [$facility, $account] = $this->facilityWithAccount();
+        $this->declare('CSI-ATTENTE');
+
+        // Aucun contact : « Jamais synchronisée ».
+        Sanctum::actingAs($this->coordination);
+        $this->getJson('/api/v1/coordination/dashboard')->assertOk()
+            ->assertJsonPath('stats.validated', 1)->assertJsonPath('stats.total', 2)->assertJsonPath('stats.pending', 1)
+            ->assertJsonPath('facilities.0.sync_status', 'never')
+            ->assertJsonPath('todo.0.action', 'validate')
+            ->assertJsonPath('analyses_available', false);
+
+        // Dernière connexion il y a 5 jours : « À surveiller ».
+        $account->forceFill(['last_login_at' => now()->subDays(5)])->save();
+        $this->getJson('/api/v1/coordination/dashboard')->assertOk()
+            ->assertJsonPath('facilities.0.sync_status', 'late')
+            ->assertJsonPath('facilities.0.last_contact_days', 5)
+            ->assertJsonPath('projects.0.sync_label', '1 FOSA à surveiller');
+
+        // Jeton utilisé aujourd'hui : « À jour ».
+        $account->createToken('mobile')->accessToken->forceFill(['last_used_at' => now()])->save();
+        $this->getJson('/api/v1/coordination/dashboard')->assertOk()->assertJsonPath('facilities.0.sync_status', 'ok');
+
+        // Opération refusée par le serveur : « Échec de synchro ».
+        \App\Models\ApiIdempotencyKey::create([
+            'user_id' => $account->id, 'key' => 'op-1', 'method' => 'POST', 'path' => 'api/v1/x', 'response_status' => 422,
+            'request_hash' => 'h', 'authorization_hash' => 'a', 'response_body' => '{}', 'content_type' => 'application/json', 'expires_at' => now()->addDay(),
+        ]);
+        $this->getJson('/api/v1/coordination/dashboard')->assertOk()
+            ->assertJsonPath('facilities.0.sync_status', 'failed')->assertJsonPath('facilities.0.failed_operations', 1)
+            ->assertJsonPath('stats.sync_failed', 1);
+
+        // Web : chiffres réels, et « Disponible avec les analyses de base » pour le reste.
+        $this->actingAs($this->coordination)->get('/dashboard')->assertOk()
+            ->assertSee('FOSA validées')->assertSee('1 / 2')->assertSee('Disponible avec les analyses de base')
+            ->assertSee($facility->name)->assertSee('Échec de synchro')->assertSee('1 FOSA attend votre validation');
+    }
 }

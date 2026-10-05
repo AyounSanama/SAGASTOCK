@@ -65,6 +65,19 @@ class CoordinationController extends Controller
         ]);
     }
 
+    public function dashboard(Request $request): JsonResponse
+    {
+        $this->coordination->assertCoordinator($request->user());
+        $missionIds = $this->scopes->coordinationMissionIds($request->user());
+        $mission = Mission::with('country')->findOrFail($request->query('mission_id', $missionIds->first()));
+        abort_unless($missionIds->contains($mission->id), 404);
+
+        return response()->json([
+            'mission' => $mission->only(['id', 'code', 'name']) + ['country' => $mission->country?->name],
+            ...$this->coordination->dashboard($request->user(), $mission),
+        ]);
+    }
+
     public function journal(Request $request): JsonResponse
     {
         $this->coordination->assertCoordinator($request->user());

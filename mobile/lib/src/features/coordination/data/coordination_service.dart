@@ -43,6 +43,12 @@ class CoordinationService {
     endpoint: '/coordination/overview',
   );
 
+  /// Tableau de bord (maquette 08), gardé sur le téléphone pour le hors ligne.
+  Future<Map<String, dynamic>> dashboard() => _repository.document(
+    collection: 'coordination_dashboard',
+    endpoint: '/coordination/dashboard',
+  );
+
   Future<void> validateFacility(String id) =>
       _post('/coordination/facilities/$id/validate');
 

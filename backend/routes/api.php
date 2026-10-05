@@ -188,6 +188,7 @@ Route::prefix('v1')->group(function (): void {
         // AM-172 — « Ma Coordination » (mobile) : mêmes règles que le Web.
         Route::middleware('permission:missions.view')->prefix('coordination')->group(function (): void {
             Route::get('/overview', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'overview']);
+            Route::get('/dashboard', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'dashboard']);
             Route::get('/journal', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'journal']);
             Route::post('/facilities/{facility}/validate', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'validateFacility']);
             Route::post('/facilities/{facility}/refuse', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'refuseFacility']);

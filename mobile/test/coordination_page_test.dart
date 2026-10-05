@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sagastock_mobile/src/core/connectivity/connectivity_service.dart';
 import 'package:sagastock_mobile/src/features/coordination/data/coordination_service.dart';
+import 'package:sagastock_mobile/src/features/coordination/presentation/coordination_dashboard_page.dart';
 import 'package:sagastock_mobile/src/features/coordination/presentation/coordination_page.dart';
 
 class _FakeConnectivity implements ConnectivityService {
@@ -46,6 +47,23 @@ class _FakeService implements CoordinationService {
     'accounts': [
       {'id': 'u1', 'name': 'M. Atangana Joseph', 'username': 'j.atangana', 'is_active': true, 'role': 'Admin Projet, GFFO5', 'status': 'Actif'},
     ],
+  };
+
+  @override
+  Future<Map<String, dynamic>> dashboard() async => {
+    'mission': {'id': 'm1', 'name': 'Coordination Yaoundé', 'country': 'Cameroun'},
+    'generated_at': '2026-10-05T10:45:00Z',
+    'stats': {'validated': 14, 'total': 17, 'pending': 3, 'sync_failed': 1, 'sync_late': 1},
+    'todo': [
+      {'tone': 'info', 'action': 'validate', 'title': '3 FOSA attendent votre validation', 'detail': 'Projets GFFO5 et FH4'},
+      {'tone': 'danger', 'action': 'facility', 'title': 'CSI d’Ekounou ne s’est pas synchronisée depuis 6 jours', 'detail': 'Projet GFFO5'},
+    ],
+    'facilities': [
+      {'name': 'CSI de Nkolndongo', 'category': 'CSI', 'last_contact_days': 0, 'sync_status': 'ok', 'sync_label': 'À jour'},
+      {'name': 'CSI d’Ekounou', 'category': 'CSI', 'last_contact_days': 6, 'sync_status': 'late', 'sync_label': 'À surveiller'},
+      {'name': 'CMA de Mvog-Ada', 'category': 'CMA', 'last_contact_days': 1, 'sync_status': 'failed', 'sync_label': 'Échec de synchro'},
+    ],
+    'analyses_available': false,
   };
 
   @override
@@ -119,5 +137,20 @@ void main() {
     expect(find.text('CSI d’Ekoumdoum'), findsOneWidget);
     expect(find.text('Valider'), findsNothing);
     expect(find.text('Refuser'), findsNothing);
+  });
+
+  testWidgets('tableau de bord : chiffres réels FOSA et synchro, le reste annoncé (maquette 08)', (tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      home: CoordinationDashboardPage(service: _FakeService(), connectivity: _FakeConnectivity(true)),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('14 / 17'), findsOneWidget);
+    expect(find.text('Disponible avec les analyses de base'), findsNWidgets(3));
+    expect(find.text('3 FOSA attendent votre validation'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Échec de synchro'), 200, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Échec de synchro'), findsOneWidget);
   });
 }

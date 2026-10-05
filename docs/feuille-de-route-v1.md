@@ -7,7 +7,7 @@ Adoptée le 02/10/2026. **Remplace le plan précédent** (`ameliorations/07-audi
 | 0 | Règles permanentes | En vigueur |
 | 1 | Finaliser l'en-cours | **En cours** |
 | 2 | Structure et conformité | À faire |
-| 3 | Écrans Coordination (c1-bis) | **En cours** (lot 1 Web livré le 05/10) |
+| 3 | Écrans Coordination (c1-bis) | **En cours** (lots 1 à 3 livrés le 05/10 ; restent les Policies et le téléphone) |
 | 4 | Mode clair / sombre (3 bis) | À faire |
 | 5 | Écrans Admin Projet (c2 / c3) | À faire |
 | 6 | Listes Standard (f) | À faire |

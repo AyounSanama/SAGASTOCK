@@ -45,6 +45,16 @@ class DashboardController extends Controller
                 'interventions' => $interventions,
             ]);
         }
+        // AM-172 : tableau de bord de la Coordination (maquette Coordination 07).
+        if (app(GovernanceService::class)->roleCode($user) === GovernanceService::COORDINATION_ADMIN
+            && ($missionId = app(\App\Services\UserScopeService::class)->coordinationMissionIds($user)->first())) {
+            $mission = \App\Models\Mission::with(['country', 'organization'])->findOrFail($missionId);
+
+            return view('dashboard.coordination', [
+                'mission' => $mission,
+                'board' => app(\App\Services\CoordinationService::class)->dashboard($user, $mission),
+            ]);
+        }
         $context = $this->dashboard->build($user);
         $stats = $context['stats'];
         $widgets = $context['widgets'];

@@ -12,6 +12,7 @@ import '../../features/configuration/presentation/configuration_page.dart';
 import '../../features/configuration/presentation/platform_standards_page.dart';
 import '../../features/configuration/presentation/organization_assistance_page.dart';
 import '../../features/home/presentation/home_page.dart';
+import '../../features/home/presentation/role_home_page.dart';
 import '../../features/organizations/presentation/funding_page.dart';
 import '../../features/organizations/presentation/scoped_funding_page.dart';
 import '../../features/organizations/presentation/missions_page.dart';
@@ -112,7 +113,7 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
             organizationId: state.pathParameters['organizationId']!,
           ),
         ),
-        GoRoute(path: '/home', builder: (context, state) => const HomePage()),
+        GoRoute(path: '/home', builder: (context, state) => const RoleHomePage()),
         GoRoute(
           path: '/notifications',
           builder: (context, state) => const NotificationsPage(),

@@ -336,6 +336,22 @@ Tests : `coordination_page_test.dart` (4 : onglets, validation, hors ligne, lect
 
 Captures (police Inter, taille Galaxy A15, données d'exemple) : `mobile/test_captures/captures/` (`flutter test test_captures --update-goldens`). Captures sur le vrai téléphone : à faire dès qu'il est branché (APK à recompiler).
 
+## Niveau 3 — Lot 3 : tableau de bord de la Coordination, Web et mobile (AM-172) · 05/10/2026
+
+| Élément | Réalisation |
+|---|---|
+| Chiffres réels | FOSA validées / total et en attente ; situation par projet (FOSA validées / total, synchronisation) ; « À traiter » (FOSA à valider, FOSA en échec ou sans synchronisation depuis plus de 3 jours) ; tableau « Synchronisation des FOSA ». |
+| Synchronisation (calcul serveur) | Dernier contact = dernier appel de l'API par un compte de la FOSA (jeton) ou dernière connexion. « Échec de synchro » = au moins une opération refusée par le serveur depuis 7 jours (`api_idempotency_keys`, statut ≥ 400). « À surveiller » = aucun contact depuis plus de 3 jours. « Jamais synchronisée » sinon. |
+| Analyses (niveau 9) | Ruptures, pré-ruptures, péremption, tableau des ruptures et graphique des ordonnances : « Disponible avec les analyses de base ». Aucun chiffre inventé. Filtres ONG / Bailleur et période : avec les analyses. |
+| Web | `dashboard.coordination` (maquette Coordination 07). Le raccourci « Créer un projet » du tableau de bord générique disparaît : création à un seul endroit (« Ma Coordination »). |
+| Mobile | `CoordinationDashboardPage` (maquette 08) sur l'Accueil de la Coordination, gardé sur le téléphone pour le hors ligne (« Hors ligne, données au … »). API `GET /api/v1/coordination/dashboard`. |
+
+Tests : `CoordinationValidationTest` (8, dont les 4 statuts de synchronisation), `ProjectCreationEntryPointsTest` adapté ; backend 301 tests OK. Mobile : 107 tests OK, `flutter analyze` sans remarque.
+
+Captures : `.tmp/ui-screenshots/lot-ma-coordination/web-tableau-de-bord.png`, `mobile/test_captures/captures/06-tableau-de-bord.png`.
+
+**Reste du niveau 3** : Policies Laravel (utilisateurs, FOSA, projets) ; M-04 (opérations hors ligne antérieures à la suspension, niveau 10) ; vérification sur le vrai téléphone (APK à recompiler).
+
 ## Modèle d'entrée pour les prochaines livraisons
 
 ```markdown

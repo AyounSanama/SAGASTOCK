@@ -1,7 +1,6 @@
 // Captures des écrans mobiles « Ma Coordination » avec la vraie police Inter
 // (taille Galaxy A15). Hors suite : flutter test test_captures --update-goldens
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sagastock_mobile/src/core/connectivity/connectivity_service.dart';
 import 'package:sagastock_mobile/src/core/theme/app_theme.dart';
 import 'package:sagastock_mobile/src/features/coordination/data/coordination_service.dart';
+import 'package:sagastock_mobile/src/features/coordination/presentation/coordination_dashboard_page.dart';
 import 'package:sagastock_mobile/src/features/coordination/presentation/coordination_page.dart';
 
 class _FakeConnectivity implements ConnectivityService {
@@ -21,9 +21,8 @@ class _FakeConnectivity implements ConnectivityService {
 }
 
 class _FakeService implements CoordinationService {
-  _FakeService({this.canAct = true, this.failWith});
+  _FakeService({this.canAct = true});
   final bool canAct;
-  final String? failWith;
   final validated = <String>[];
   String pendingStatus = 'pending';
 
@@ -56,8 +55,24 @@ class _FakeService implements CoordinationService {
   };
 
   @override
+  Future<Map<String, dynamic>> dashboard() async => {
+    'mission': {'id': 'm1', 'name': 'Coordination Yaoundé', 'country': 'Cameroun'},
+    'generated_at': '2026-10-05T10:45:00Z',
+    'stats': {'validated': 14, 'total': 17, 'pending': 3, 'sync_failed': 1, 'sync_late': 1},
+    'todo': [
+      {'tone': 'info', 'action': 'validate', 'title': '3 FOSA attendent votre validation', 'detail': 'Projets GFFO5 et FH4'},
+      {'tone': 'danger', 'action': 'facility', 'title': 'CSI d’Ekounou ne s’est pas synchronisée depuis 6 jours', 'detail': 'Projet GFFO5'},
+    ],
+    'facilities': [
+      {'name': 'CSI de Nkolndongo', 'category': 'CSI', 'last_contact_days': 0, 'sync_status': 'ok', 'sync_label': 'À jour'},
+      {'name': 'CSI d’Ekounou', 'category': 'CSI', 'last_contact_days': 6, 'sync_status': 'late', 'sync_label': 'À surveiller'},
+      {'name': 'CMA de Mvog-Ada', 'category': 'CMA', 'last_contact_days': 1, 'sync_status': 'failed', 'sync_label': 'Échec de synchro'},
+    ],
+    'analyses_available': false,
+  };
+
+  @override
   Future<void> validateFacility(String id) async {
-    if (failWith != null) throw CoordinationActionException(failWith!);
     validated.add(id);
     pendingStatus = 'validated';
   }
@@ -114,4 +129,20 @@ void main() {
       await expectLater(find.byType(RepaintBoundary).first, matchesGoldenFile('captures/$name.png'));
     });
   }
+
+  testWidgets('capture 06-tableau-de-bord', (tester) async {
+    await _fonts();
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.77;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      home: RepaintBoundary(
+        child: CoordinationDashboardPage(service: _FakeService(), connectivity: _FakeConnectivity(true)),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await expectLater(find.byType(RepaintBoundary).first, matchesGoldenFile('captures/06-tableau-de-bord.png'));
+  });
 }

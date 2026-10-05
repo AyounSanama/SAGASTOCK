@@ -35,10 +35,11 @@ class ProjectCreationEntryPointsTest extends TestCase
             ->assertSee('funding-picker', false)
             ->assertSee('Aucun bailleur disponible');
 
+        // Tableau de bord de la Coordination (maquette 07, AM-172) : pas de
+        // raccourci de création ; le bouton unique est dans « Ma Coordination ».
         $this->actingAs($actor)->get('/dashboard')
             ->assertOk()
-            ->assertSee('Créer un projet')
-            ->assertSee('/projects?create=1', false)
+            ->assertSee('Situation par projet')
             ->assertDontSee('Créer un utilisateur');
 
         $this->actingAs($actor)->get('/organizations/'.$organization->id.'/missions/'.$mission->id)
