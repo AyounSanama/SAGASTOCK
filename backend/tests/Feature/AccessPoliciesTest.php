@@ -88,8 +88,9 @@ class AccessPoliciesTest extends TestCase
 
         // Matrice des rôles : l'Admin Projet gère les comptes de ses FOSA, pas l'Admin Coordination.
         $this->assertNull($this->decision($projectAdmin, 'resetPassword', $siteAdmin));
+        // Comptes placés au-dessus : hors de son périmètre de comptes, donc introuvables.
         $this->assertSame(404, $this->decision($projectAdmin, 'update', $coordination));
-        $this->assertSame(403, $this->decision($siteUser, 'update', $siteAdmin));
+        $this->assertSame(404, $this->decision($siteUser, 'update', $siteAdmin));
 
         // Jamais son propre compte (422), jamais par un compte en lecture seule (403).
         $this->assertSame(422, $this->decision($coordination, 'delete', $coordination));
