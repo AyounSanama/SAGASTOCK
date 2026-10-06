@@ -66,10 +66,12 @@ class ProjectCreationEntryPointsTest extends TestCase
             'scope_id' => $project->id,
         ]);
 
-        $this->actingAs($actor)->get('/projects')
+        $this->actingAs($actor)->get('/projects')->assertRedirect(route('modules.health-facilities'));
+        $this->actingAs($actor)->get('/health-facilities')
             ->assertOk()
             ->assertDontSee('name="admin[email]"', false)
             ->assertDontSee('Créer un projet');
+        $this->actingAs($actor)->get(route('projects.wizard.create'))->assertForbidden();
         $this->actingAs($actor)->get('/dashboard')
             ->assertOk()
             ->assertDontSee('Créer un projet')

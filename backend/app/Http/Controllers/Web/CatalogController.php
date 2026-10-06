@@ -39,6 +39,10 @@ class CatalogController extends Controller
 
     public function home(Request $request, string $section): RedirectResponse
     {
+        // Niveau 5 : Liste Standard de l'Admin Projet, en consultation (maquette AdminProjet 04).
+        if (app(\App\Services\GovernanceService::class)->roleCode($request->user()) === \App\Services\GovernanceService::PROJECT_ADMIN) {
+            return redirect()->route('project-admin.standard-list');
+        }
         $organization = $this->scopes->organizations($request->user())
             ->where('is_active', true)
             ->orderBy('name')

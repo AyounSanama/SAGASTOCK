@@ -33,6 +33,10 @@ class ProjectController extends Controller
     public function home(Request $request): View|RedirectResponse
     {
         $this->allow('projects.view');
+        // Niveau 5 : « Projet & FOSA » de l'Admin Projet s'ouvre sur l'onglet FOSA (maquette AdminProjet 02).
+        if (app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::PROJECT_ADMIN) {
+            return redirect()->route('modules.health-facilities');
+        }
         // Niveau 2 : la création passe par l'assistant « Créer un projet / programme ».
         if ($request->boolean('create') && ! config('pharmacare_v1.features.legacy_project_form')
             && app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN

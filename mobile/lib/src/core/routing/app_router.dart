@@ -39,6 +39,10 @@ import '../../features/auth/data/auth_service.dart';
 import '../../features/catalog/presentation/catalog_page.dart';
 import '../../features/catalog/presentation/standard_list_entry_page.dart';
 import '../../features/projects_wizard/presentation/project_wizard_page.dart';
+import '../../features/project_admin/presentation/project_admin_facilities_page.dart';
+import '../../features/project_admin/presentation/project_admin_facility_page.dart';
+import '../../features/project_admin/presentation/project_admin_standard_list_page.dart';
+import '../../features/project_admin/presentation/role_page.dart';
 
 GoRouter createAppRouter({required String initialLocation}) => GoRouter(
   initialLocation: initialLocation,
@@ -83,6 +87,17 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
     GoRoute(
       path: '/change-password',
       builder: (context, state) => const ChangePasswordPage(),
+    ),
+    // Niveau 5 — Fiche FOSA de l'Admin Projet (maquette mobile 07), plein écran.
+    GoRoute(
+      path: '/health-facilities/new',
+      builder: (context, state) => const ProjectAdminFacilityPage(),
+    ),
+    GoRoute(
+      path: '/health-facilities/:facilityId/configure',
+      builder: (context, state) => ProjectAdminFacilityPage(
+        facilityId: state.pathParameters['facilityId'],
+      ),
     ),
     // Niveau 2 — Assistant « Créer un projet / programme », plein écran.
     GoRoute(
@@ -189,9 +204,13 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
           path: '/funding',
           builder: (context, state) => const ScopedFundingPage(),
         ),
+        // Niveau 5 : écrans de l'Admin Projet (maquettes mobiles 06 et 08).
         GoRoute(
           path: '/health-facilities',
-          builder: (context, state) => const ScopedFacilitiesPage(),
+          builder: (context, state) => const ProjectAdminOr(
+            projectAdmin: ProjectAdminFacilitiesPage(),
+            other: ScopedFacilitiesPage(),
+          ),
         ),
         GoRoute(
           path: '/dispensing-sites',
@@ -207,7 +226,10 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
         ),
         GoRoute(
           path: '/standard-lists',
-          builder: (context, state) => const StandardListEntryPage(),
+          builder: (context, state) => const ProjectAdminOr(
+            projectAdmin: ProjectAdminStandardListPage(),
+            other: StandardListEntryPage(),
+          ),
         ),
         for (final module in const <(String, String, IconData)>[
           ('/synchronization', 'Synchronisation', Icons.sync_outlined),

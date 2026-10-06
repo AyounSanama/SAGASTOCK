@@ -297,9 +297,25 @@ class CoordinationService
             $overview['facility_accounts'] = $overview['facility_accounts']->filter(fn (User $user) => $siteIds->contains($user->roles->first()?->pivot?->scope_id))->values();
         }
         $facilities = $overview['facilities'];
+        $rows = $this->syncRows($facilities, $overview['facility_accounts']);
+
+        return $this->dashboardSummary($overview, $facilities, $rows, $mission, $allProjects, $donorId, $projectId);
+    }
+
+    /**
+     * État de synchronisation par FOSA validée ou suspendue : dernier contact
+     * d'un de ses comptes (connexion ou synchronisation du téléphone) et
+     * opérations refusées par le serveur. Commun aux tableaux de bord
+     * Coordination et Admin Projet.
+     *
+     * @param  Collection<int, HealthFacility>  $facilities
+     * @param  Collection<int, User>  $facilityAccounts  comptes Admin Site / Utilisateur Site (rôles chargés)
+     */
+    public function syncRows(Collection $facilities, Collection $facilityAccounts): Collection
+    {
         $sites = Site::whereIn('health_facility_id', $facilities->pluck('id'))->pluck('health_facility_id', 'id');
-        $accountsByFacility = $overview['facility_accounts']->groupBy(fn (User $user) => $sites[$user->roles->first()?->pivot?->scope_id] ?? null);
-        $userIds = $overview['facility_accounts']->pluck('id');
+        $accountsByFacility = $facilityAccounts->groupBy(fn (User $user) => $sites[$user->roles->first()?->pivot?->scope_id] ?? null);
+        $userIds = $facilityAccounts->pluck('id');
         $lastTokenUse = DB::table('personal_access_tokens')->where('tokenable_type', User::class)->whereIn('tokenable_id', $userIds)
             ->groupBy('tokenable_id')->selectRaw('tokenable_id, max(last_used_at) as last_used_at')->pluck('last_used_at', 'tokenable_id');
         $failures = \App\Models\ApiIdempotencyKey::whereIn('user_id', $userIds)->where('response_status', '>=', 400)
@@ -335,6 +351,11 @@ class CoordinationService
             ];
         })->values();
 
+        return $rows;
+    }
+
+    private function dashboardSummary(array $overview, Collection $facilities, Collection $rows, Mission $mission, Collection $allProjects, ?string $donorId, ?string $projectId): array
+    {
         $projects = $overview['projects']->map(function (Project $project) use ($facilities, $rows) {
             $projectFacilities = $facilities->filter(fn ($facility) => $facility->projects->contains('id', $project->id));
             $projectRows = $rows->filter(fn ($row) => $row['project_ids']->contains($project->id));

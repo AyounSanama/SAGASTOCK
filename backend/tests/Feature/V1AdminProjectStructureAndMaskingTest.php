@@ -58,19 +58,20 @@ class V1AdminProjectStructureAndMaskingTest extends TestCase
         $menu = collect(app(ApplicationNavigationService::class)->items($admin))->where('menu', true);
         $this->assertSame(['Tableau de bord', 'Projet & FOSA', 'Liste standard', 'Mon profil'], $menu->pluck('label')->values()->all());
 
+        // Niveau 5 (maquette AdminProjet 02) : onglets FOSA, Comptes utilisateurs, Paramètres d'approvisionnement.
         $this->actingAs($admin)->get('/health-facilities')->assertOk()
-            ->assertSee('project-admin-tabs', false)
-            ->assertSee('Comptes utilisateurs')
+            ->assertSee('class="pa-tabs"', false)
+            ->assertSee('Comptes utilisateurs')->assertSee('Paramètres d’approvisionnement')
             // Filtres Organisation et Mission masqués.
-            ->assertDontSee('<label>Organisation<select', false);
-        $this->get('/users')->assertOk()->assertSee('project-admin-tabs', false);
+            ->assertDontSee('<label>Organisation<select', false)->assertDontSee('Missions couvertes');
+        $this->get('/users')->assertOk()->assertSee('class="pa-tabs"', false);
     }
 
     public function test_topbar_shows_the_scope_breadcrumb_and_two_letter_initials(): void
     {
         $admin = $this->actor('project_admin', 'project', $this->project->id);
 
-        $this->actingAs($admin)->get('/projects')->assertOk()
+        $this->actingAs($admin)->get('/health-facilities')->assertOk()
             ->assertSee('topbar-breadcrumb', false)
             ->assertSee('ALIMA')->assertSee('Coordination Maroua')->assertSee('Projet VIH')
             ->assertSee('<span class="profile-avatar">AN</span>', false)

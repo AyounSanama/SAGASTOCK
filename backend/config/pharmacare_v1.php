@@ -46,6 +46,8 @@ return [
         ],
         'project_admin' => [
             '#^api/v1/(?:auth|me|profile|navigation|dashboard)(?:/|$)#',
+            // Niveau 5 : espace Admin Projet (tableau de bord, FOSA, Liste Standard).
+            '#^api/v1/project-admin(?:/|$)#',
             '#^api/v1/organizations/?$#',
             '#^api/v1/organizations/[^/]+/?$#',
             '#^api/v1/projects(?:/|$)#',

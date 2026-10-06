@@ -35,6 +35,10 @@ class UserController extends Controller
                 ->when($request->string('search')->toString(), fn ($query, $search) => $query
                     ->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
                 ->when($request->filled('role_id'), fn ($query) => $query->whereHas('roles', fn ($roles) => $roles->whereKey($request->integer('role_id'))))
+                // Niveau 5 : bouton « Comptes » d'une FOSA (maquette AdminProjet 02).
+                ->when($request->filled('facility'), fn ($query) => $query->whereHas('roles', fn ($roles) => $roles
+                    ->where('role_user.scope_type', 'site')
+                    ->whereIn('role_user.scope_id', \App\Models\Site::where('health_facility_id', $request->string('facility')->toString())->pluck('id'))))
                 ->when($request->get('status') === 'active', fn ($query) => $query->where('is_active', true))
                 ->when($request->get('status') === 'inactive', fn ($query) => $query->where('is_active', false))
                 ->orderBy('name')->paginate(20)->withQueryString(),

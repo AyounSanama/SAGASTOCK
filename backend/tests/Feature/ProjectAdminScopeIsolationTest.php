@@ -60,8 +60,13 @@ class ProjectAdminScopeIsolationTest extends TestCase
         $this->assertTrue($scopes->siteIds($admin)->contains($allowedSite->id));
         $this->assertFalse($scopes->siteIds($admin)->contains($hiddenSite->id));
 
-        $this->actingAs($admin)->get('/projects')->assertOk()
-            ->assertSee('Projet Nutrition')->assertDontSee('Projet Santé Maternelle')->assertDontSee('Projet étranger');
+        // Niveau 5 : « Projet & FOSA » (/projects redirige vers l'onglet FOSA) et tableau de bord.
+        $this->actingAs($admin)->get('/projects')->assertRedirect(route('modules.health-facilities'));
+        $this->actingAs($admin)->get('/health-facilities')->assertOk()
+            ->assertSee('Projet Nutrition')->assertDontSee('Projet Santé Maternelle')->assertDontSee('Projet étranger')
+            ->assertSee($allowedFacility->name)->assertDontSee($hiddenFacility->name);
+        $this->actingAs($admin)->get('/dashboard')->assertOk()
+            ->assertSee('Projet Nutrition')->assertDontSee('Projet Santé Maternelle');
         Sanctum::actingAs($admin);
         $this->getJson('/api/v1/auth/me')
             ->assertOk()

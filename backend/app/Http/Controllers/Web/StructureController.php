@@ -27,6 +27,10 @@ class StructureController extends Controller
 
     public function home(Request $request): View
     {
+        // Niveau 5 : « Projet & FOSA » de l'Admin Projet (maquette AdminProjet 02).
+        if (app(\App\Services\GovernanceService::class)->roleCode($request->user()) === \App\Services\GovernanceService::PROJECT_ADMIN) {
+            return app(ProjectAdminController::class)->facilities($request);
+        }
         $this->allow($request, 'structures.view');
         $organizations = $this->scopes->organizations($request->user())->orderBy('name')->get();
         $organization = $request->filled('organization_id')

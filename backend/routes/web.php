@@ -94,6 +94,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/projects/{project}/wizard/identity', 'updateIdentity')->name('projects.wizard.identity.update');
         Route::put('/projects/{project}/wizard/standard-list', 'updateStandardList')->middleware('permission:standard_lists.manage')->name('projects.wizard.standard-list.update');
         Route::put('/projects/{project}/wizard/supply', 'updateSupply')->name('projects.wizard.supply.update');
+        Route::post('/projects/{project}/supply/apply-to-facilities', 'applySupplyToFacilities')->name('projects.supply.apply');
     });
     Route::get('/projects/medical-references', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'show'])->middleware('permission:standard_lists.view')->name('projects.medical-references');
     Route::post('/projects/medical-references/care-levels', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'storeCareLevel'])->middleware('permission:standard_lists.manage')->name('projects.medical-references.care-levels.store');
@@ -118,6 +119,17 @@ Route::middleware('auth')->group(function () {
     });
     Route::get('/funding', [FundingController::class, 'home'])->middleware('permission:funding.view')->name('modules.funding');
     Route::get('/health-facilities', [StructureController::class, 'home'])->middleware('permission:health_facilities.view')->name('modules.health-facilities');
+    // Niveau 5 — Écrans de l'Admin Projet (maquettes AdminProjet 01 à 04).
+    Route::controller(\App\Http\Controllers\Web\ProjectAdminController::class)->name('project-admin.')->group(function (): void {
+        Route::get('/health-facilities/supply-settings', 'supply')->middleware('permission:health_facilities.view')->name('supply');
+        Route::get('/health-facilities/standard-list-preview', 'preview')->middleware('permission:health_facilities.manage')->name('facilities.preview');
+        Route::get('/health-facilities/new', 'create')->middleware('permission:health_facilities.manage')->name('facilities.create');
+        Route::post('/health-facilities', 'store')->middleware('permission:health_facilities.manage')->name('facilities.store');
+        Route::get('/health-facilities/{facility}/configure', 'edit')->middleware('permission:health_facilities.manage')->name('facilities.edit');
+        Route::put('/health-facilities/{facility}', 'update')->middleware('permission:health_facilities.manage')->name('facilities.update');
+        Route::get('/standard-lists/project', 'standardList')->middleware('permission:standard_lists.view')->name('standard-list');
+        Route::get('/standard-lists/project/export', 'exportStandardList')->middleware('permission:standard_lists.view')->name('standard-list.export');
+    });
     Route::get('/dispensing-sites', [StructureController::class, 'sites'])->middleware('permission:dispensing_sites.view')->name('modules.dispensing-sites');
     Route::get('/users', [WebUserController::class, 'index'])->middleware('permission:users.view')->name('users.index');
     Route::get('/standard-lists', [CatalogController::class, 'home'])->defaults('section', 'lists')->middleware('permission:standard_lists.view')->name('modules.standard-lists');

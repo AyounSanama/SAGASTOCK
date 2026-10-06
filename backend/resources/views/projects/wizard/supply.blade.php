@@ -65,6 +65,15 @@
         </div>
     </form>
 
+    @if($active && $project->healthFacilities()->exists())
+        {{-- DEC-08 : action explicite, confirmée ; une modification du projet n'écrase jamais les FOSA. --}}
+        <form method="post" action="{{ route('projects.supply.apply', $project) }}" class="wz-card" style="grid-column:1/2" onsubmit="return confirm('Appliquer les paramètres enregistrés du projet à toutes ses FOSA ? Les valeurs propres à chaque FOSA seront remplacées (historisées).')">
+            @csrf <input type="hidden" name="confirm" value="1">
+            <h2>Appliquer à toutes les FOSA</h2>
+            <p class="wz-sub" style="margin-bottom:12px">Recopie les paramètres enregistrés du projet (périodicité, DL, stock de sécurité, dates) dans les {{ $project->healthFacilities()->count() }} FOSA du projet. Enregistrez d’abord les nouvelles valeurs ci-dessus.</p>
+            <button class="wz-btn" type="submit">Appliquer à toutes les FOSA</button>
+        </form>
+    @endif
     <aside class="wz-recap" aria-label="Récapitulatif">
         <h2>Récapitulatif</h2>
         <dl>

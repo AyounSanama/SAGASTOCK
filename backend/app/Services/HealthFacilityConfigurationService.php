@@ -44,6 +44,9 @@ class HealthFacilityConfigurationService
                 'order_period_months' => $project->order_period_months,
                 'delivery_lead_time_months' => $project->delivery_lead_time_months,
                 'safety_stock_months' => $project->safety_stock_months !== null ? (float) $project->safety_stock_months : null,
+                'inventory_date' => $project->inventory_date?->format('Y-m-d'),
+                'order_submission_date' => $project->order_submission_date?->format('Y-m-d'),
+                'order_receipt_date' => $project->order_receipt_date?->format('Y-m-d'),
             ],
         ];
     }
@@ -69,7 +72,7 @@ class HealthFacilityConfigurationService
                 ->all();
             // DEC-08 : préremplissage depuis le projet à la création uniquement.
             if ($creating && $project) {
-                foreach (['order_period_months', 'delivery_lead_time_months', 'safety_stock_months'] as $field) {
+                foreach (HealthFacility::SUPPLY_FIELDS as $field) {
                     if (($supply[$field] ?? null) === null && $project->{$field} !== null) {
                         $supply[$field] = $project->{$field};
                     }
@@ -99,6 +102,10 @@ class HealthFacilityConfigurationService
                 'order_period_months' => $project->order_period_months,
                 'delivery_lead_time_months' => $project->delivery_lead_time_months,
                 'safety_stock_months' => $project->safety_stock_months,
+                // Niveau 2 : dates du projet (inventaire, soumission, réception).
+                'inventory_date' => $project->inventory_date,
+                'order_submission_date' => $project->order_submission_date,
+                'order_receipt_date' => $project->order_receipt_date,
             ]);
             if ($facility->isDirty(HealthFacility::SUPPLY_FIELDS)) {
                 $facility->save();

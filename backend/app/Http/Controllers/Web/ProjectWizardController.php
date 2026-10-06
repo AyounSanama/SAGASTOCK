@@ -88,6 +88,19 @@ class ProjectWizardController extends Controller
         });
     }
 
+    /** DEC-08 — « Appliquer à toutes les FOSA » : action explicite et confirmée, jamais automatique. */
+    public function applySupplyToFacilities(Request $request, Project $project): RedirectResponse
+    {
+        Gate::authorize('configure', $project);
+        $request->validate(['confirm' => ['required', 'accepted']], ['confirm.accepted' => 'Confirmez l’application des paramètres du projet à toutes ses FOSA.']);
+        $updated = app(\App\Services\HealthFacilityConfigurationService::class)->applyProjectSupplyToFacilities($project, $request->user());
+        $this->audit->record($request, 'project.supply_applied_to_facilities', $project, [], ['facilities_updated' => $updated]);
+
+        return back()->with('status', $updated > 0
+            ? "Paramètres du projet appliqués à {$updated} FOSA (historisés)."
+            : 'Toutes les FOSA ont déjà les paramètres du projet.');
+    }
+
     /** « + Ajouter un bailleur » : bailleur ajouté au référentiel et sélectionné dans l'étape 2. */
     public function storeDonor(Request $request): JsonResponse
     {

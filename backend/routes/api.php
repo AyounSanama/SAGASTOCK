@@ -48,6 +48,17 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'read']);
         Route::get('/organizations/{organization}/operational-report', [OperationalReportController::class, 'index']);
+        // Niveau 5 — Espace Admin Projet (mobile).
+        Route::prefix('project-admin')->controller(\App\Http\Controllers\Api\V1\ProjectAdminController::class)->group(function (): void {
+            Route::get('/dashboard', 'dashboard')->middleware('permission:projects.view');
+            Route::get('/facilities', 'facilities')->middleware('permission:health_facilities.view');
+            Route::get('/facilities/options', 'options')->middleware('permission:health_facilities.manage');
+            Route::get('/facilities/preview', 'preview')->middleware('permission:health_facilities.manage');
+            Route::post('/facilities', 'store')->middleware('permission:health_facilities.manage');
+            Route::get('/facilities/{facility}', 'show')->middleware('permission:health_facilities.manage');
+            Route::put('/facilities/{facility}', 'update')->middleware('permission:health_facilities.manage');
+            Route::get('/standard-list', 'standardList')->middleware('permission:standard_lists.view');
+        });
         // Niveau 2 — Assistant « Créer un projet / programme » (mobile).
         Route::middleware('permission:projects.manage')->controller(\App\Http\Controllers\Api\V1\ProjectWizardController::class)->group(function (): void {
             Route::get('/projects/wizard/options', 'options');

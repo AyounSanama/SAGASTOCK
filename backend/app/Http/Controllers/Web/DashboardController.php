@@ -45,6 +45,10 @@ class DashboardController extends Controller
                 'interventions' => $interventions,
             ]);
         }
+        // Niveau 5 : tableau de bord de l'Admin Projet (maquette AdminProjet 01).
+        if (app(GovernanceService::class)->roleCode($user) === GovernanceService::PROJECT_ADMIN) {
+            return app(\App\Http\Controllers\Web\ProjectAdminController::class)->dashboard($request);
+        }
         // AM-172 : tableau de bord de la Coordination (maquette Coordination 07).
         if (app(GovernanceService::class)->roleCode($user) === GovernanceService::COORDINATION_ADMIN
             && ($missionId = app(\App\Services\UserScopeService::class)->coordinationMissionIds($user)->first())) {

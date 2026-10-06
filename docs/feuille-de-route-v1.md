@@ -6,10 +6,10 @@ Adoptée le 02/10/2026. **Remplace le plan précédent** (`ameliorations/07-audi
 |---|---|---|
 | 0 | Règles permanentes | En vigueur |
 | 1 | Finaliser l'en-cours | **En cours** |
-| 2 | Structure et conformité | À faire |
-| 3 | Écrans Coordination (c1-bis) | **En cours** (lots 1 à 3 livrés le 05/10 ; restent les Policies et le téléphone) |
+| 2 | Structure et conformité | **Livré le 06/10, à valider** (menu Référentiels, assistant en 4 étapes ; restent le check-up des maquettes et l’audit des doublons) |
+| 3 | Écrans Coordination (c1-bis) | **Livré le 06/10, à valider** (Policies, « Modifier » les comptes, filtres et badge de synchronisation ; reste la vérification sur le téléphone) |
 | 4 | Mode clair / sombre (3 bis) | À faire |
-| 5 | Écrans Admin Projet (c2 / c3) | À faire |
+| 5 | Écrans Admin Projet (c2 / c3) | **Livré le 06/10, à valider** (Web et mobile ; mobile à compiler sur Codemagic) |
 | 6 | Listes Standard (f) | À faire |
 | 7 | Stock et dispensation FOSA (g) | À faire |
 | 8 | Capture par téléphone | À faire |

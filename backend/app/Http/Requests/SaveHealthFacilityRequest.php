@@ -211,6 +211,16 @@ class SaveHealthFacilityRequest extends FormRequest
     public function organization(): Organization
     {
         $organization = $this->route('organization');
+        // Niveau 5 : routes « /health-facilities » de l'Admin Projet, sans organisation dans l'URL.
+        if ($organization === null) {
+            if ($facility = $this->facility()) {
+                return $facility->organization;
+            }
+            $projectId = app(UserScopeService::class)->directProjectIds($this->user())->unique()->first();
+            abort_unless($projectId, 404);
+
+            return Project::findOrFail($projectId)->organization;
+        }
 
         return $organization instanceof Organization ? $organization : Organization::findOrFail($organization);
     }
