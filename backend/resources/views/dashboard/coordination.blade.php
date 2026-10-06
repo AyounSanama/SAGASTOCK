@@ -9,6 +9,9 @@
 @endphp
 @push('styles')<style>
 .cd{width:100%;box-sizing:border-box;max-width:1440px;margin:auto;padding:28px 32px 60px;color:var(--pc-color-text)}
+.cd-head-filters{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}.cd-filters{display:flex;gap:10px;flex-wrap:wrap}
+.cd-filters select{min-height:40px;border:1px solid var(--pc-color-border);border-radius:10px;padding:8px 12px;font:inherit;background:var(--pc-color-surface,#fff);color:inherit}.cd-filters select:disabled{color:var(--pc-color-text-muted);background:var(--pc-color-surface-subtle,#f6f6f4);cursor:not-allowed}
+@media(max-width:650px){.cd-filters,.cd-filters select{width:100%}}
 .cd-head h1{margin:0;font-size:24px}.cd-head p{margin:4px 0 0;color:var(--pc-color-text-muted)}
 .cd-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0}.cd-kpi{background:var(--pc-color-surface,#fff);border:1px solid var(--pc-color-border);border-radius:14px;padding:16px 18px}.cd-kpi small{color:var(--pc-color-text-muted);font-size:13px}.cd-kpi strong{display:block;font-size:28px;margin:6px 0 4px}.cd-kpi span{color:var(--pc-color-text-muted);font-size:13px}.cd-kpi.na strong{color:var(--pc-color-text-muted)}
 .cd-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:18px;align-items:start}.cd-col{display:grid;gap:18px}
@@ -23,7 +26,24 @@
 </style>@endpush
 @section('content')
 <div class="cd">
-    <header class="cd-head"><h1>Tableau de bord</h1><p>{{ $mission->name }}, situation au {{ $generated->translatedFormat('j F Y') }} à {{ $generated->format('H:i') }}</p></header>
+    <header class="cd-head cd-head-filters">
+        <div><h1>Tableau de bord</h1><p>{{ $mission->name }}, situation au {{ $generated->translatedFormat('j F Y') }} à {{ $generated->format('H:i') }}</p></div>
+        {{-- Niveau 3 (maquette Coordination 07) : couple ONG/Bailleur et projet filtrent les blocs ci-dessous. --}}
+        <form class="cd-filters" method="get" action="{{ route('dashboard') }}">
+            <select name="donor_id" aria-label="Couple ONG / Bailleur" onchange="this.form.submit()">
+                <option value="">Tous les couples ONG / Bailleur</option>
+                @foreach($board['filters']['donors'] as $donor)<option value="{{ $donor['id'] }}" @selected($board['filters']['donor_id'] === $donor['id'])>{{ $donor['label'] }}</option>@endforeach
+            </select>
+            <select name="project_id" aria-label="Projet" onchange="this.form.submit()">
+                <option value="">Tous les projets</option>
+                @foreach($board['filters']['projects'] as $project)<option value="{{ $project['id'] }}" @selected($board['filters']['project_id'] === $project['id'])>{{ $project['code'] }}</option>@endforeach
+            </select>
+            <select aria-label="Période" disabled title="Disponible avec les analyses de base (ruptures, péremptions, consommations)">
+                <option>Mois en cours ({{ now()->locale('fr')->translatedFormat('F Y') }})</option>
+            </select>
+            <noscript><button class="cd-btn" type="submit">Filtrer</button></noscript>
+        </form>
+    </header>
 
     <section class="cd-kpis">
         @foreach(['Produits en rupture', 'Produits en pré-rupture', 'Lots à risque de péremption'] as $label)

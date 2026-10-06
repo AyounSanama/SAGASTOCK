@@ -44,9 +44,12 @@ class CoordinationService {
   );
 
   /// Tableau de bord (maquette 08), gardé sur le téléphone pour le hors ligne.
-  Future<Map<String, dynamic>> dashboard() => _repository.document(
+  /// Niveau 3 : filtre « couple ONG/Bailleur » (maquette 08) ; chaque filtre
+  /// est gardé séparément sur le téléphone pour le hors ligne.
+  Future<Map<String, dynamic>> dashboard({String? donorId}) => _repository.document(
     collection: 'coordination_dashboard',
     endpoint: '/coordination/dashboard',
+    query: {if (donorId != null) 'donor_id': donorId},
   );
 
   Future<void> validateFacility(String id) =>
@@ -65,12 +68,22 @@ class CoordinationService {
     '/coordination/accounts/$userId/${active ? 'reactivate' : 'suspend'}',
   );
 
-  Future<void> _post(String path, [Map<String, dynamic>? data]) async {
+  /// Niveau 3 — « Modifier » un compte de la coordination (identité, contact,
+  /// projet d'un Admin Projet). Exige le réseau, comme les autres décisions.
+  Future<void> updateAccount(String userId, Map<String, dynamic> data) =>
+      _post('/coordination/accounts/$userId', data, 'PUT');
+
+  Future<void> _post(
+    String path, [
+    Map<String, dynamic>? data,
+    String method = 'POST',
+  ]) async {
     try {
-      await _client.dio.post<Map<String, dynamic>>(
+      await _client.dio.request<Map<String, dynamic>>(
         path,
         data: data,
         options: Options(
+          method: method,
           headers: {
             'Authorization': 'Bearer ${await _storage.read(key: 'auth_token')}',
           },

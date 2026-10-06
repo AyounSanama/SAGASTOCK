@@ -114,6 +114,50 @@ class CoordinationService
         $this->audit->record($request, $active ? 'user.reactivated' : 'user.suspended', $target, ['is_active' => ! $active], ['is_active' => $active]);
     }
 
+    /**
+     * Niveau 3 — « Modifier » un compte de la coordination (Admin Projet ou
+     * Coordination en lecture seule) : identité, contact et, pour un Admin
+     * Projet, le projet rattaché (parmi ceux de la coordination).
+     */
+    public function updateAccount(Request $request, User $target): User
+    {
+        Gate::forUser($request->user())->authorize('setActive', $target);
+        $projectRole = $target->roles()->where('roles.code', 'project_admin')->first();
+        abort_unless($projectRole || $target->roles()->where('roles.code', 'coordination_admin')->exists(), 403, 'Les comptes FOSA sont gérés par les Admin Projet.');
+        $projectIds = Project::whereIn('mission_id', $this->scopes->coordinationMissionIds($request->user()))->pluck('id');
+
+        $data = $request->validate([
+            'first_name' => ['required', 'string', 'max:80'],
+            'last_name' => ['required', 'string', 'max:80'],
+            'email' => ['required', 'email', 'max:190', \Illuminate\Validation\Rule::unique('users', 'email')->ignore($target->id)],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'project_id' => [$projectRole ? 'required' : 'prohibited', 'uuid', \Illuminate\Validation\Rule::in($projectIds->all())],
+        ], [
+            'email.unique' => 'Cette adresse e-mail est déjà utilisée par un autre compte.',
+            'project_id.in' => 'Choisissez un projet de votre coordination.',
+        ], ['first_name' => 'prénom', 'last_name' => 'nom', 'email' => 'e-mail', 'phone' => 'téléphone', 'project_id' => 'projet']);
+
+        $old = $target->only(['first_name', 'last_name', 'email', 'phone']) + ['project_id' => $projectRole?->pivot->scope_id];
+        \Illuminate\Support\Facades\DB::transaction(function () use ($target, $data, $projectRole): void {
+            $target->update([
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'name' => trim($data['first_name'].' '.$data['last_name']),
+                'email' => $data['email'],
+                'phone' => $data['phone'] ?? null,
+            ]);
+            if ($projectRole && $projectRole->pivot->scope_id !== $data['project_id']) {
+                \Illuminate\Support\Facades\DB::table('role_user')
+                    ->where('user_id', $target->id)->where('role_id', $projectRole->id)
+                    ->where('scope_type', 'project')->where('scope_id', $projectRole->pivot->scope_id)
+                    ->update(['scope_id' => $data['project_id']]);
+            }
+        });
+        $this->audit->record($request, 'user.updated', $target, $old, $target->only(['first_name', 'last_name', 'email', 'phone']) + ['project_id' => $data['project_id'] ?? null]);
+
+        return $target->refresh();
+    }
+
     /** Comptes que la Coordination peut suspendre ou réactiver. */
     public function manageableAccounts(User $actor): Builder
     {
@@ -214,9 +258,44 @@ class CoordinationService
      *
      * @return array<string, mixed>
      */
-    public function dashboard(User $actor, Mission $mission): array
+    /**
+     * Niveau 3 — Dernier contact d'un compte FOSA de la coordination avec le
+     * serveur (synchronisation du téléphone ou connexion), pour le badge
+     * « Synchronisé il y a … » des maquettes Coordination.
+     */
+    public function lastSyncAt(User $actor): ?\Illuminate\Support\Carbon
+    {
+        $userIds = $this->facilityAccounts($this->facilities($actor)->pluck('id'))->pluck('users.id');
+        if ($userIds->isEmpty()) {
+            return null;
+        }
+        $token = DB::table('personal_access_tokens')->where('tokenable_type', User::class)->whereIn('tokenable_id', $userIds)->max('last_used_at');
+        $login = User::whereIn('id', $userIds)->max('last_login_at');
+        $latest = collect([$token, $login])->filter()->map(fn ($value) => \Illuminate\Support\Carbon::parse($value))->max();
+
+        return $latest;
+    }
+
+    /**
+     * @param  array{donor_id?: ?string, project_id?: ?string}  $filters  Couple ONG/Bailleur et projet (maquette Coordination 07).
+     */
+    public function dashboard(User $actor, Mission $mission, array $filters = []): array
     {
         $overview = $this->overview($actor, $mission);
+        $allProjects = $overview['projects'];
+        $donorId = $filters['donor_id'] ?? null;
+        $projectId = $filters['project_id'] ?? null;
+        if ($donorId || $projectId) {
+            $selected = $allProjects
+                ->when($donorId, fn (Collection $projects) => $projects->filter(fn (Project $project) => $project->donors->contains('id', $donorId)))
+                ->when($projectId, fn (Collection $projects) => $projects->where('id', $projectId))
+                ->pluck('id');
+            $overview['projects'] = $allProjects->whereIn('id', $selected)->values();
+            $overview['facilities'] = $overview['facilities']->filter(fn (HealthFacility $facility) => $facility->projects->pluck('id')->intersect($selected)->isNotEmpty())->values();
+            $kept = $overview['facilities']->pluck('id');
+            $siteIds = Site::whereIn('health_facility_id', $kept)->pluck('id');
+            $overview['facility_accounts'] = $overview['facility_accounts']->filter(fn (User $user) => $siteIds->contains($user->roles->first()?->pivot?->scope_id))->values();
+        }
         $facilities = $overview['facilities'];
         $sites = Site::whereIn('health_facility_id', $facilities->pluck('id'))->pluck('health_facility_id', 'id');
         $accountsByFacility = $overview['facility_accounts']->groupBy(fn (User $user) => $sites[$user->roles->first()?->pivot?->scope_id] ?? null);
@@ -302,6 +381,15 @@ class CoordinationService
             'projects' => $projects,
             'facilities' => $rows->map(fn ($row) => collect($row)->except('project_ids')->all())->values(),
             'todo' => $todo->values(),
+            'last_sync_at' => $rows->pluck('last_contact_at')->filter()->max(),
+            'filters' => [
+                'donor_id' => $donorId,
+                'project_id' => $projectId,
+                // Couple « ONG / Bailleur » : organisation de la mission et bailleur du projet.
+                'donors' => $allProjects->flatMap->donors->unique('id')->sortBy('name')
+                    ->map(fn ($donor) => ['id' => $donor->id, 'label' => ($mission->organization?->name ?? 'ONG').' / '.$donor->name])->values(),
+                'projects' => $allProjects->sortBy('code')->map(fn (Project $project) => ['id' => $project->id, 'code' => $project->code])->values(),
+            ],
             // Indicateurs prévus au niveau 9 (analyses de base) : jamais de chiffre inventé.
             'analyses_available' => false,
         ];

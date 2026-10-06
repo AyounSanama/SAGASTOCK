@@ -176,6 +176,151 @@ class _CoordinationPageState extends State<CoordinationPage>
     );
   }
 
+  /// Niveau 3 — « Modifier » un compte de la coordination (maquette 04) :
+  /// identité, contact, projet d'un Admin Projet ; suspension depuis la fiche.
+  Future<void> _editAccount(Map<String, dynamic> account) async {
+    final firstName = TextEditingController(text: '${account['first_name'] ?? ''}');
+    final lastName = TextEditingController(
+      text: '${account['last_name'] ?? account['name'] ?? ''}',
+    );
+    final email = TextEditingController(text: '${account['email'] ?? ''}');
+    final phone = TextEditingController(text: '${account['phone'] ?? ''}');
+    final projects = _list('projects');
+    final isProjectAdmin = account['project_id'] != null;
+    String? projectId = account['project_id'] as String?;
+    String? error;
+    var saving = false;
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            16 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Modifier le compte',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                _Muted(isProjectAdmin ? 'Admin Projet' : 'Coordination (lecture seule)'),
+                const SizedBox(height: 12),
+                if (error != null) ...[
+                  Text(error!, style: const TextStyle(color: AppColors.dangerText)),
+                  const SizedBox(height: 8),
+                ],
+                TextField(
+                  controller: firstName,
+                  decoration: const InputDecoration(labelText: 'Prénom *'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: lastName,
+                  decoration: const InputDecoration(labelText: 'Nom *'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: email,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'E-mail *'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: phone,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'Téléphone'),
+                ),
+                if (isProjectAdmin) ...[
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: projects.any((project) => project['id'] == projectId)
+                        ? projectId
+                        : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Projet *'),
+                    items: [
+                      for (final project in projects)
+                        DropdownMenuItem(
+                          value: '${project['id']}',
+                          child: Text('${project['code']} · ${project['name']}'),
+                        ),
+                    ],
+                    onChanged: (value) => projectId = value,
+                  ),
+                ],
+                const SizedBox(height: 16),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryStrong,
+                    minimumSize: const Size.fromHeight(46),
+                  ),
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          setSheetState(() {
+                            saving = true;
+                            error = null;
+                          });
+                          try {
+                            await _service.updateAccount('${account['id']}', {
+                              'first_name': firstName.text.trim(),
+                              'last_name': lastName.text.trim(),
+                              'email': email.text.trim(),
+                              'phone': phone.text.trim(),
+                              if (isProjectAdmin) 'project_id': projectId,
+                            });
+                            if (sheetContext.mounted) Navigator.pop(sheetContext, 'saved');
+                          } on CoordinationActionException catch (exception) {
+                            setSheetState(() {
+                              saving = false;
+                              error = exception.message;
+                            });
+                          }
+                        },
+                  child: const Text('Enregistrer'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  style: account['is_active'] == true
+                      ? OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.dangerText,
+                          side: const BorderSide(color: AppColors.dangerText),
+                        )
+                      : null,
+                  onPressed: saving ? null : () => Navigator.pop(sheetContext, 'toggle'),
+                  child: Text(
+                    account['is_active'] == true ? 'Suspendre le compte' : 'Réactiver le compte',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    firstName.dispose();
+    lastName.dispose();
+    email.dispose();
+    phone.dispose();
+    if (!mounted) return;
+    if (result == 'saved') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Compte mis à jour.')),
+      );
+      await _load();
+    } else if (result == 'toggle') {
+      await _toggleAccount(account);
+    }
+  }
+
   /// Niveau 2 — Assistant « Créer un projet / programme » (création ou reprise
   /// d'un brouillon) ; la liste est rechargée après enregistrement.
   Future<void> _openWizard(String location) async {
@@ -530,7 +675,7 @@ class _CoordinationPageState extends State<CoordinationPage>
             account: account,
             title: true,
             subtitle: '${account['role']}\n${account['email'] ?? account['username']}',
-            onToggle: _canAct && !_busy ? () => _toggleAccount(account) : null,
+            onEdit: _canAct && !_busy ? () => _editAccount(account) : null,
           ),
         ],
       ),
@@ -756,11 +901,13 @@ class _AccountRow extends StatelessWidget {
     required this.account,
     required this.subtitle,
     this.onToggle,
+    this.onEdit,
     this.title = false,
   });
   final Map<String, dynamic> account;
   final String subtitle;
   final VoidCallback? onToggle;
+  final VoidCallback? onEdit;
   final bool title;
 
   @override
@@ -792,7 +939,9 @@ class _AccountRow extends StatelessWidget {
               ],
             ),
           ),
-          if (onToggle != null)
+          if (onEdit != null)
+            OutlinedButton(onPressed: onEdit, child: const Text('Modifier'))
+          else if (onToggle != null)
             OutlinedButton(
               style: active
                   ? OutlinedButton.styleFrom(

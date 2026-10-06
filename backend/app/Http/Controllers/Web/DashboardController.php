@@ -50,9 +50,17 @@ class DashboardController extends Controller
             && ($missionId = app(\App\Services\UserScopeService::class)->coordinationMissionIds($user)->first())) {
             $mission = \App\Models\Mission::with(['country', 'organization'])->findOrFail($missionId);
 
+            // Niveau 3 : filtres couple ONG/Bailleur et projet ; badge « Synchronisé il y a … ».
+            $board = app(\App\Services\CoordinationService::class)->dashboard($user, $mission, array_filter([
+                'donor_id' => $request->string('donor_id')->toString() ?: null,
+                'project_id' => $request->string('project_id')->toString() ?: null,
+            ]));
+
             return view('dashboard.coordination', [
                 'mission' => $mission,
-                'board' => app(\App\Services\CoordinationService::class)->dashboard($user, $mission),
+                'board' => $board,
+                // false : aucune synchronisation encore (badge « Aucune synchronisation »).
+                'syncedAt' => app(\App\Services\CoordinationService::class)->lastSyncAt($user) ?? false,
             ]);
         }
         $context = $this->dashboard->build($user);

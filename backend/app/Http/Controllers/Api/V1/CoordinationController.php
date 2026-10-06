@@ -57,7 +57,8 @@ class CoordinationController extends Controller
                 $projectRole = $user->roles->firstWhere('code', 'project_admin');
 
                 return [
-                    ...$user->only(['id', 'name', 'username', 'email', 'is_active', 'read_only']),
+                    ...$user->only(['id', 'name', 'first_name', 'last_name', 'phone', 'username', 'email', 'is_active', 'read_only']),
+                    'project_id' => $projectRole?->pivot->scope_id,
                     'role' => $projectRole ? 'Admin Projet, '.($projectCodes[$projectRole->pivot->scope_id] ?? '—') : 'Coordination (lecture seule)',
                     'status' => CoordinationService::accountStatus($user)['label'],
                 ];
@@ -74,7 +75,10 @@ class CoordinationController extends Controller
 
         return response()->json([
             'mission' => $mission->only(['id', 'code', 'name']) + ['country' => $mission->country?->name],
-            ...$this->coordination->dashboard($request->user(), $mission),
+            ...$this->coordination->dashboard($request->user(), $mission, array_filter([
+                'donor_id' => $request->string('donor_id')->toString() ?: null,
+                'project_id' => $request->string('project_id')->toString() ?: null,
+            ])),
         ]);
     }
 
@@ -115,6 +119,13 @@ class CoordinationController extends Controller
         $this->coordination->reactivate($request, $model);
 
         return response()->json(['facility' => $model->fresh()]);
+    }
+
+    public function updateAccount(Request $request, User $user): JsonResponse
+    {
+        $user = $this->coordination->updateAccount($request, $user);
+
+        return response()->json(['user' => $user->only(['id', 'name', 'first_name', 'last_name', 'email', 'phone', 'username', 'is_active'])]);
     }
 
     public function suspendAccount(Request $request, User $user): JsonResponse

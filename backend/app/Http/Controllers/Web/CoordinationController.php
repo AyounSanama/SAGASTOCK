@@ -45,6 +45,13 @@ class CoordinationController extends Controller
         return back()->with('status', "FOSA « {$model->name} » réactivée.");
     }
 
+    public function updateAccount(Request $request, User $user): RedirectResponse
+    {
+        $user = $this->coordination->updateAccount($request, $user);
+
+        return back()->with('status', "Compte de {$user->name} mis à jour.");
+    }
+
     public function suspendAccount(Request $request, User $user): RedirectResponse
     {
         $this->coordination->setAccountActive($request, $user, false);

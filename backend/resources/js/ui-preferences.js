@@ -61,7 +61,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const online = navigator.onLine;
         connection.classList.toggle('is-offline', !online);
         const label = connection.querySelector('[data-connection-label]');
-        if (label) label.textContent = window.pcTranslate ? window.pcTranslate(online ? 'En ligne' : 'Hors ligne') : (online ? 'En ligne' : 'Hors ligne');
+        // Niveau 3 : « Synchronisé il y a … » (Coordination) remplace « En ligne » quand la page le fournit.
+        const onlineLabel = connection.dataset.onlineLabel || 'En ligne';
+        if (label) label.textContent = online
+            ? (connection.dataset.onlineLabel ? onlineLabel : (window.pcTranslate ? window.pcTranslate(onlineLabel) : onlineLabel))
+            : (window.pcTranslate ? window.pcTranslate('Hors ligne') : 'Hors ligne');
     };
     window.addEventListener('online', renderConnection);
     window.addEventListener('offline', renderConnection);

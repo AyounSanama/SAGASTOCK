@@ -10,7 +10,9 @@
         @if($trail)<nav class="topbar-breadcrumb" aria-label="{{ __('Périmètre') }}">@foreach($trail as $crumb)<span>{{ $crumb }}</span>@endforeach</nav>@endif
     </div>
     <span class="topbar-spacer"></span>
-    <span class="topbar-connection" data-connection-status role="status" aria-live="polite"><span class="topbar-connection-dot" aria-hidden="true"></span><span data-connection-label>{{ __('En ligne') }}</span></span>
+    {{-- Niveau 3 (maquettes Coordination) : dernière synchronisation des FOSA, fournie par la page. --}}
+    @php($syncLabel = isset($syncedAt) ? ($syncedAt instanceof \Carbon\CarbonInterface ? __('Synchronisé il y a :delay', ['delay' => $syncedAt->locale(app()->getLocale())->diffForHumans(['syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE, 'short' => true])]) : __('Aucune synchronisation')) : null)
+    <span class="topbar-connection" data-connection-status @if($syncLabel) data-online-label="{{ $syncLabel }}" title="{{ __('Dernière synchronisation d’une FOSA de votre coordination') }}" @endif role="status" aria-live="polite"><span class="topbar-connection-dot" aria-hidden="true"></span><span data-connection-label>{{ $syncLabel ?? __('En ligne') }}</span></span>
     @if($actor?->read_only)<span class="app-badge app-badge--info" title="Vous consultez les informations sans pouvoir les modifier."><span class="material-symbols-outlined" aria-hidden="true">visibility</span>Lecture seule</span>@endif
     <div class="topbar-tools" aria-label="Préférences d’affichage">
         <form class="topbar-locale-switch" method="post" action="{{ route('profile.locale') }}" aria-label="{{ __('ui.language') }}">

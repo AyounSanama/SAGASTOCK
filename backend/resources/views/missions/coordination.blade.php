@@ -207,9 +207,7 @@ details.mc-row>summary{list-style:none;cursor:pointer}details.mc-row>summary::-w
                             <td class="mc-muted">{{ $account->email ?: $account->username }}</td>
                             <td>@if($projectRole)<span class="mc-badge brand">Admin Projet, {{ $c['projects']->firstWhere('id', $projectRole->pivot->scope_id)?->code ?? '—' }}</span>@else<span class="mc-badge neutral">Coordination (lecture seule)</span>@endif</td>
                             <td><span class="mc-badge {{ $status['tone'] }}">{{ $status['label'] }}</span></td>
-                            <td class="mc-actions">@if($c['can_act'])
-                                <form method="post" action="{{ route($account->is_active ? 'coordination.accounts.suspend' : 'coordination.accounts.reactivate', $account) }}" onsubmit="return confirm('{{ $account->is_active ? 'Suspendre' : 'Réactiver' }} ce compte ?')">@csrf<button class="mc-btn sm {{ $account->is_active ? 'danger' : 'secondary' }}">{{ $account->is_active ? 'Suspendre' : 'Réactiver' }}</button></form>
-                            @endif</td>
+                            <td class="mc-actions">@if($c['can_act'])<button class="mc-btn sm" type="button" data-sheet-open="account-edit-{{ $account->id }}">Modifier</button>@endif</td>
                         </tr>
                     @empty
                         <tr><td colspan="5" class="mc-empty">Aucun compte de coordination.</td></tr>
@@ -219,6 +217,39 @@ details.mc-row>summary{list-style:none;cursor:pointer}details.mc-row>summary::-w
             </div>
             @include('missions.partials.journal', ['entries' => $c['journal'], 'compact' => true])
         </div>
+        {{-- Niveau 3 — « Modifier » (maquette Coordination 04) : identité, contact, projet ; suspension. --}}
+        @if($c['can_act'])
+            @foreach($c['coordination_accounts'] as $account)
+                @php($projectRole = $account->roles->firstWhere('code', 'project_admin'))
+                @php($editing = (string) old('account_id') === (string) $account->id)
+                <x-form-sheet id="account-edit-{{ $account->id }}" title="Modifier le compte" :description="$projectRole ? 'Admin Projet' : 'Coordination (lecture seule)'">
+                    <form method="post" action="{{ route('coordination.accounts.update', $account) }}">@csrf @method('PUT')
+                        <input type="hidden" name="account_id" value="{{ $account->id }}">
+                        @if($editing && $errors->any())<div class="mc-notice error">{{ $errors->first() }}</div>@endif
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                            <label class="mc-field">Prénom *<input name="first_name" value="{{ $editing ? old('first_name') : ($account->first_name ?? '') }}" required maxlength="80"></label>
+                            <label class="mc-field">Nom *<input name="last_name" value="{{ $editing ? old('last_name') : ($account->last_name ?? $account->name) }}" required maxlength="80"></label>
+                            <label class="mc-field">E-mail *<input type="email" name="email" value="{{ $editing ? old('email') : $account->email }}" required maxlength="190"></label>
+                            <label class="mc-field">Téléphone<input name="phone" value="{{ $editing ? old('phone') : $account->phone }}" maxlength="40"></label>
+                            @if($projectRole)
+                                <label class="mc-field" style="grid-column:1/-1">Projet *
+                                    <select name="project_id" required>
+                                        @foreach($c['projects'] as $project)<option value="{{ $project->id }}" @selected(($editing ? old('project_id') : $projectRole->pivot->scope_id) === $project->id)>{{ $project->code }} · {{ $project->name }}</option>@endforeach
+                                    </select>
+                                </label>
+                            @endif
+                            <p class="mc-muted" style="grid-column:1/-1;margin:0;font-size:13px">Identifiant : {{ $account->username ?: '—' }}. Le mot de passe se change par le titulaire du compte.</p>
+                        </div>
+                        <div class="mc-foot" style="margin-top:18px"><button class="mc-btn" type="button" data-sheet-close="account-edit-{{ $account->id }}">Annuler</button><button class="mc-btn primary" type="submit">Enregistrer</button></div>
+                    </form>
+                    <form method="post" action="{{ route($account->is_active ? 'coordination.accounts.suspend' : 'coordination.accounts.reactivate', $account) }}" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--pc-color-border)" onsubmit="return confirm('{{ $account->is_active ? 'Suspendre' : 'Réactiver' }} ce compte ?')">@csrf
+                        <p class="mc-muted" style="margin:0 0 10px;font-size:13px">{{ $account->is_active ? 'Un compte suspendu ne peut plus se connecter ; ses données sont conservées.' : 'Le compte pourra de nouveau se connecter.' }}</p>
+                        <button class="mc-btn {{ $account->is_active ? 'danger' : '' }}">{{ $account->is_active ? 'Suspendre le compte' : 'Réactiver le compte' }}</button>
+                    </form>
+                </x-form-sheet>
+            @endforeach
+            @if(old('account_id') && $errors->any())<script>document.addEventListener('DOMContentLoaded', () => document.getElementById('account-edit-{{ old('account_id') }}')?.showModal())</script>@endif
+        @endif
     @endif
 
     @if($tab === 'journal')

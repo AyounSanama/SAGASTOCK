@@ -100,6 +100,8 @@ class MissionController extends Controller
 
         return view($coordination ? 'missions.coordination' : 'missions.show', [
             'coordination' => $coordination,
+            // Niveau 3 : badge « Synchronisé il y a … » de la barre supérieure.
+            ...($coordination ? ['syncedAt' => app(\App\Services\CoordinationService::class)->lastSyncAt($request->user()) ?? false] : []),
             'tab' => $coordination ? $coordination['tab'] : 'projects',
             'organization' => $organization,
             'mission' => $mission->load('country'),

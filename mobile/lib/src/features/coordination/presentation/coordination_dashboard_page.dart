@@ -28,6 +28,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
   Map<String, dynamic> _data = const {};
   bool _online = true;
   bool _loading = true;
+  String? _donorId;
 
   static const _later = 'Disponible avec les analyses de base';
 
@@ -41,7 +42,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
     setState(() => _loading = true);
     try {
       final online = await _connectivity.hasNetwork;
-      final data = await _service.dashboard();
+      final data = await _service.dashboard(donorId: _donorId);
       if (mounted) {
         setState(() {
           _online = online;
@@ -66,6 +67,10 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
     final mission = Map<String, dynamic>.from(_data['mission'] as Map? ?? const {});
     final stats = Map<String, dynamic>.from(_data['stats'] as Map? ?? const {});
     final country = '${mission['country'] ?? ''}';
+    // Dernier contact d'une FOSA de la coordination (maquette 08).
+    final syncedAgo = _ago(_data['last_sync_at']);
+    final filters = Map<String, dynamic>.from(_data['filters'] as Map? ?? const {});
+    final donors = (filters['donors'] as List? ?? const []).whereType<Map>().toList();
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -94,9 +99,11 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                           if (_data.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
-                              _online
+                              !_online
+                                  ? 'Hors ligne, données au ${_stamp(_data['generated_at'])}'
+                                  : syncedAgo == null
                                   ? 'Données au ${_stamp(_data['generated_at'])}'
-                                  : 'Hors ligne, données au ${_stamp(_data['generated_at'])}',
+                                  : 'Synchronisé $syncedAgo, données au ${_stamp(_data['generated_at'])}',
                               style: TextStyle(
                                 color: _online ? const Color(0xFF8FD3A5) : AppColors.sidebarText,
                                 fontSize: 13,
@@ -130,6 +137,55 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                         ),
                       ]
                     : [
+                        // Niveau 3 : couple ONG/Bailleur ; la période sert aux analyses (niveau 9).
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: DropdownButtonFormField<String?>(
+                                key: ValueKey('donor-$_donorId-${donors.length}'),
+                                initialValue: donors.any((donor) => donor['id'] == _donorId) ? _donorId : null,
+                                isExpanded: true,
+                                decoration: const InputDecoration(isDense: true),
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('Tous les couples ONG / Bailleur', overflow: TextOverflow.ellipsis),
+                                  ),
+                                  for (final donor in donors)
+                                    DropdownMenuItem<String?>(
+                                      value: '${donor['id']}',
+                                      child: Text('${donor['label']}', overflow: TextOverflow.ellipsis),
+                                    ),
+                                ],
+                                onChanged: (value) {
+                                  setState(() => _donorId = value);
+                                  _load();
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: Tooltip(
+                                message: _later,
+                                child: DropdownButtonFormField<int>(
+                                  initialValue: DateTime.now().month,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(isDense: true),
+                                  items: [
+                                    DropdownMenuItem(
+                                      value: DateTime.now().month,
+                                      child: Text(_monthName(DateTime.now().month)),
+                                    ),
+                                  ],
+                                  onChanged: null,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
                         GridView(
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
@@ -252,6 +308,22 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
     String two(int n) => n.toString().padLeft(2, '0');
     return '${two(date.day)}/${two(date.month)} ${two(date.hour)}:${two(date.minute)}';
   }
+
+  /// « il y a 2 min », « il y a 3 h », « il y a 6 j » ; null sans synchronisation.
+  static String? _ago(Object? value) {
+    final date = DateTime.tryParse('${value ?? ''}');
+    if (date == null) return null;
+    final elapsed = DateTime.now().difference(date);
+    if (elapsed.inMinutes < 1) return 'à l’instant';
+    if (elapsed.inHours < 1) return 'il y a ${elapsed.inMinutes} min';
+    if (elapsed.inDays < 1) return 'il y a ${elapsed.inHours} h';
+    return 'il y a ${elapsed.inDays} j';
+  }
+
+  static String _monthName(int month) => const [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+  ][month - 1];
 }
 
 class _Kpi extends StatelessWidget {
