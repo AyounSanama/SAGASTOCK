@@ -10,14 +10,19 @@ return [
         'clinical_validation' => false,
         // Destination de sortie « Communauté » : masquée en V1 (C-08).
         'community_dispensation' => false,
+        // Niveau 2 : ancien formulaire « Créer un projet » remplacé par l'assistant en 4 étapes.
+        'legacy_project_form' => false,
     ],
     'navigation' => [
-        'coordination_admin' => ['dashboard', 'missions', 'projects', 'standard-lists', 'profile'],
+        'coordination_admin' => ['dashboard', 'missions', 'projects', 'referentials', 'standard-lists', 'profile'],
         'project_admin' => ['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'profile'],
     ],
     // Entrées affichées dans le menu latéral (les autres restent accessibles
     // par onglets ; le manifeste mobile les conserve pour la navigation).
     'menu' => [
+        // Niveau 2 : « Configuration des projets » quitte le menu (création et
+        // ouverture depuis « Ma Coordination »).
+        'coordination_admin' => ['dashboard', 'missions', 'referentials', 'standard-lists', 'profile'],
         'project_admin' => ['dashboard', 'projects', 'standard-lists', 'profile'],
     ],
     'web_paths' => [

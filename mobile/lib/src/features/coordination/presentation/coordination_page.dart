@@ -176,6 +176,13 @@ class _CoordinationPageState extends State<CoordinationPage>
     );
   }
 
+  /// Niveau 2 — Assistant « Créer un projet / programme » (création ou reprise
+  /// d'un brouillon) ; la liste est rechargée après enregistrement.
+  Future<void> _openWizard(String location) async {
+    final saved = await context.push<bool>(location);
+    if (saved == true && mounted) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final country = '${_mission['country'] ?? ''}';
@@ -191,7 +198,7 @@ class _CoordinationPageState extends State<CoordinationPage>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
-              onPressed: () => context.push('/projects?create=1'),
+              onPressed: () => _openWizard('/projects/new'),
               child: const Icon(Icons.add),
             )
           : null,
@@ -354,6 +361,14 @@ class _CoordinationPageState extends State<CoordinationPage>
             _Muted(
               'FOSA validées / en attente : ${project['validated_facilities_count'] ?? 0} / ${project['pending_facilities_count'] ?? 0}',
             ),
+            if (_canAct && project['status'] == 'draft')
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => _openWizard('/projects/${project['id']}/wizard'),
+                  child: const Text('Reprendre'),
+                ),
+              ),
           ],
         ),
     ];

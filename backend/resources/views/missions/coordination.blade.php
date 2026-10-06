@@ -35,7 +35,7 @@ details.mc-row>summary{list-style:none;cursor:pointer}details.mc-row>summary::-w
 <div class="mc">
     <header class="mc-head">
         <div><h1>Ma Coordination</h1><p>{{ $organization->name }}, {{ $mission->name }}, {{ $mission->country->name }}</p></div>
-        @if($c['can_act'] && $canManageProjects)<a class="mc-btn primary" href="{{ route('modules.projects', ['create' => 1]) }}"><span class="material-symbols-outlined">add</span> Créer un projet / programme</a>@endif
+        @if($c['can_act'] && $canManageProjects)<a class="mc-btn primary" href="{{ route('projects.wizard.create') }}"><span class="material-symbols-outlined">add</span> Créer un projet / programme</a>@endif
     </header>
     @if(session('status'))<div class="mc-notice" style="margin-top:16px">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="mc-notice error" style="margin-top:16px">{{ $errors->first() }}</div>@endif
@@ -73,7 +73,7 @@ details.mc-row>summary{list-style:none;cursor:pointer}details.mc-row>summary::-w
                     <td>{{ $project->admin_name ?? 'Non attribué' }}</td>
                     <td>{{ $project->validated_facilities_count }} / {{ $project->pending_facilities_count }}</td>
                     <td><span class="mc-badge {{ ['active' => 'success', 'draft' => 'info', 'suspended' => 'danger'][$project->status] ?? 'neutral' }}">{{ $project->status_label }}</span></td>
-                    <td class="mc-right"><a class="mc-btn sm" href="{{ route('projects.medical-configuration', $project) }}">Ouvrir</a></td>
+                    <td class="mc-right">@if($project->status === 'draft' && $c['can_act'] && $canManageProjects)<a class="mc-btn sm" href="{{ route('projects.wizard.show', [$project, app(\App\Services\ProjectWizardService::class)->resumeStep($project)]) }}">Reprendre</a>@else<a class="mc-btn sm" href="{{ route('projects.medical-configuration', $project) }}">Ouvrir</a>@endif</td>
                 </tr>
             @empty
                 <tr><td colspan="8" class="mc-empty">Aucun projet ni programme dans cette coordination.</td></tr>

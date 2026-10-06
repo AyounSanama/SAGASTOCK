@@ -12,10 +12,10 @@ use Illuminate\Support\Str;
 
 class ProjectProvisioningService
 {
-    public const SUPPLY_FIELDS = ['order_period_months', 'delivery_lead_time_months', 'safety_stock_months'];
+    public const SUPPLY_FIELDS = ['order_period_months', 'delivery_lead_time_months', 'safety_stock_months', 'inventory_date', 'order_submission_date', 'order_receipt_date'];
 
     /** AM-114 — Historique append-only des paramètres d'approvisionnement. */
-    private function recordSupplySettings(Project $project, ?int $actorId): void
+    public function recordSupplySettings(Project $project, ?int $actorId): void
     {
         if (collect(self::SUPPLY_FIELDS)->every(fn (string $field) => $project->{$field} === null)) {
             return;
@@ -23,7 +23,8 @@ class ProjectProvisioningService
         DB::table('project_supply_settings_history')->insert([
             'id' => (string) Str::uuid(),
             'project_id' => $project->id,
-            ...$project->only(self::SUPPLY_FIELDS),
+            ...collect($project->only(self::SUPPLY_FIELDS))
+                ->map(fn ($value) => $value instanceof \DateTimeInterface ? $value->format('Y-m-d') : $value)->all(),
             'changed_by' => $actorId,
             'effective_at' => now(),
             'created_at' => now(),
@@ -39,7 +40,8 @@ class ProjectProvisioningService
                 'donor_reference_code', 'moh_program_code', 'responsible_name',
                 'responsible_contact', 'description', 'starts_on', 'ends_on',
                 'order_period_months', 'delivery_lead_time_months',
-                'safety_stock_months', 'status', 'type', 'is_active',
+                'safety_stock_months', 'inventory_date', 'order_submission_date',
+                'order_receipt_date', 'status', 'type', 'is_active',
             ]));
 
             $project->donors()->sync($data['donor_ids'] ?? []);
@@ -85,7 +87,8 @@ class ProjectProvisioningService
                 'donor_reference_code', 'moh_program_code', 'responsible_name',
                 'responsible_contact', 'description', 'starts_on', 'ends_on',
                 'order_period_months', 'delivery_lead_time_months',
-                'safety_stock_months', 'status', 'type', 'is_active',
+                'safety_stock_months', 'inventory_date', 'order_submission_date',
+                'order_receipt_date', 'status', 'type', 'is_active',
             ]));
             $supplyChanged = $project->isDirty(self::SUPPLY_FIELDS);
             $project->save();

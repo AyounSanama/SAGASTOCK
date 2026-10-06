@@ -26,14 +26,18 @@ class ProjectCreationEntryPointsTest extends TestCase
     {
         [$actor, $organization, $mission] = $this->coordination();
 
+        // Niveau 2 : un seul point de création, l'assistant en 4 étapes.
         $this->actingAs($actor)->get('/projects')
             ->assertOk()
-            ->assertSee('Créer un projet')
-            ->assertSee('data-sheet-open="project-create-sheet"', false)
-            ->assertSee('aria-labelledby="project-create-sheet-title"', false)
-            ->assertSee('name="admin[email]"', false)
-            ->assertSee('funding-picker', false)
-            ->assertSee('Aucun bailleur disponible');
+            ->assertSee('Créer un projet / programme')
+            ->assertSee(route('projects.wizard.create'), false)
+            ->assertDontSee('data-sheet-open="project-create-sheet"', false)
+            ->assertDontSee('name="admin[email]"', false);
+        $this->actingAs($actor)->get('/projects?create=1')->assertRedirect(route('projects.wizard.create'));
+        $this->actingAs($actor)->get(route('projects.wizard.create'))
+            ->assertOk()
+            ->assertSee('Étape 1 sur 4')
+            ->assertSee('Sélectionner un bailleur');
 
         // Tableau de bord de la Coordination (maquette 07, AM-172) : pas de
         // raccourci de création ; le bouton unique est dans « Ma Coordination ».
@@ -44,7 +48,7 @@ class ProjectCreationEntryPointsTest extends TestCase
 
         $this->actingAs($actor)->get('/organizations/'.$organization->id.'/missions/'.$mission->id)
             ->assertOk()
-            ->assertSee('/projects?create=1', false);
+            ->assertSee(route('projects.wizard.create'), false);
     }
 
     public function test_project_admin_never_sees_project_creation_action(): void
@@ -79,10 +83,10 @@ class ProjectCreationEntryPointsTest extends TestCase
         [$actor, $organization] = $this->coordination(false);
 
         $this->assertNull($actor->organization_id);
-        $this->actingAs($actor)->get('/projects')
+        $this->actingAs($actor)->get(route('projects.wizard.create'))
             ->assertOk()
             ->assertSee($organization->name)
-            ->assertSee('data-sheet-open="project-create-sheet"', false);
+            ->assertSee('Coordination Cameroun (votre coordination)');
     }
 
     /** @return array{User, Organization, Mission} */

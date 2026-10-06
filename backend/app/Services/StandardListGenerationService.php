@@ -29,10 +29,19 @@ class StandardListGenerationService {
  }
 
  public function generate(Project $project,array $context): Collection {
-  // Niveaux retenus : ceux du contexte et du projet, avec leurs parents (un
-  // produit rattaché à « Soins de santé primaire » vaut pour ses programmes)
-  // et leurs descendants (retenir un niveau couvre ses programmes).
-  $careLevelIds=$this->expandHierarchy($this->projectIds($project,'project_care_levels','care_level_id')->push($context['care_level_id']??null)->filter()->unique());
+  return $this->generateFor($project,$this->projectIds($project,'project_care_levels','care_level_id')->push($context['care_level_id']??null)->filter()->unique(),$context);
+ }
+
+ /**
+  * Niveau 2 — Produits proposés pour des choix pas encore enregistrés
+  * (assistant « Créer un projet / programme », étape 3).
+  * @param Collection<int,string> $careLevelIds
+  */
+ public function generateFor(Project $project,Collection $careLevelIds,array $context): Collection {
+  // Niveaux retenus avec leurs parents (un produit rattaché à « Soins de
+  // santé primaire » vaut pour ses programmes) et leurs descendants
+  // (retenir un niveau couvre ses programmes).
+  $careLevelIds=$this->expandHierarchy($careLevelIds->filter()->unique()->values());
   $query=ProductStandardMapping::query()->where('organization_id',$project->organization_id)->whereIn('care_level_id',$careLevelIds)
    ->when($context['facility_category_id']??null,fn($q,$id)=>$q->where(fn($n)=>$n->whereNull('facility_category_id')->orWhere('facility_category_id',$id)))
    ->where(fn($q)=>$q->whereNull('target_population_id')->orWhereIn('target_population_id',$context['target_population_ids']??[]));

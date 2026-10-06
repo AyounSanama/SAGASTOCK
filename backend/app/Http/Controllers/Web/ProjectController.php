@@ -30,9 +30,15 @@ class ProjectController extends Controller
         private ProjectProvisioningService $provisioning,
     ) {}
 
-    public function home(Request $request): View
+    public function home(Request $request): View|RedirectResponse
     {
         $this->allow('projects.view');
+        // Niveau 2 : la création passe par l'assistant « Créer un projet / programme ».
+        if ($request->boolean('create') && ! config('pharmacare_v1.features.legacy_project_form')
+            && app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN
+            && $request->user()->hasPermission('projects.manage')) {
+            return redirect()->route('projects.wizard.create');
+        }
         $projects = $this->scopes->projects($request->user())
             ->with(['organization:id,name', 'mission.country:id,iso2,name', 'healthFacilities:id,name,code', 'donors:id,code,name', 'programs:id,code,name', 'administrators:id,name,email'])
             ->when($request->string('search')->toString(), fn ($query, $search) => $query

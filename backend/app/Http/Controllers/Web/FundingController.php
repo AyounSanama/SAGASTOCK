@@ -133,8 +133,15 @@ class FundingController extends Controller
         $activeSection = in_array($request->string('section')->toString(), ['donors', 'programs'], true)
             ? $request->string('section')->toString()
             : 'donors';
+        // Niveau 2 : « Référentiels > Bailleurs » de la Coordination ; le
+        // rattachement au projet se fait dans l'assistant de création.
+        $referentialsMode = app(\App\Services\GovernanceService::class)->roleCode($request->user()) === \App\Services\GovernanceService::COORDINATION_ADMIN;
+        if ($referentialsMode) {
+            $activeSection = 'donors';
+        }
 
         return [
+            'referentialsMode' => $referentialsMode,
             'organization' => $organization,
             'project' => $project,
             'organizations' => $organizations,

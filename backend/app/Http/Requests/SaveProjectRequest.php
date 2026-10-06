@@ -73,7 +73,11 @@ class SaveProjectRequest extends FormRequest
             // AM-114 / DEC-06 : un projet actif doit porter ses trois paramètres d'approvisionnement.
             'order_period_months' => ['nullable', 'required_if:status,active', 'integer', 'min:1', 'max:24'],
             'delivery_lead_time_months' => ['nullable', 'required_if:status,active', 'integer', 'min:1', 'max:24'],
-            'safety_stock_months' => ['nullable', 'required_if:status,active', 'integer', 'min:1', 'max:24'],
+            // Mois décimaux, mêmes valeurs que la FOSA qu'il préremplit (0,25 à 2).
+            'safety_stock_months' => ['nullable', 'required_if:status,active', 'numeric', Rule::in(\App\Models\HealthFacility::SAFETY_STOCK_OPTIONS)],
+            'inventory_date' => ['nullable', 'date'],
+            'order_submission_date' => ['nullable', 'date'],
+            'order_receipt_date' => ['nullable', 'date', 'after_or_equal:order_submission_date'],
             'status' => ['required', Rule::in(array_keys(Project::STATUSES))],
             // Décision E1 : projet bailleur ou programme national (un bailleur au plus).
             'type' => ['nullable', Rule::in(array_keys(Project::TYPES))],
@@ -91,6 +95,7 @@ class SaveProjectRequest extends FormRequest
             'donor_ids.max' => 'Un projet est rattaché à un seul bailleur : créez un projet par code bailleur.',
             'required_if' => 'Le champ :attribute est obligatoire pour un projet actif.',
             'status.in' => 'Le statut doit être Brouillon, Actif, Suspendu ou Clôturé.',
+            'safety_stock_months.in' => 'Le stock de sécurité doit être de 0,25 ; 0,5 ; 0,75 ; 1 ; 1,5 ou 2 mois.',
         ];
     }
 

@@ -85,6 +85,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/sago/dashboard', [DashboardController::class, 'index'])->middleware('role:sago_admin')->name('sago.dashboard');
     Route::get('/projects', [ProjectController::class, 'home'])->middleware('permission:projects.view')->name('modules.projects');
+    // Niveau 2 — Assistant « Créer un projet / programme » (Coordination).
+    Route::middleware('permission:projects.manage')->controller(\App\Http\Controllers\Web\ProjectWizardController::class)->group(function (): void {
+        Route::get('/projects/new', 'create')->name('projects.wizard.create');
+        Route::post('/projects/new', 'store')->name('projects.wizard.store');
+        Route::post('/projects/new/donors', 'storeDonor')->middleware('permission:funding.manage')->name('projects.wizard.donors.store');
+        Route::get('/projects/{project}/wizard/{step}', 'show')->whereIn('step', ['identity', 'standard-list', 'supply'])->name('projects.wizard.show');
+        Route::put('/projects/{project}/wizard/identity', 'updateIdentity')->name('projects.wizard.identity.update');
+        Route::put('/projects/{project}/wizard/standard-list', 'updateStandardList')->middleware('permission:standard_lists.manage')->name('projects.wizard.standard-list.update');
+        Route::put('/projects/{project}/wizard/supply', 'updateSupply')->name('projects.wizard.supply.update');
+    });
     Route::get('/projects/medical-references', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'show'])->middleware('permission:standard_lists.view')->name('projects.medical-references');
     Route::post('/projects/medical-references/care-levels', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'storeCareLevel'])->middleware('permission:standard_lists.manage')->name('projects.medical-references.care-levels.store');
     Route::delete('/projects/medical-references/care-levels/{reference}', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'archiveCareLevel'])->middleware('permission:standard_lists.manage')->name('projects.medical-references.care-levels.archive');

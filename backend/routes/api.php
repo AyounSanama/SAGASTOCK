@@ -48,6 +48,17 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'read']);
         Route::get('/organizations/{organization}/operational-report', [OperationalReportController::class, 'index']);
+        // Niveau 2 — Assistant « Créer un projet / programme » (mobile).
+        Route::middleware('permission:projects.manage')->controller(\App\Http\Controllers\Api\V1\ProjectWizardController::class)->group(function (): void {
+            Route::get('/projects/wizard/options', 'options');
+            Route::post('/projects/wizard', 'store');
+            Route::post('/projects/wizard/donors', 'storeDonor')->middleware('permission:funding.manage');
+            Route::get('/projects/{project}/wizard', 'show');
+            Route::put('/projects/{project}/wizard/identity', 'updateIdentity');
+            Route::get('/projects/{project}/wizard/standard-list', 'standardList');
+            Route::put('/projects/{project}/wizard/standard-list', 'updateStandardList')->middleware('permission:standard_lists.manage');
+            Route::put('/projects/{project}/wizard/supply', 'updateSupply');
+        });
         Route::get('/projects/medical-references', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'show'])->middleware('permission:standard_lists.view');
         Route::post('/projects/medical-references/care-levels', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'storeCareLevel'])->middleware('permission:standard_lists.manage');
         Route::delete('/projects/medical-references/care-levels/{reference}', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'archiveCareLevel'])->middleware('permission:standard_lists.manage');

@@ -40,7 +40,7 @@ class ProjectProvisioningTest extends TestCase
             'ends_on' => '2027-08-31',
             'order_period_months' => 1,
             'delivery_lead_time_months' => 2,
-            'safety_stock_months' => 3,
+            'safety_stock_months' => 1.5,
             'is_active' => true,
             'donor_ids' => [$donor->id],
             'program_ids' => [$program->id],
@@ -58,7 +58,7 @@ class ProjectProvisioningTest extends TestCase
             ->assertJsonPath('project.programs.0.id', $program->id)
             ->assertJsonPath('project.order_period_months', 1)
             ->assertJsonPath('project.delivery_lead_time_months', 2)
-            ->assertJsonPath('project.safety_stock_months', 3)
+            ->assertJsonPath('project.safety_stock_months', 1.5)
             ->assertJsonPath('admin_project.roles.0.code', 'project_admin')
             ->assertJsonPath('admin_project.must_change_password', true)
             ->assertJsonMissingPath('password')

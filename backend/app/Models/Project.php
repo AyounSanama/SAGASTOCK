@@ -16,7 +16,7 @@ class Project extends Model
     protected $keyType = 'string';
     public const STATUSES = ['draft' => 'Brouillon', 'active' => 'Actif', 'suspended' => 'Suspendu', 'closed' => 'Clôturé'];
 
-    protected $fillable = ['organization_id', 'mission_id', 'code', 'name', 'implementing_partner', 'donor_reference_code', 'moh_program_code', 'responsible_name', 'responsible_contact', 'description', 'starts_on', 'ends_on', 'order_period_months', 'delivery_lead_time_months', 'safety_stock_months', 'status', 'type', 'is_active'];
+    protected $fillable = ['organization_id', 'mission_id', 'code', 'name', 'implementing_partner', 'donor_reference_code', 'moh_program_code', 'responsible_name', 'responsible_contact', 'description', 'starts_on', 'ends_on', 'order_period_months', 'delivery_lead_time_months', 'safety_stock_months', 'inventory_date', 'order_submission_date', 'order_receipt_date', 'status', 'type', 'is_active'];
 
     /** Type de projet (décision E1) : un bailleur au plus dans les deux cas. */
     public const TYPES = [
@@ -49,6 +49,17 @@ class Project extends Model
         });
     }
 
+    /** Mois décimaux (0,25 à 2) ; entier lorsque la valeur est ronde, pour les clients existants. */
+    public function getSafetyStockMonthsAttribute(mixed $value): int|float|null
+    {
+        if ($value === null) {
+            return null;
+        }
+        $months = (float) $value;
+
+        return floor($months) === $months ? (int) $months : $months;
+    }
+
     public function getStatusLabelAttribute(): string
     {
         return self::STATUSES[$this->status ?? 'active'] ?? (string) $this->status;
@@ -56,7 +67,7 @@ class Project extends Model
 
     protected function casts(): array
     {
-        return ['starts_on' => 'date', 'ends_on' => 'date', 'order_period_months' => 'integer', 'delivery_lead_time_months' => 'integer', 'safety_stock_months' => 'integer', 'is_active' => 'boolean'];
+        return ['starts_on' => 'date', 'ends_on' => 'date', 'order_period_months' => 'integer', 'delivery_lead_time_months' => 'integer', 'inventory_date' => 'date', 'order_submission_date' => 'date', 'order_receipt_date' => 'date', 'is_active' => 'boolean'];
     }
 
     public function organization(): BelongsTo

@@ -38,6 +38,7 @@ import '../access/application_access.dart';
 import '../../features/auth/data/auth_service.dart';
 import '../../features/catalog/presentation/catalog_page.dart';
 import '../../features/catalog/presentation/standard_list_entry_page.dart';
+import '../../features/projects_wizard/presentation/project_wizard_page.dart';
 
 GoRouter createAppRouter({required String initialLocation}) => GoRouter(
   initialLocation: initialLocation,
@@ -82,6 +83,18 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
     GoRoute(
       path: '/change-password',
       builder: (context, state) => const ChangePasswordPage(),
+    ),
+    // Niveau 2 — Assistant « Créer un projet / programme », plein écran.
+    GoRoute(
+      path: '/projects/new',
+      builder: (context, state) => const ProjectWizardPage(),
+    ),
+    GoRoute(
+      path: '/projects/:projectId/wizard',
+      builder: (context, state) => ProjectWizardPage(
+        projectId: state.pathParameters['projectId'],
+        initialStep: state.uri.queryParameters['step'],
+      ),
     ),
     ShellRoute(
       builder: (context, state, child) =>

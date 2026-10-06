@@ -9,6 +9,7 @@ return [
         'missions' => 'public',
         'projects' => 'work',
         'funding' => 'handshake',
+        'referentials' => 'domain',
         'facilities' => 'local_hospital',
         'sites' => 'location_on',
         'users' => 'group',

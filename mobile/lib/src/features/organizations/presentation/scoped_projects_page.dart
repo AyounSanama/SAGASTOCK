@@ -188,7 +188,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
         adminEmail.text.trim().isEmpty ? null : _required(value);
     int? orderPeriodMonths = project?['order_period_months'] as int?;
     int? deliveryLeadTimeMonths = project?['delivery_lead_time_months'] as int?;
-    int? safetyStockMonths = project?['safety_stock_months'] as int?;
+    num? safetyStockMonths = _safetyValue(project?['safety_stock_months']);
     final result = await showAppFormSheet<String>(
       context: context,
       title: editing ? 'Modifier le projet' : 'Nouveau projet',
@@ -370,12 +370,12 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                         : (value) => deliveryLeadTimeMonths = value,
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
+                  DropdownButtonFormField<num>(
                     initialValue: safetyStockMonths,
                     decoration: const InputDecoration(
                       labelText: 'Stock de sécurité',
                     ),
-                    items: _monthOptions,
+                    items: _safetyOptions,
                     validator: (value) => status == 'active' && value == null
                         ? 'Obligatoire pour un projet actif'
                         : null,
@@ -425,12 +425,12 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                         : (value) => deliveryLeadTimeMonths = value,
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
+                  DropdownButtonFormField<num>(
                     initialValue: safetyStockMonths,
                     decoration: const InputDecoration(
                       labelText: 'Stock de sécurité',
                     ),
-                    items: _monthOptions,
+                    items: _safetyOptions,
                     validator: (value) => status == 'active' && value == null
                         ? 'Obligatoire pour un projet actif'
                         : null,
@@ -740,6 +740,25 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
       DropdownMenuItem(value: month, child: Text('$month mois')),
   ];
 
+  // Niveau 2 : stock de sécurité en mois décimaux, comme la FOSA (0,25 à 2).
+  static const _safetyStockValues = <num>[0.25, 0.5, 0.75, 1, 1.5, 2];
+  static final _safetyOptions = <DropdownMenuItem<num>>[
+    for (final months in _safetyStockValues)
+      DropdownMenuItem(
+        value: months,
+        child: Text('${months.toString().replaceAll('.', ',')} mois'),
+      ),
+  ];
+
+  /// Valeur reprise seulement si elle fait partie de la liste officielle.
+  static num? _safetyValue(Object? value) {
+    final number = num.tryParse('${value ?? ''}');
+    for (final option in _safetyStockValues) {
+      if (option == number) return option;
+    }
+    return null;
+  }
+
   Future<void> _changeArchiveState(Map<String, dynamic> project) async {
     final restoring = _archived;
     final confirmed = await showDialog<bool>(
@@ -880,7 +899,8 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
     ),
   );
 
-  String _months(dynamic value) => value == null ? '—' : '$value mois';
+  String _months(dynamic value) =>
+      value == null ? '—' : '${'$value'.replaceAll('.', ',')} mois';
 
   String _names(dynamic values) {
     final names = (values as List? ?? const [])

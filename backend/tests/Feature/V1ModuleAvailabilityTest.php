@@ -27,9 +27,11 @@ class V1ModuleAvailabilityTest extends TestCase
         $project = $this->actor('project_admin', 'project');
 
         $coordinationItems = collect($navigation->items($coordination));
-        $this->assertSame(['dashboard', 'missions', 'projects', 'standard-lists', 'profile'], $coordinationItems->pluck('key')->all());
-        $this->assertSame(['Tableau de bord', 'Ma Coordination', 'Configuration des projets', 'Liste standard du projet', 'Mon profil'], $coordinationItems->pluck('label')->all());
+        $this->assertSame(['dashboard', 'missions', 'projects', 'referentials', 'standard-lists', 'profile'], $coordinationItems->pluck('key')->all());
+        $this->assertSame(['Tableau de bord', 'Ma Coordination', 'Configuration des projets', 'Référentiels', 'Liste Standard', 'Mon profil'], $coordinationItems->pluck('label')->all());
         $this->assertSame('/projects', $coordinationItems->firstWhere('key', 'projects')['path']);
+        // Niveau 2 : « Configuration des projets » quitte le menu (route conservée).
+        $this->assertSame(['dashboard', 'missions', 'referentials', 'standard-lists', 'profile'], $coordinationItems->where('menu', true)->pluck('key')->values()->all());
 
         $projectItems = collect($navigation->items($project));
         $this->assertSame(['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'profile'], $projectItems->pluck('key')->all());

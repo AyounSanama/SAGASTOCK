@@ -71,12 +71,15 @@ class ConfigurationMissionProjectTest extends TestCase
 
     public function test_order_period_offers_one_to_twelve_months_with_the_validated_labels(): void
     {
-        $page = $this->actingAs($this->coordination)->get(route('modules.projects'))->assertOk();
+        // Niveau 2 : étape 4 de l'assistant « Créer un projet / programme ».
+        $project = Project::create(['organization_id' => $this->organization->id, 'mission_id' => $this->mission->id, 'code' => 'DRAFT', 'name' => 'Brouillon', 'status' => 'draft']);
+        $page = $this->actingAs($this->coordination)->get(route('projects.wizard.show', [$project, 'supply']))->assertOk();
 
         $page->assertSee('Périodicité de commande')->assertSee('Stock de sécurité')->assertDontSee('Périodicité des commandes');
         foreach ([5, 7, 11] as $month) {
             $page->assertSee("<option value=\"$month\"", false);
         }
+        $page->assertSee('<option value="0.25"', false)->assertSee('0,25 mois');
     }
 
     public function test_only_the_coordination_changes_the_standard_list_table(): void

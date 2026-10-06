@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 @section('title', 'Référentiel médical · PharmaCare')
-@section('page-title', 'Configuration des projets')
+@section('page-title', auth()->user() && app(\App\Services\GovernanceService::class)->roleCode(auth()->user()) === \App\Services\GovernanceService::COORDINATION_ADMIN ? 'Référentiels' : 'Configuration des projets')
 @section('content')
 <x-app-page-header title="Référentiel médical" description="Niveaux de soins hiérarchiques utilisés pour générer les listes standards : Niveau → Catégorie → Programme." />
 @include('projects.partials.configuration-tabs', ['activeTab' => 'medical'])

@@ -448,7 +448,7 @@ class OrganizationService {
     String adminPassword = '',
     int? orderPeriodMonths,
     int? deliveryLeadTimeMonths,
-    int? safetyStockMonths,
+    num? safetyStockMonths,
     Map<String, dynamic> identity = const {},
   }) async {
     // Le mot de passe ne doit jamais être persisté dans l'outbox locale.
@@ -495,7 +495,7 @@ class OrganizationService {
     DateTime? endsOn,
     int? orderPeriodMonths,
     int? deliveryLeadTimeMonths,
-    int? safetyStockMonths,
+    num? safetyStockMonths,
     bool isActive = true,
     Map<String, dynamic> identity = const {},
   }) async {
@@ -531,7 +531,7 @@ class OrganizationService {
     DateTime? endsOn,
     int? orderPeriodMonths,
     int? deliveryLeadTimeMonths,
-    int? safetyStockMonths,
+    num? safetyStockMonths,
     List<String> donorIds = const [],
     List<String> programIds = const [],
     List<Map<String, dynamic>> donorRecords = const [],

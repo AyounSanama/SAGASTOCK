@@ -20,6 +20,8 @@ class ApplicationNavigationService
         ['key' => 'funding', 'label' => 'Bailleurs et programmes', 'route' => 'modules.funding', 'path' => '/funding', 'icon' => 'funding', 'permission' => 'funding.view'],
         ['key' => 'facilities', 'label' => 'Formations sanitaires', 'route' => 'modules.health-facilities', 'path' => '/health-facilities', 'icon' => 'facilities', 'permission' => 'health_facilities.view'],
         ['key' => 'sites', 'label' => 'Sites de dispensation', 'route' => 'modules.dispensing-sites', 'path' => '/dispensing-sites', 'icon' => 'sites', 'permission' => 'dispensing_sites.view'],
+        // Niveau 2 : « Référentiels » de la Coordination (Bailleurs, Référentiel médical).
+        ['key' => 'referentials', 'label' => 'Référentiels', 'route' => 'modules.funding', 'path' => '/funding', 'icon' => 'referentials', 'permission' => 'funding.view', 'webOnly' => true],
         ['key' => 'users', 'label' => 'Utilisateurs', 'route' => 'users.index', 'path' => '/users', 'icon' => 'users', 'permission' => 'users.view'],
         ['key' => 'standard-lists', 'label' => 'Listes standards de médicaments', 'route' => 'modules.standard-lists', 'path' => '/standard-lists', 'icon' => 'standard_lists', 'permission' => 'standard_lists.view'],
         ['key' => 'products', 'label' => 'Produits', 'route' => 'modules.products', 'path' => '/products', 'icon' => 'products', 'permission' => 'products.view'],
@@ -65,9 +67,14 @@ class ApplicationNavigationService
                 }
                 if ($role === GovernanceService::COORDINATION_ADMIN && $item['key'] === 'missions') {
                     $item['label'] = 'Ma Coordination';
+                    // Les projets se créent et s'ouvrent depuis « Ma Coordination ».
+                    $item['active_routes'] = ['modules.missions', 'coordination.*', 'organizations.missions.*', 'modules.projects', 'projects.wizard.*', 'projects.medical-configuration*'];
                 }
                 if ($role === GovernanceService::COORDINATION_ADMIN && $item['key'] === 'standard-lists') {
-                    $item['label'] = 'Liste standard du projet';
+                    $item['label'] = 'Liste Standard';
+                }
+                if ($item['key'] === 'referentials') {
+                    $item['active_routes'] = ['modules.funding', 'projects.medical-references*'];
                 }
                 if ($role === GovernanceService::COORDINATION_ADMIN && $item['key'] === 'projects') {
                     $item['label'] = 'Configuration des projets';

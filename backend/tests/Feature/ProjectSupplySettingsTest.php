@@ -74,8 +74,11 @@ class ProjectSupplySettingsTest extends TestCase
         $this->putJson($this->url($id), $this->payload(['status' => 'active', 'name' => 'Renommé', ...$settings]))->assertOk();
         $this->assertDatabaseCount('project_supply_settings_history', 1);
 
-        $this->putJson($this->url($id), $this->payload(['status' => 'active', ...$settings, 'safety_stock_months' => 3]))->assertOk();
+        $this->putJson($this->url($id), $this->payload(['status' => 'active', ...$settings, 'safety_stock_months' => 1.5]))->assertOk();
         $this->assertDatabaseCount('project_supply_settings_history', 2);
-        $this->assertDatabaseHas('project_supply_settings_history', ['project_id' => $id, 'safety_stock_months' => 3]);
+        $this->assertDatabaseHas('project_supply_settings_history', ['project_id' => $id, 'safety_stock_months' => 1.5]);
+        // Niveau 2 : mêmes valeurs que la FOSA (0,25 à 2 mois).
+        $this->putJson($this->url($id), $this->payload(['status' => 'active', ...$settings, 'safety_stock_months' => 3]))
+            ->assertUnprocessable()->assertJsonValidationErrors('safety_stock_months');
     }
 }

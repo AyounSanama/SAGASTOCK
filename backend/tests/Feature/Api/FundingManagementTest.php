@@ -102,21 +102,21 @@ class FundingManagementTest extends TestCase
         [$organization, $project] = $this->context();
         $admin = $this->administrator($project);
 
+        // Niveau 2 : la Coordination y voit « Référentiels > Bailleurs » ; Programmes
+        // et rattachement au projet passent par l'assistant (onglets masqués).
         $this->actingAs($admin)->get('/funding')
             ->assertOk()
-            ->assertSee('Configuration des projets')
-            ->assertSee('Projets')
+            ->assertSee('Référentiels')
             ->assertSee('Bailleurs')
-            ->assertSee('Programmes')
+            ->assertSee('Référentiel médical')
+            ->assertDontSee('Ajouter un programme')
             ->assertSee('donor-create-sheet')
-            ->assertSee('overflow-x:clip', false)
-            ->assertSee('grid-template-columns:minmax(0,1fr) minmax(0,1fr)', false)
-            ->assertSee($project->name);
+            ->assertSee('overflow-x:clip', false);
 
         $this->actingAs($admin)->get('/funding?section=programs')
             ->assertOk()
-            ->assertSee('section-programs', false)
-            ->assertSee('Ajouter un programme');
+            ->assertSee('section-donors', false)
+            ->assertDontSee('Associations au projet');
 
         $this->actingAs($admin)->from('/funding')->post("/organizations/{$organization->id}/donors", [
             'code' => 'GAVI', 'name' => 'Alliance Gavi', 'email' => 'contact@gavi.test',
@@ -137,8 +137,10 @@ class FundingManagementTest extends TestCase
             'program_id' => $program->id,
         ])->assertRedirect('/funding');
 
+        // Rattachements enregistrés ; la page « Référentiels » ne liste que les bailleurs.
         $this->actingAs($admin)->get('/funding?organization_id='.$organization->id.'&project_id='.$project->id)
-            ->assertOk()->assertSee('Alliance Gavi')->assertSee('Programme Vaccins')->assertSee('CONV-2026');
+            ->assertOk()->assertSee('Alliance Gavi')->assertDontSee('CONV-2026');
+        $this->assertDatabaseHas('program_project', ['project_id' => $project->id, 'program_id' => $program->id]);
         $this->assertDatabaseHas('project_donors', [
             'project_id' => $project->id, 'donor_id' => $donor->id, 'currency' => 'XAF',
         ]);
