@@ -13,6 +13,7 @@ use App\Services\UserScopeService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * AM-162 (lot c1) — Création et modification d'une FOSA : mêmes règles sur le
@@ -32,7 +33,8 @@ class SaveHealthFacilityRequest extends FormRequest
         abort_unless($scopes->organizations($user)->whereKey($this->organization()->id)->exists(), 404);
         $facility = $this->facility();
         if ($facility) {
-            abort_unless($facility->organization_id === $this->organization()->id && $scopes->facilityIds($user)->contains($facility->id), 404);
+            abort_unless($facility->organization_id === $this->organization()->id, 404);
+            Gate::forUser($user)->authorize('update', $facility);
         }
 
         return true;

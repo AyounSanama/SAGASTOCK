@@ -19,6 +19,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Gate;
 
 class StructureController extends Controller
 {
@@ -279,7 +280,7 @@ class StructureController extends Controller
     private function siteData(Request $request, HealthFacility $facility, ?Site $model=null):array{$data=$request->validate(['department_id'=>['nullable','uuid','exists:departments,id'],'pharmacy_id'=>['nullable','uuid','exists:pharmacies,id'],'code'=>['required','alpha_dash','max:50',Rule::unique('sites')->where('health_facility_id',$facility->id)->ignore($model?->id)],'name'=>['required','string','max:160'],'site_type'=>['required',Rule::in(['stock','dispensing','stock_and_dispensing','quarantine','other'])],'location'=>['nullable','string','max:190'],'is_active'=>['nullable','boolean']]);if(!empty($data['department_id']))abort_unless($facility->departments()->whereKey($data['department_id'])->exists(),422);if(!empty($data['pharmacy_id']))abort_unless($facility->pharmacies()->whereKey($data['pharmacy_id'])->exists(),422);$data['is_active']=$request->boolean('is_active',true);return $data;}
     private function organization(Request $request,Organization $organization):void{abort_unless($this->scopes->organizations($request->user())->whereKey($organization->id)->exists(),404);}
     private function manage(Request $request,Organization $organization):void{$this->allow($request,'structures.manage');$this->organization($request,$organization);}
-    private function manageFacility(Request $request,Organization $organization,HealthFacility $facility):void{$this->manage($request,$organization);abort_unless($facility->organization_id===$organization->id&&$this->scopes->facilityIds($request->user())->contains($facility->id),404);}
+    private function manageFacility(Request $request,Organization $organization,HealthFacility $facility):void{$this->manage($request,$organization);abort_unless($facility->organization_id===$organization->id,404);Gate::authorize('update',$facility);}
     private function manageChild(Request $request,Organization $organization,HealthFacility $facility,Model $model):void{$this->manageFacility($request,$organization,$facility);abort_unless($model->health_facility_id===$facility->id,404);}
     private function saved(Request $request,Model $model,string $event,string $message):RedirectResponse{$this->audit->record($request,$event,$model,[],$model->toArray());return back()->with('status',$message);}
     private function archiveChild(Request $request,Organization $organization,HealthFacility $facility,Model $model,string $event,string $message):RedirectResponse{$this->manageChild($request,$organization,$facility,$model);$model->update(['is_active'=>false]);$model->delete();return $this->saved($request,$model,$event,$message);}

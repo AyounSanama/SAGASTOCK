@@ -3,9 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Models\Project;
-use App\Services\GovernanceService;
-use App\Services\UserScopeService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 
 /** AM-112 — Validation unique Web / API de la configuration médicale d'un projet. */
 class SaveProjectMedicalConfigurationRequest extends FormRequest
@@ -13,12 +12,11 @@ class SaveProjectMedicalConfigurationRequest extends FormRequest
     public function authorize(): bool
     {
         $project = $this->route('project');
-        abort_unless($project instanceof Project
-            && app(UserScopeService::class)->projects($this->user())->whereKey($project->id)->exists(), 404);
-
+        abort_unless($project instanceof Project, 404);
         // Configuration structurante : Coordination uniquement (cahier des charges).
-        return app(GovernanceService::class)->roleCode($this->user()) === GovernanceService::COORDINATION_ADMIN
-            && $this->user()->hasPermission('standard_lists.manage');
+        Gate::forUser($this->user())->authorize('configure', $project);
+
+        return true;
     }
 
     protected function prepareForValidation(): void

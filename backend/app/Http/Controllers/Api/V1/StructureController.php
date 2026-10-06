@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Gate;
 
 class StructureController extends Controller
 {
@@ -166,8 +167,7 @@ class StructureController extends Controller
     {
         $this->organization($request, $organization);
         abort_unless(
-            $facility->organization_id === $organization->id
-                && $this->scopes->facilityIds($request->user())->contains($facility->id),
+            $facility->organization_id === $organization->id && Gate::allows('update', $facility),
             403,
             'Cette formation sanitaire ne fait pas partie de votre projet.',
         );
@@ -226,11 +226,8 @@ class StructureController extends Controller
     private function facility(Request $request, Organization $organization, HealthFacility $facility): void
     {
         $this->organization($request, $organization);
-        abort_unless(
-            $facility->organization_id === $organization->id
-                && $this->scopes->facilityIds($request->user())->contains($facility->id),
-            404,
-        );
+        abort_unless($facility->organization_id === $organization->id, 404);
+        Gate::authorize('view', $facility);
     }
 
     private function child(Request $request, Organization $organization, HealthFacility $facility, Model $child): void

@@ -16,6 +16,7 @@ use App\Services\GovernanceService;
 use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -42,7 +43,7 @@ class UserController extends Controller
 
     public function show(User $user): JsonResponse
     {
-        abort_unless($this->scopes->canAccess(request()->user(), $user), 404);
+        Gate::authorize('view', $user);
 
         return response()->json(['user' => $user->load(['roles.permissions', 'devices'])]);
     }
@@ -64,7 +65,7 @@ class UserController extends Controller
     public function restore(Request $request, string $user): JsonResponse
     {
         $managedUser = $this->scopes->users($request->user(), User::onlyTrashed())->findOrFail($user);
-        $this->governance->assertCanManageUser($request->user(), $managedUser);
+        Gate::authorize('restore', $managedUser);
         $archivedAt = $managedUser->deleted_at?->toISOString();
         $managedUser->restore();
         $managedUser->update(['is_active' => true]);
@@ -138,9 +139,7 @@ class UserController extends Controller
 
     public function update(Request $request, User $user): JsonResponse
     {
-        abort_unless($this->scopes->canAccess($request->user(), $user), 404);
-        $this->authorizeSiteAccountManagement($request, $user, 'users.update_site_admin');
-        $this->governance->assertCanManageUser($request->user(), $user);
+        Gate::authorize('update', $user);
         $old = $user->only(['name', 'email', 'phone', 'is_active']);
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:120'],
@@ -183,9 +182,7 @@ class UserController extends Controller
 
     public function resetPassword(Request $request, User $user): JsonResponse
     {
-        abort_unless($this->scopes->canAccess($request->user(), $user), 404);
-        $this->authorizeSiteAccountManagement($request, $user, 'users.update_site_admin');
-        $this->governance->assertCanManageUser($request->user(), $user);
+        Gate::authorize('resetPassword', $user);
         $temporary = Str::password(16, symbols: true);
         $user->update(['password' => Hash::make($temporary), 'must_change_password' => true]);
         $user->tokens()->delete();
@@ -198,10 +195,7 @@ class UserController extends Controller
 
     public function destroy(Request $request, User $user): JsonResponse
     {
-        abort_unless($this->scopes->canAccess($request->user(), $user), 404);
-        $this->authorizeSiteAccountManagement($request, $user, 'users.suspend_site_admin');
-        abort_if($request->user()->is($user), 422, 'Vous ne pouvez pas archiver votre propre compte.');
-        $this->governance->assertCanManageUser($request->user(), $user);
+        Gate::authorize('delete', $user);
         if ($user->roles()->whereIn('code', ['sago_admin', 'owner', 'platform_owner'])->exists()) {
             $otherOwners = User::where('is_active', true)->whereKeyNot($user->id)
                 ->whereHas('roles', fn ($query) => $query->whereIn('code', ['sago_admin', 'owner', 'platform_owner']))->exists();
@@ -278,24 +272,5 @@ class UserController extends Controller
         )->whereIn('id', $permissionIds)->pluck('id');
         abort_unless($allowed->count() === count(array_unique($permissionIds)), 403);
         $user->directPermissions()->sync($allowed);
-    }
-
-    private function authorizeSiteAccountManagement(Request $request, User $target, string $permission): void
-    {
-        $actor = $request->user();
-        if ($actor->hasPermission('users.manage')) {
-            return;
-        }
-
-        abort_unless($actor->hasPermission($permission), 403);
-        abort_unless($this->governance->roleCode($target) === GovernanceService::SITE_ADMIN, 403);
-        $targetSiteIds = $target->roles()
-            ->wherePivot('scope_type', 'site')
-            ->pluck('role_user.scope_id');
-        abort_unless(
-            $targetSiteIds->isNotEmpty()
-                && $targetSiteIds->every(fn (string $id) => $this->scopes->siteIds($actor)->contains($id)),
-            403,
-        );
     }
 }

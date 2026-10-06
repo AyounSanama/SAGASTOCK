@@ -10,6 +10,7 @@ use App\Services\UserScopeService;
 use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Validation unique de création et de modification d'un projet.
@@ -28,7 +29,7 @@ class SaveProjectRequest extends FormRequest
         $project = $this->route('project');
         if ($project instanceof Project) {
             abort_unless($project->organization_id === $this->organization()->id, 404);
-            abort_unless(app(UserScopeService::class)->projects($this->user())->whereKey($project->id)->exists(), 404);
+            Gate::forUser($this->user())->authorize('update', $project);
         }
 
         return (bool) $this->user()?->hasPermission('projects.manage');

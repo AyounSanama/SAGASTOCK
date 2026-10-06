@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * AM-172 (niveau 3) — « Ma Coordination » : validation, refus, suspension et
@@ -59,8 +60,10 @@ class CoordinationService
     public function facility(User $actor, string $id): HealthFacility
     {
         $this->assertCoordinator($actor);
+        $facility = HealthFacility::findOrFail($id);
+        Gate::forUser($actor)->authorize('coordinate', $facility);
 
-        return $this->facilities($actor)->whereKey($id)->firstOrFail();
+        return $facility;
     }
 
     public function validate(Request $request, HealthFacility $facility): void
@@ -100,10 +103,7 @@ class CoordinationService
      */
     public function setAccountActive(Request $request, User $target, bool $active): void
     {
-        $actor = $request->user();
-        $this->assertCoordinator($actor);
-        abort_if($actor->read_only || $actor->is($target), 403, 'Vous ne pouvez pas gérer ce compte.');
-        abort_unless($this->manageableAccounts($actor)->whereKey($target->id)->exists(), 404);
+        Gate::forUser($request->user())->authorize('setActive', $target);
         if ($target->is_active === $active) {
             return;
         }

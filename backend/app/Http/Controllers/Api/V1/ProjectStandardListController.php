@@ -13,6 +13,7 @@ use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class ProjectStandardListController extends Controller {
  public function __construct(private UserScopeService $scopes,private StandardListGenerationService $generator,private AuditService $audit,private GovernanceService $governance) {}
@@ -61,6 +62,6 @@ class ProjectStandardListController extends Controller {
   abort_if(empty($data['pathology_ids'])&&empty($data['laboratory_exam_ids']),422,'Sélectionnez une pathologie ou un examen de laboratoire.'); return $data;
  }
  private function references(Project $project,array $ids,string $type): void { abort_unless(CatalogReference::whereIn('id',$ids)->where('reference_type',$type)->where(fn($q)=>$q->whereNull('organization_id')->orWhere('organization_id',$project->organization_id))->count()===count($ids),422,"Référentiel $type invalide."); }
- private function project(Request $request,Project $project): void { abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(),404); }
- private function manage(Request $request,Project $project): void { $this->project($request,$project); abort_unless($this->governance->roleCode($request->user())===GovernanceService::COORDINATION_ADMIN&&$request->user()->hasPermission('standard_lists.manage'),403); }
+ private function project(Request $request,Project $project): void { Gate::authorize('view',$project); }
+ private function manage(Request $request,Project $project): void { Gate::authorize('configure',$project); }
 }

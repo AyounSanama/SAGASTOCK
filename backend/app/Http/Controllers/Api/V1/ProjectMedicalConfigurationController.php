@@ -7,11 +7,11 @@ use App\Http\Requests\SaveProjectMedicalConfigurationRequest;
 use App\Models\Project;
 use App\Services\AuditService;
 use App\Services\CareLevelHierarchyService;
-use App\Services\GovernanceService;
 use App\Services\ProjectMedicalConfigurationService;
 use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 /** AM-112 — Configuration médicale d'un projet, même chemin que le Web. */
 class ProjectMedicalConfigurationController extends Controller
@@ -24,9 +24,8 @@ class ProjectMedicalConfigurationController extends Controller
 
     public function show(Request $request, Project $project): JsonResponse
     {
-        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
-        $canManage = app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN
-            && $request->user()->hasPermission('standard_lists.manage');
+        Gate::authorize('view', $project);
+        $canManage = $request->user()->can('configure', $project);
 
         return response()->json([
             'configuration' => $this->configuration->get($project),

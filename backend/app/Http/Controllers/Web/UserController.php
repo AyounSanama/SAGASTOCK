@@ -16,6 +16,7 @@ use App\Services\UserScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -90,7 +91,7 @@ class UserController extends Controller
     {
         $this->allow('users.manage');
         $managedUser = $this->scopes->users($request->user(), User::onlyTrashed())->findOrFail($user);
-        app(GovernanceService::class)->assertCanManageUser($request->user(), $managedUser);
+        Gate::authorize('restore', $managedUser);
         $archivedAt = $managedUser->deleted_at?->toISOString();
         $managedUser->restore();
         $managedUser->update(['is_active' => true]);
@@ -102,7 +103,7 @@ class UserController extends Controller
     public function show(User $user): View
     {
         $this->allow('users.view');
-        abort_unless($this->scopes->canAccess(Auth::user(), $user), 404);
+        Gate::authorize('view', $user);
 
         return view('users.show', ['managedUser' => $user->load(['roles.permissions', 'devices'])]);
     }
@@ -110,8 +111,7 @@ class UserController extends Controller
     public function edit(User $user): View
     {
         $this->allow('users.manage');
-        abort_unless($this->scopes->canAccess(Auth::user(), $user), 404);
-        app(GovernanceService::class)->assertCanManageUser(Auth::user(), $user);
+        Gate::authorize('update', $user);
 
         return view('users.edit', [
             'expectedScope' => $this->expectedScope(Auth::user()),
@@ -169,8 +169,7 @@ class UserController extends Controller
     public function update(Request $request, User $user): RedirectResponse
     {
         $this->allow('users.manage');
-        abort_unless($this->scopes->canAccess($request->user(), $user), 404);
-        app(GovernanceService::class)->assertCanManageUser($request->user(), $user);
+        Gate::authorize('update', $user);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'first_name' => ['nullable', 'string', 'max:80'],
@@ -234,9 +233,7 @@ class UserController extends Controller
     public function destroy(Request $request, User $user): RedirectResponse
     {
         $this->allow('users.manage');
-        abort_unless($this->scopes->canAccess($request->user(), $user), 404);
-        abort_if($request->user()->is($user), 422, 'Vous ne pouvez pas archiver votre propre compte.');
-        app(GovernanceService::class)->assertCanManageUser($request->user(), $user);
+        Gate::authorize('delete', $user);
         if ($user->roles()->whereIn('code', ['sago_admin', 'owner', 'platform_owner'])->exists()) {
             $otherOwners = User::where('is_active', true)->whereKeyNot($user->id)
                 ->whereHas('roles', fn ($query) => $query->whereIn('code', ['sago_admin', 'owner', 'platform_owner']))->exists();

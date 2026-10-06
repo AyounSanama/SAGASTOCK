@@ -16,6 +16,7 @@ use App\Services\UserScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -232,8 +233,7 @@ class AuthController extends Controller
             'scope' => ['required', 'string', 'max:100'],
         ]);
         [$scopeType, $scopeId] = $this->parseScope($data['scope']);
-        abort_unless($this->scopes->canAccess($request->user(), $user), 404);
-        $this->governance->assertCanManageUser($request->user(), $user);
+        Gate::authorize('update', $user);
         abort_unless($this->scopes->allowsScope($request->user(), $scopeType, $scopeId), 403);
         $role = $this->scopes->assignableRoles($request->user())->findOrFail($data['role_id']);
         abort_unless($this->governance->canAssign($request->user(), $role, $scopeType, $scopeId), 403);
@@ -258,8 +258,7 @@ class AuthController extends Controller
     public function resetUserPassword(Request $request, User $user): RedirectResponse
     {
         $this->authorizeUsers('users.manage');
-        abort_unless($this->scopes->canAccess(request()->user(), $user), 404);
-        $this->governance->assertCanManageUser($request->user(), $user);
+        Gate::authorize('resetPassword', $user);
         $temporary = Str::password(16, symbols: true);
         $user->update(['password' => $temporary, 'must_change_password' => true]);
         $user->tokens()->delete();

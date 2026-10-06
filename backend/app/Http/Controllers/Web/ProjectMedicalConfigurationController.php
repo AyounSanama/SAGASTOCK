@@ -7,12 +7,12 @@ use App\Http\Requests\SaveProjectMedicalConfigurationRequest;
 use App\Models\Project;
 use App\Services\AuditService;
 use App\Services\CareLevelHierarchyService;
-use App\Services\GovernanceService;
 use App\Services\ProjectMedicalConfigurationService;
 use App\Services\UserScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Gate;
 
 /** AM-112 — Configuration médicale d'un projet (écriture Coordination, lecture périmètre projet). */
 class ProjectMedicalConfigurationController extends Controller
@@ -25,7 +25,7 @@ class ProjectMedicalConfigurationController extends Controller
 
     public function show(Request $request, Project $project): View
     {
-        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
+        Gate::authorize('view', $project);
         $project->load('organization:id,name', 'mission.country:id,name');
 
         return view('projects.medical-configuration', [
@@ -33,8 +33,7 @@ class ProjectMedicalConfigurationController extends Controller
             'configuration' => $this->configuration->get($project),
             'options' => $this->configuration->options($project),
             'levels' => CareLevelHierarchyService::DEPTH_LABELS,
-            'canManage' => app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN
-                && $request->user()->hasPermission('standard_lists.manage'),
+            'canManage' => $request->user()->can('configure', $project),
         ]);
     }
 

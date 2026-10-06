@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use App\Support\PasswordPolicy;
+use Illuminate\Support\Facades\Gate;
 
 class ProjectController extends Controller
 {
@@ -44,7 +45,7 @@ class ProjectController extends Controller
 
     public function show(Request $request, Project $project): JsonResponse
     {
-        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
+        Gate::authorize('view', $project);
 
         return response()->json([
             'project' => $project->load([
@@ -107,7 +108,7 @@ class ProjectController extends Controller
     {
         $this->accessible($request, $organization);
         abort_unless($project->organization_id === $organization->id, 404);
-        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
+        Gate::authorize('update', $project);
         $old = $project->only(self::AUDITED);
         $project = $this->provisioning->update($project, $request->projectData(), $request->user()->id);
         $this->audit->record($request, 'project.updated', $project, $old, $project->only(array_keys($old)));
@@ -119,7 +120,7 @@ class ProjectController extends Controller
     {
         $this->accessible($request, $organization);
         abort_unless($project->organization_id === $organization->id, 404);
-        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
+        Gate::authorize('delete', $project);
         $project->delete();
         $this->audit->record($request, 'project.archived', $project);
 
@@ -130,9 +131,7 @@ class ProjectController extends Controller
     {
         $this->accessible($request, $organization);
         $model = $organization->projects()->onlyTrashed()->findOrFail($project);
-        if (app(GovernanceService::class)->roleCode($request->user()) === GovernanceService::COORDINATION_ADMIN) {
-            abort_unless($this->scopes->coordinationMissionIds($request->user())->contains($model->mission_id), 404);
-        }
+        Gate::authorize('restore', $model);
         $model->restore();
         $model->update(['is_active' => true]);
         $this->audit->record($request, 'project.restored', $model);
@@ -148,7 +147,7 @@ class ProjectController extends Controller
      */
     public function applySupplyToFacilities(Request $request, Project $project): JsonResponse
     {
-        abort_unless($this->scopes->projects($request->user())->whereKey($project->id)->exists(), 404);
+        Gate::authorize('update', $project);
         $request->validate(['confirm' => ['required', 'accepted']], ['confirm.accepted' => 'Confirmez l’application des paramètres du projet à toutes ses FOSA.']);
         $updated = app(\App\Services\HealthFacilityConfigurationService::class)->applyProjectSupplyToFacilities($project, $request->user());
         $this->audit->record($request, 'project.supply_applied_to_facilities', $project, [], ['facilities_updated' => $updated]);
