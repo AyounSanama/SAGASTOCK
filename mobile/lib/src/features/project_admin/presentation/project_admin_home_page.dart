@@ -18,7 +18,8 @@ class ProjectAdminHomePage extends StatefulWidget {
 }
 
 class _ProjectAdminHomePageState extends State<ProjectAdminHomePage> {
-  late final ProjectAdminService _service = widget.service ?? ProjectAdminService();
+  late final ProjectAdminService _service =
+      widget.service ?? ProjectAdminService();
   Map<String, dynamic> _data = const {};
   bool _loading = true;
 
@@ -52,7 +53,10 @@ class _ProjectAdminHomePageState extends State<ProjectAdminHomePage> {
       body: Column(
         children: [
           ProjectAdminHeader(
-            overline: ['Admin Projet', project['mission']].whereType<String>().join(' · '),
+            overline: [
+              'Admin Projet',
+              project['mission'],
+            ].whereType<String>().join(' · '),
             title: project.isEmpty ? 'Mon projet' : 'Projet ${project['code']}',
             subtitle: _data.isEmpty
                 ? null
@@ -66,22 +70,33 @@ class _ProjectAdminHomePageState extends State<ProjectAdminHomePage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                 children: _loading && _data.isEmpty
-                    ? const [Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))]
+                    ? const [
+                        Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      ]
                     : _data.isEmpty
-                    ? const [ProjectAdminMessage('Aucune donnée enregistrée sur ce téléphone. Connectez-vous à internet une première fois.')]
+                    ? const [
+                        ProjectAdminMessage(
+                          'Aucune donnée enregistrée sur ce téléphone. Connectez-vous à internet une première fois.',
+                        ),
+                      ]
                     : [
-                        GridView(
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 10,
-                            mainAxisExtent: 96,
-                          ),
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          children: [
-                            ProjectAdminKpi(label: 'FOSA actives', value: '${stats['active_facilities'] ?? 0} / ${stats['facilities'] ?? 0}'),
-                            ProjectAdminKpi(label: 'Comptes FOSA', value: '${stats['accounts'] ?? 0}'),
+                        // Deux tuiles par ligne, hauteur selon le contenu (taille de texte du téléphone).
+                        for (final pair in [
+                          [
+                            ProjectAdminKpi(
+                              label: 'FOSA actives',
+                              value:
+                                  '${stats['active_facilities'] ?? 0} / ${stats['facilities'] ?? 0}',
+                            ),
+                            ProjectAdminKpi(
+                              label: 'Comptes FOSA',
+                              value: '${stats['accounts'] ?? 0}',
+                            ),
+                          ],
+                          [
                             ProjectAdminKpi(
                               label: 'Échecs de synchro',
                               value: '$failed',
@@ -93,7 +108,20 @@ class _ProjectAdminHomePageState extends State<ProjectAdminHomePage> {
                               color: AppColors.primaryStrong,
                             ),
                           ],
-                        ),
+                        ])
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(child: pair[0]),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: pair[1]),
+                                ],
+                              ),
+                            ),
+                          ),
                         const SizedBox(height: 12),
                         if (watch > 0)
                           Container(
@@ -108,7 +136,10 @@ class _ProjectAdminHomePageState extends State<ProjectAdminHomePage> {
                               children: [
                                 Text(
                                   '$watch FOSA à surveiller',
-                                  style: const TextStyle(color: AppColors.dangerText, fontWeight: FontWeight.w700),
+                                  style: const TextStyle(
+                                    color: AppColors.dangerText,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                                 const Text(
                                   'Pas de synchronisation depuis plus de 3 jours, ou opérations refusées.',
@@ -122,7 +153,10 @@ class _ProjectAdminHomePageState extends State<ProjectAdminHomePage> {
                             const Expanded(
                               child: Text(
                                 'Synchronisation des FOSA',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                             TextButton(
@@ -132,18 +166,29 @@ class _ProjectAdminHomePageState extends State<ProjectAdminHomePage> {
                           ],
                         ),
                         if (sync.isEmpty)
-                          const ProjectAdminMessage('Aucune FOSA validée dans ce projet.')
+                          const ProjectAdminMessage(
+                            'Aucune FOSA validée dans ce projet.',
+                          )
                         else
                           ProjectAdminCard(
                             padding: EdgeInsets.zero,
                             child: Column(
                               children: [
-                                for (final (index, row) in sync.take(6).indexed) ...[
+                                for (final (index, row)
+                                    in sync.take(6).indexed) ...[
                                   if (index > 0) const Divider(height: 1),
                                   ListTile(
-                                    title: Text('${row['name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    title: Text(
+                                      '${row['name']}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                     subtitle: Text(
-                                      [row['category'], agoLabel(row['last_contact_at'])].whereType<String>().join(' · '),
+                                      [
+                                        row['category'],
+                                        agoLabel(row['last_contact_at']),
+                                      ].whereType<String>().join(' · '),
                                     ),
                                     trailing: AppBadge(
                                       label: '${row['sync_label'] ?? ''}',

@@ -49,7 +49,7 @@ class CoordinationService {
   Future<Map<String, dynamic>> dashboard({String? donorId}) => _repository.document(
     collection: 'coordination_dashboard',
     endpoint: '/coordination/dashboard',
-    query: {if (donorId != null) 'donor_id': donorId},
+    query: {'donor_id': ?donorId},
   );
 
   Future<void> validateFacility(String id) =>

@@ -55,7 +55,7 @@ class ProjectAdminService {
       _repository.document(
         collection: 'project_admin_standard_list',
         endpoint: '/project-admin/standard-list',
-        query: {if (facilityId != null) 'facility': facilityId},
+        query: {'facility': ?facilityId},
       );
 
   Future<Map<String, dynamic>> options() =>

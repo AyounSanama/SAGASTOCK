@@ -55,7 +55,7 @@ class _FakeService implements CoordinationService {
   };
 
   @override
-  Future<Map<String, dynamic>> dashboard() async => {
+  Future<Map<String, dynamic>> dashboard({String? donorId}) async => {
     'mission': {'id': 'm1', 'name': 'Coordination Yaoundé', 'country': 'Cameroun'},
     'generated_at': '2026-10-05T10:45:00Z',
     'stats': {'validated': 14, 'total': 17, 'pending': 3, 'sync_failed': 1, 'sync_late': 1},
@@ -85,6 +85,8 @@ class _FakeService implements CoordinationService {
   Future<void> reactivateFacility(String id) async {}
   @override
   Future<void> setAccountActive(String userId, {required bool active}) async {}
+  @override
+  Future<void> updateAccount(String userId, Map<String, dynamic> data) async {}
 }
 
 

@@ -68,7 +68,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
     final stats = Map<String, dynamic>.from(_data['stats'] as Map? ?? const {});
     final country = '${mission['country'] ?? ''}';
     // Dernier contact d'une FOSA de la coordination (maquette 08).
-    final syncedAgo = _ago(_data['last_sync_at']);
+    final syncedAgo = _syncedAgo(_data['last_sync_at']);
     final filters = Map<String, dynamic>.from(_data['filters'] as Map? ?? const {});
     final donors = (filters['donors'] as List? ?? const []).whereType<Map>().toList();
     return Scaffold(
@@ -310,7 +310,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
   }
 
   /// « il y a 2 min », « il y a 3 h », « il y a 6 j » ; null sans synchronisation.
-  static String? _ago(Object? value) {
+  static String? _syncedAgo(Object? value) {
     final date = DateTime.tryParse('${value ?? ''}');
     if (date == null) return null;
     final elapsed = DateTime.now().difference(date);
