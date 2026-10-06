@@ -352,6 +352,24 @@ Captures : `.tmp/ui-screenshots/lot-ma-coordination/web-tableau-de-bord.png`, `m
 
 **Reste du niveau 3** : Policies Laravel (utilisateurs, FOSA, projets) ; M-04 (opérations hors ligne antérieures à la suspension, niveau 10) ; vérification sur le vrai téléphone (APK à recompiler).
 
+## Niveau 3 — Lot 4 : Policies utilisateurs, FOSA et projets (AM-172) · 06/10/2026
+
+Les règles d'accès, jusqu'ici recopiées dans chaque contrôleur Web et API (`abort_unless` dispersés), sont regroupées dans trois Policies Laravel. Une seule règle par action, partagée par le Web, l'API et les FormRequest. Comportement inchangé : objet hors périmètre = 404 (existence non révélée), action interdite = 403, archiver son propre compte = 422.
+
+| Policy | Actions | Utilisée par |
+|---|---|---|
+| `UserPolicy` | `view`, `update`, `resetPassword`, `delete`, `restore`, `setActive` (suspendre / réactiver depuis « Ma Coordination ») | `Api\V1\UserController`, `Web\UserController`, `Web\AuthController`, `CoordinationService`. La délégation « Admin Site » de l'API (`users.update_site_admin`, `users.suspend_site_admin`) est intégrée à la même règle. |
+| `HealthFacilityPolicy` | `view`, `update` (FOSA, départements, pharmacies, sites, archivage), `coordinate` (valider, refuser, suspendre, réactiver) | `Api\V1\StructureController`, `Web\StructureController`, `SaveHealthFacilityRequest`, `CoordinationService` |
+| `ProjectPolicy` | `view`, `update`, `delete`, `restore` (Coordination : uniquement dans ses missions), `configure` (configuration médicale et Liste Standard, Coordination uniquement) | `ProjectController` (Web et API), `ProjectMedicalConfigurationController` (Web et API), `ProjectStandardListController` (Web et API), `SaveProjectRequest`, `SaveProjectMedicalConfigurationRequest` |
+
+Les permissions de route (`permission:...`) et le blocage des comptes en lecture seule (`EnforceReadOnlyAccount`) restent en place en amont ; les Policies ajoutent le contrôle objet par objet.
+
+Tests : nouveau `AccessPoliciesTest` (4 tests, deux coordinations étanches, 5 rôles chacune, contrôles croisés Web / API). Suite backend : 305 tests OK (2 541 assertions).
+
+Sécurité : aucune règle assouplie ; l'ajout d'un site à une FOSA hors projet garde son refus 403 et son message (`GovernanceMatrixTest`, `AdminProjectFacilitySiteUserFlowTest`).
+
+**Reste du niveau 3** : M-04 (niveau 10) ; vérification sur le vrai téléphone (APK à recompiler, compilation annoncée avant lancement).
+
 ## Modèle d'entrée pour les prochaines livraisons
 
 ```markdown
