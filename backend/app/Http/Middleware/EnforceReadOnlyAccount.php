@@ -18,7 +18,7 @@ class EnforceReadOnlyAccount
 
     private const ACCOUNT_PATHS = [
         'logout', 'profile', 'profile/*',
-        'api/v1/auth/logout', 'api/v1/auth/password', 'api/v1/auth/locale', 'api/v1/auth/devices/*',
+        'api/v1/auth/logout', 'api/v1/auth/password', 'api/v1/auth/locale', 'api/v1/auth/theme', 'api/v1/auth/devices/*',
         'api/v1/notifications/*',
     ];
 

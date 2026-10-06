@@ -109,7 +109,7 @@
 
         .secondary {
             background: var(--pc-color-primary-soft);
-            color: var(--pc-color-primary-strong)
+            color:var(--pc-color-primary-soft-text)
         }
 
         .success {
@@ -180,7 +180,7 @@
             padding: 5px 9px;
             border-radius: 999px;
             background: var(--pc-color-primary-soft);
-            color: var(--pc-color-primary-strong);
+            color:var(--pc-color-primary-soft-text);
             font-size: 13px
         }
 

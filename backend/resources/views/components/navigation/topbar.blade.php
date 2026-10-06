@@ -22,9 +22,14 @@
             @endforeach
         </form>
         @if(config('pharmacare_v1.features.dark_mode'))
-        <button class="topbar-theme-toggle" type="button" data-theme-toggle aria-label="{{ __('ui.enable_dark_mode') }}" title="{{ __('ui.enable_dark_mode') }}">
-            <span class="material-symbols-outlined" data-theme-icon aria-hidden="true">dark_mode</span>
-        </button>
+        {{-- Niveau 4 : Clair / Sombre / Système, enregistré dans le profil (sans rechargement si le script est actif). --}}
+        @php($themePreference = $actor?->theme_preference ?: 'light')
+        <form class="topbar-theme-switch" method="post" action="{{ route('profile.theme') }}" aria-label="{{ __('Mode d’affichage') }}" data-theme-switch data-theme-preference="{{ $themePreference }}">
+            @csrf
+            @foreach(['light' => ['light_mode', __('Clair')], 'dark' => ['dark_mode', __('Sombre')], 'system' => ['contrast', __('Système')]] as $value => [$icon, $label])
+                <button class="topbar-theme-option {{ $themePreference === $value ? 'is-active' : '' }}" type="submit" name="theme" value="{{ $value }}" data-theme-option aria-pressed="{{ $themePreference === $value ? 'true' : 'false' }}" title="{{ $label }}"><span class="material-symbols-outlined" aria-hidden="true">{{ $icon }}</span><span class="visually-hidden">{{ $label }}</span></button>
+            @endforeach
+        </form>
         @endif
     </div>
     @include('components.notification-center')

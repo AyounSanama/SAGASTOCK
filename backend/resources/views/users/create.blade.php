@@ -13,7 +13,7 @@
         input:focus,select:focus{outline:3px solid #f47a2030;border-color:var(--o)}.error{display:block;color:var(--danger);font-size:13px;margin-top:5px}.invalid{border-color:var(--danger)}
         .password-field{position:relative}.password-field input{padding-right:50px}.password-field button{position:absolute;right:4px;top:11px;width:42px;padding:8px;background:transparent;color:var(--pc-color-text-muted)}
         .notice{background:var(--pc-color-primary-soft);padding:14px;border-radius:10px;color:var(--pc-color-text-muted);font-size:14px}.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
-        button,.button{border:0;border-radius:9px;padding:12px 17px;background:var(--o);color:white;font-weight:800;text-decoration:none;cursor:pointer}.secondary{background:var(--pc-color-primary-soft);color:var(--pc-color-primary-strong)}
+        button,.button{border:0;border-radius:9px;padding:12px 17px;background:var(--o);color:white;font-weight:800;text-decoration:none;cursor:pointer}.secondary{background:var(--pc-color-primary-soft);color:var(--pc-color-primary-soft-text)}
         @media(max-width:700px){.grid{grid-template-columns:1fr}.intro,.actions{flex-direction:column}.actions .button,.actions button{width:100%;text-align:center}}
     </style>
 </head>

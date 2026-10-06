@@ -11,7 +11,11 @@
         (() => {
             try {
                 window.PC_DARK_MODE = @json((bool) config('pharmacare_v1.features.dark_mode'));
-                if (window.PC_DARK_MODE && localStorage.getItem('pc-theme') === 'dark') document.documentElement.dataset.theme = 'dark';
+                // Niveau 4 : choix du profil appliqué avant l'affichage (pas d'éclair blanc en mode sombre).
+                window.PC_THEME = @json(auth()->user()?->theme_preference);
+                const preference = window.PC_DARK_MODE ? (window.PC_THEME || localStorage.getItem('pc-theme') || 'light') : 'light';
+                const dark = preference === 'dark' || (preference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.dataset.theme = dark ? 'dark' : 'light';
             } catch (_) {}
         })();
         window.PC_I18N = {

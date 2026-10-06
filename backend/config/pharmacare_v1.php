@@ -3,7 +3,8 @@
 return [
     // Fonctions masquées en V1 (le code est conservé).
     'features' => [
-        'dark_mode' => false,
+        // Niveau 4 : mode clair / sombre validé le 06/10.
+        'dark_mode' => true,
         // Rôle « Formation sanitaire » (Admin Site) masqué pour la Coordination.
         'coordination_creates_site_admin' => false,
         // Validation clinique des ordonnances : prévue en V4 (C-07).

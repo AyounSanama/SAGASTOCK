@@ -29,6 +29,15 @@ class ProfileController extends Controller
         return back();
     }
 
+    /** Niveau 4 — Clair / Sombre / Système ; JSON pour l'enregistrement sans rechargement. */
+    public function setTheme(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate(['theme' => ['required', Rule::in(['light', 'dark', 'system'])]]);
+        $request->user()->forceFill(['theme_preference' => $data['theme']])->save();
+
+        return $request->expectsJson() ? response()->json(['theme' => $data['theme']]) : back();
+    }
+
     public function show(Request $request): View
     {
         return view('profile.show', [

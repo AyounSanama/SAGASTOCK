@@ -21,7 +21,7 @@
 .fc-field input[readonly]{background:var(--pc-color-surface-subtle,#f3f3f1);color:var(--pc-color-text-muted)}.fc-field.invalid :is(input,select){border-color:var(--pc-status-danger-text)}.fc-error{display:block;margin-top:5px;color:var(--pc-status-danger-text);font-size:13px;font-weight:600}
 .fc-legend{font-weight:600;font-size:14px;margin:4px 0 8px}.fc-chips{display:flex;flex-wrap:wrap;gap:8px}
 .fc-chip{position:relative;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;border:1px solid var(--pc-color-border);background:var(--pc-color-surface,#fff);font-size:14px;cursor:pointer}.fc-chip input{width:16px;height:16px;margin:0;accent-color:var(--pc-color-primary-strong)}
-.fc-chip:has(input:checked){border-color:var(--pc-color-primary);background:var(--pc-color-primary-soft);color:var(--pc-color-primary-strong)}.fc-help{margin:8px 0 0;color:var(--pc-color-text-muted);font-size:13px}
+.fc-chip:has(input:checked){border-color:var(--pc-color-primary);background:var(--pc-color-primary-soft);color:var(--pc-color-primary-soft-text)}.fc-help{margin:8px 0 0;color:var(--pc-color-text-muted);font-size:13px}
 .fc-count{font-size:30px;font-weight:800;color:var(--pc-color-primary-strong)}.fc-count small{font-size:15px;font-weight:600;color:var(--pc-color-text-muted);margin-left:6px}
 .fc-switch{display:flex;justify-content:space-between;align-items:center;gap:12px;font-weight:600}.fc-switch input{width:22px;height:22px;accent-color:var(--pc-color-primary-strong)}
 .fc-actions{display:flex;gap:10px}

@@ -105,6 +105,15 @@ class AuthController extends Controller
         return response()->json(['user' => $this->userPayload($request->user()->refresh())]);
     }
 
+    /** Niveau 4 — Mode d'affichage (Clair / Sombre / Système), partagé avec le Web. */
+    public function updateTheme(Request $request): JsonResponse
+    {
+        $data = $request->validate(['theme_preference' => ['required', Rule::in(['light', 'dark', 'system'])]]);
+        $request->user()->update($data);
+
+        return response()->json(['user' => $this->userPayload($request->user()->refresh())]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()?->delete();
@@ -151,6 +160,7 @@ class AuthController extends Controller
             'email' => $user->email,
             'phone' => $user->phone,
             'preferred_locale' => $user->preferred_locale ?: 'fr',
+            'theme_preference' => $user->theme_preference ?: 'light',
             'organization_id' => $organization?->id,
             'organization' => $organization ? [
                 'id' => $organization->id,

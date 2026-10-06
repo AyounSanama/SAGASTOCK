@@ -7,20 +7,18 @@ window.pcTranslate = value => {
         : value;
 };
 
-function applyTheme(theme) {
-    const isDark = theme === 'dark';
-    document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+// Niveau 4 — Clair / Sombre / Système. « Système » suit le réglage de l'appareil.
+const systemDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+const resolveTheme = preference => preference === 'system' ? (systemDark?.matches ? 'dark' : 'light') : (preference === 'dark' ? 'dark' : 'light');
 
-    const toggle = document.querySelector('[data-theme-toggle]');
-    if (toggle) {
-        const icon = toggle.querySelector('[data-theme-icon]');
-        const label = isDark
-            ? (window.PC_I18N?.locale === 'en' ? 'Enable light mode' : 'Activer le mode clair')
-            : (window.PC_I18N?.locale === 'en' ? 'Enable dark mode' : 'Activer le mode sombre');
-        if (icon) icon.textContent = isDark ? 'light_mode' : 'dark_mode';
-        toggle.setAttribute('aria-label', label);
-        toggle.title = label;
-    }
+function applyTheme(preference) {
+    document.documentElement.dataset.theme = resolveTheme(preference);
+    document.documentElement.dataset.themePreference = preference;
+    document.querySelectorAll('[data-theme-option]').forEach(option => {
+        const active = option.value === preference;
+        option.classList.toggle('is-active', active);
+        option.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
 }
 
 function translateText(root) {
@@ -71,17 +69,27 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('offline', renderConnection);
     renderConnection();
 
-    let savedTheme = 'light';
-    // Mode sombre masqué en V1 : thème clair imposé, même si un choix est mémorisé.
-    if (window.PC_DARK_MODE) {
-        try { savedTheme = localStorage.getItem(themeKey) || 'light'; } catch (_) {}
+    // Choix enregistré dans le profil (serveur), sinon dernier choix de ce navigateur.
+    const themeSwitch = document.querySelector('[data-theme-switch]');
+    let preference = 'light';
+    if (window.PC_DARK_MODE !== false && (themeSwitch || window.PC_DARK_MODE)) {
+        let stored = null;
+        try { stored = localStorage.getItem(themeKey); } catch (_) {}
+        preference = themeSwitch?.dataset.themePreference || window.PC_THEME || stored || 'light';
     }
-    applyTheme(savedTheme);
+    applyTheme(preference);
+    systemDark?.addEventListener?.('change', () => { if (preference === 'system') applyTheme('system'); });
 
-    document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
-        const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-        try { localStorage.setItem(themeKey, nextTheme); } catch (_) {}
-        applyTheme(nextTheme);
+    themeSwitch?.addEventListener('click', event => {
+        const option = event.target.closest('[data-theme-option]');
+        if (!option) return;
+        event.preventDefault();
+        preference = option.value;
+        applyTheme(preference);
+        try { localStorage.setItem(themeKey, preference); } catch (_) {}
+        const data = new FormData(themeSwitch);
+        data.set('theme', preference);
+        fetch(themeSwitch.action, { method: 'POST', body: data, headers: { Accept: 'application/json' }, credentials: 'same-origin' }).catch(() => {});
     });
 
     translateText(document.body);

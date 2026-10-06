@@ -152,6 +152,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/security/roles/{role}', [SecurityController::class, 'destroy'])->middleware('permission:roles.manage')->name('security.roles.destroy');
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::post('/profile/locale', [ProfileController::class, 'setLocale'])->name('profile.locale');
+    Route::post('/profile/theme', [ProfileController::class, 'setTheme'])->name('profile.theme');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
     Route::delete('/profile/devices/{device}', [ProfileController::class, 'revoke'])->name('profile.devices.revoke');

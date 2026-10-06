@@ -151,6 +151,7 @@ Route::prefix('v1')->group(function (): void {
         });
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::put('/auth/locale', [AuthController::class, 'updateLocale']);
+        Route::put('/auth/theme', [AuthController::class, 'updateTheme']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::put('/auth/password', [PasswordController::class, 'update']);
         Route::get('/auth/devices', [DeviceController::class, 'index']);

@@ -17,7 +17,7 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, HasUuids, Notifiable, SoftDeletes;
 
-    protected $fillable = ['organization_id', 'name', 'first_name', 'last_name', 'username', 'email', 'phone', 'preferred_locale', 'password', 'is_active', 'must_change_password', 'read_only', 'last_login_at', 'password_changed_at', 'failed_login_attempts', 'locked_until'];
+    protected $fillable = ['organization_id', 'name', 'first_name', 'last_name', 'username', 'email', 'phone', 'preferred_locale', 'theme_preference', 'password', 'is_active', 'must_change_password', 'read_only', 'last_login_at', 'password_changed_at', 'failed_login_attempts', 'locked_until'];
     protected $hidden = ['password', 'remember_token'];
 
     /** S-01 : un compte désactivé ou archivé perd immédiatement ses jetons. */
