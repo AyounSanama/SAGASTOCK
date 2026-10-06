@@ -30,5 +30,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(HealthFacility::class, HealthFacilityPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
+
+        // Base réelle et copie de travail : pas de migrate:fresh / refresh / reset ni db:wipe.
+        \App\Support\DatabaseGuard::prohibitDestructiveCommands();
     }
 }
