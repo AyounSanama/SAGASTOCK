@@ -67,7 +67,8 @@ class StandardListCatalogService
     public static function productRules(string $prefix = ''): array
     {
         $rules = [
-            'code' => ['required', 'string', 'max:60', 'regex:/^[A-Za-z0-9._\/-]+$/'],
+            // Lettres accentuées acceptées (codification propre à chaque ONG) ; pas d'espace.
+            'code' => ['required', 'string', 'max:60', 'regex:/^[\pL\pM\pN._\/-]+$/u'],
             'name' => ['required', 'string', 'max:190'],
             'packaging' => ['nullable', 'string', 'max:190'],
             'barcode' => ['nullable', 'string', 'max:190'],
@@ -81,7 +82,7 @@ class StandardListCatalogService
 
         return [
             collect($rules)->mapWithKeys(fn ($rule, $field) => [$key($field) => $rule])->all(),
-            [$key('code').'.regex' => 'Le code ne contient que des lettres, chiffres, points, tirets, barres obliques et tirets bas.'],
+            [$key('code').'.regex' => 'Le code ne contient que des lettres (accents compris), chiffres, points, tirets, barres obliques et tirets bas, sans espace.'],
             collect($labels)->mapWithKeys(fn ($label, $field) => [$key($field) => $label])->all(),
         ];
     }

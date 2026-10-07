@@ -203,7 +203,7 @@
         outline-offset: 2px
     }
 
-    body.pc-app button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not(.nav-group-toggle):not(.oa-configure):not(.topbar-locale-option):not(.topbar-theme-toggle):not(.profile-theme-option):not([data-toggle="password"]):not([data-password-toggle]):not([class*="btn-"]),
+    body.pc-app button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not(.nav-group-toggle):not(.oa-configure):not(.topbar-locale-option):not(.topbar-theme-toggle):not(.profile-theme-option):not(.pa-btn):not(.wz-btn):not(.mc-btn):not(.sl-chip):not(.wz-link):not([data-toggle="password"]):not([data-password-toggle]):not([class*="btn-"]),
     body.pc-app .button:not(.secondary):not(.danger):not(.success):not([class*="btn-"]),
     body.pc-app .btn-primary {
         background: var(--pc-color-primary-strong) !important;

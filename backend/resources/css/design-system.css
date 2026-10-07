@@ -216,7 +216,7 @@ body.pc-app[data-theme="dark"], :root[data-theme="dark"] body.pc-app { color:var
 
 /* AM-160 — Survol / appui des boutons principaux : toujours plus foncé que #B85D00. */
 body.pc-app :is(.btn-primary,.button.primary,.app-button--primary):is(:hover,:active),
-body.pc-app button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not(.nav-group-toggle):not(.oa-configure):not(.topbar-locale-option):not(.topbar-theme-toggle):not(.profile-theme-option):not([data-toggle="password"]):not([data-password-toggle]):not([class*="btn-"]):not([class*="app-"]):is(:hover,:active) {
+body.pc-app button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not(.nav-group-toggle):not(.oa-configure):not(.topbar-locale-option):not(.topbar-theme-toggle):not(.profile-theme-option):not(.pa-btn):not(.wz-btn):not(.mc-btn):not(.sl-chip):not(.wz-link):not([data-toggle="password"]):not([data-password-toggle]):not([class*="btn-"]):not([class*="app-"]):is(:hover,:active) {
     background:var(--pc-color-primary-strong-hover)!important;
 }
 /* Menu latéral sombre : compte et déconnexion. */
@@ -285,3 +285,5 @@ body.pc-app .topbar-profile-copy strong { font-size:16px!important; font-weight:
 .profile-theme-options { display:flex; flex-wrap:wrap; gap:10px; }
 body.pc-app .profile-theme-option { display:inline-flex!important; align-items:center; gap:8px; min-height:42px; padding:8px 16px!important; border:1px solid var(--pc-color-border)!important; border-radius:10px!important; background:var(--pc-color-surface)!important; color:var(--pc-color-text)!important; font:inherit; font-weight:600; cursor:pointer; box-shadow:none!important; }
 body.pc-app .profile-theme-option.is-active { border-color:var(--pc-color-primary-strong)!important; background:var(--pc-color-primary-soft)!important; color:var(--pc-color-primary-soft-text)!important; }
+/* Fenêtres « Ajouter un produit », « Importer », « Code-barres » : toujours au centre de l'écran. */
+body.pc-app dialog:is(.sl-dialog,.wz-dialog)[open] { position:fixed; inset:0; margin:auto; max-height:calc(100dvh - 48px); overflow:auto; }

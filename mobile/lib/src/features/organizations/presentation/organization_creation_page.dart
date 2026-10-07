@@ -8,7 +8,8 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/security/password_policy.dart';
 import '../data/organization_service.dart';
 
-final RegExp _adminUsernamePattern = RegExp(r'^[A-Za-z0-9_-]+$');
+// Comme le serveur (alpha_dash) : lettres accentuées acceptées, sans espace.
+final RegExp _adminUsernamePattern = RegExp(r'^[\p{L}\p{M}\p{N}_-]+$', unicode: true);
 
 String? validateOrganizationAdminUsername(String? value) {
   final username = value?.trim() ?? '';

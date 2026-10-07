@@ -38,6 +38,7 @@ void main() {
     expect(validateOrganizationAdminUsername('jean_coordination'), isNull);
     expect(validateOrganizationAdminUsername('jean-coordination'), isNull);
     expect(validateOrganizationAdminUsername('JeanCoordination01'), isNull);
+    expect(validateOrganizationAdminUsername('hélène_coordination'), isNull, reason: 'accents acceptés comme sur le serveur');
     expect(validateOrganizationAdminUsername('jean coordination'), isNotNull);
     expect(validateOrganizationAdminUsername('jean@coordination'), isNotNull);
   });

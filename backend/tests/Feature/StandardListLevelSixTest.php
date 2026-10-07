@@ -153,6 +153,12 @@ class StandardListLevelSixTest extends TestCase
         $draft = StandardListVersion::where('status', 'draft')->latest('version_number')->firstOrFail();
         $this->assertEqualsCanonicalizing([$this->act->id, $this->diazepam->id, $product->id], $draft->products()->pluck('products.id')->all());
 
+        // Accents acceptés dans le code, la désignation et le conditionnement.
+        $this->actingAs($this->coordination)->post(route('coordination.standard-list.products.store', $this->project), [
+            'code' => 'PARACÉTAMOL-500', 'name' => 'Paracétamol 500 mg à libération prolongée', 'packaging' => 'Comprimé, boîte de 1000',
+        ])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('products', ['code' => 'PARACÉTAMOL-500', 'name' => 'Paracétamol 500 mg à libération prolongée']);
+
         // Code déjà utilisé : refusé.
         $this->actingAs($this->coordination)->from(route('projects.wizard.show', [$this->project, 'standard-list']))
             ->put(route('projects.wizard.standard-list.products.store', $this->project), [...$this->state(), 'new_product' => ['code' => 'ONG-AMOX-500', 'name' => 'Doublon']])
