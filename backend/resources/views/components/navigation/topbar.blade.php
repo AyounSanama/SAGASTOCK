@@ -22,13 +22,14 @@
             @endforeach
         </form>
         @if(config('pharmacare_v1.features.dark_mode'))
-        {{-- Niveau 4 : Clair / Sombre / Système, enregistré dans le profil (sans rechargement si le script est actif). --}}
+        {{-- Un seul bouton : lune en mode clair, soleil en mode sombre. « Système » se choisit dans Mon profil. --}}
         @php($themePreference = $actor?->theme_preference ?: 'light')
-        <form class="topbar-theme-switch" method="post" action="{{ route('profile.theme') }}" aria-label="{{ __('Mode d’affichage') }}" data-theme-switch data-theme-preference="{{ $themePreference }}">
+        <form class="topbar-theme-switch" method="post" action="{{ route('profile.theme') }}" data-theme-switch data-theme-preference="{{ $themePreference }}">
             @csrf
-            @foreach(['light' => ['light_mode', __('Clair')], 'dark' => ['dark_mode', __('Sombre')], 'system' => ['contrast', __('Système')]] as $value => [$icon, $label])
-                <button class="topbar-theme-option {{ $themePreference === $value ? 'is-active' : '' }}" type="submit" name="theme" value="{{ $value }}" data-theme-option aria-pressed="{{ $themePreference === $value ? 'true' : 'false' }}" title="{{ $label }}"><span class="material-symbols-outlined" aria-hidden="true">{{ $icon }}</span><span class="visually-hidden">{{ $label }}</span></button>
-            @endforeach
+            <button class="topbar-icon topbar-theme-toggle" type="submit" name="theme" value="{{ $themePreference === 'dark' ? 'light' : 'dark' }}" data-theme-toggle
+                aria-label="{{ $themePreference === 'dark' ? __('Passer en mode clair') : __('Passer en mode sombre') }}" title="{{ $themePreference === 'dark' ? __('Passer en mode clair') : __('Passer en mode sombre') }}">
+                <span class="material-symbols-outlined" aria-hidden="true" data-theme-icon>{{ $themePreference === 'dark' ? 'light_mode' : 'dark_mode' }}</span>
+            </button>
         </form>
         @endif
     </div>
@@ -36,9 +37,10 @@
     <details class="profile-menu">
         <summary class="topbar-profile" aria-label="Menu utilisateur">
             <span class="profile-avatar">{{ $initials }}</span>
-            <span class="topbar-profile-copy"><strong>{{ $actor?->name }}</strong><small>{{ $actor?->email }}</small></span>
+            <span class="topbar-profile-copy"><strong>{{ $actor?->name }}</strong></span>
         </summary>
         <div class="profile-menu-panel">
+            <p class="profile-menu-email">{{ $actor?->email }}</p>
             <a href="{{ route('profile.show') }}">{{ __('Mon profil') }}</a>
             <form method="post" action="{{ route('logout') }}">@csrf<button class="secondary" type="submit">{{ __('Déconnexion') }}</button></form>
         </div>

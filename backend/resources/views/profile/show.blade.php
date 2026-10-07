@@ -14,6 +14,19 @@
     <div class="profile-actions"><x-app-button type="submit" icon="save">Enregistrer les modifications</x-app-button></div>
    </form>
   </section>
+  @if(config('pharmacare_v1.features.dark_mode'))
+  {{-- Le bouton lune / soleil de la barre du haut bascule Clair / Sombre ; « Système » se choisit ici. --}}
+  @php($themePreference = $user->theme_preference ?: 'light')
+  <section class="profile-card"><header><span class="material-symbols-outlined">contrast</span><div><h2>Mode d’affichage</h2><p>« Système » suit le réglage de votre ordinateur ou de votre téléphone.</p></div></header>
+   <form class="profile-form profile-theme" method="post" action="{{ route('profile.theme') }}" data-theme-switch data-theme-preference="{{ $themePreference }}">@csrf
+    <div class="profile-theme-options" role="group" aria-label="Mode d’affichage">
+     @foreach(['light' => ['light_mode', 'Clair'], 'dark' => ['dark_mode', 'Sombre'], 'system' => ['contrast', 'Système']] as $value => [$icon, $label])
+      <button class="profile-theme-option {{ $themePreference === $value ? 'is-active' : '' }}" type="submit" name="theme" value="{{ $value }}" data-theme-option aria-pressed="{{ $themePreference === $value ? 'true' : 'false' }}"><span class="material-symbols-outlined" aria-hidden="true">{{ $icon }}</span>{{ $label }}</button>
+     @endforeach
+    </div>
+   </form>
+  </section>
+  @endif
   <section class="profile-card"><header><span class="material-symbols-outlined">lock</span><div><h2>Modifier le mot de passe</h2><p>Utilisez un mot de passe robuste et personnel.</p></div></header>
    <form class="profile-form" method="post" action="{{ route('profile.password') }}">@csrf @method('PUT')
     @foreach([['current_password','Mot de passe actuel','current-password'],['password','Nouveau mot de passe','new-password'],['password_confirmation','Confirmation','new-password']] as [$name,$label,$autocomplete])

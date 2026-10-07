@@ -216,7 +216,7 @@ body.pc-app[data-theme="dark"], :root[data-theme="dark"] body.pc-app { color:var
 
 /* AM-160 — Survol / appui des boutons principaux : toujours plus foncé que #B85D00. */
 body.pc-app :is(.btn-primary,.button.primary,.app-button--primary):is(:hover,:active),
-body.pc-app button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not(.nav-group-toggle):not(.oa-configure):not(.topbar-locale-option):not(.topbar-theme-toggle):not([data-toggle="password"]):not([data-password-toggle]):not([class*="btn-"]):not([class*="app-"]):is(:hover,:active) {
+body.pc-app button:not(.secondary):not(.danger):not(.success):not(.form-sheet-close):not(.logout-button):not(.nav-group-toggle):not(.oa-configure):not(.topbar-locale-option):not(.topbar-theme-toggle):not(.profile-theme-option):not([data-toggle="password"]):not([data-password-toggle]):not([class*="btn-"]):not([class*="app-"]):is(:hover,:active) {
     background:var(--pc-color-primary-strong-hover)!important;
 }
 /* Menu latéral sombre : compte et déconnexion. */
@@ -261,3 +261,27 @@ body.pc-app form :is(.notice,.message):not(.error):not(.success) { background:va
 .app-sidebar-context strong { color:#FFFFFF; font-size:13px; font-weight:600; }
 .sidebar-collapsed .app-sidebar-context { display:none; }
 @media (max-width:760px) { .topbar-breadcrumb, .topbar-connection [data-connection-label], .topbar-profile-copy { display:none; } .topbar-connection { padding:0 8px; } }
+
+/* Barre du haut — disposition validée : [FR | EN] · lune/soleil · cloche · avatar rond + nom. */
+body.pc-app .topbar-tools { gap:16px; }
+body.pc-app .topbar-locale-switch { height:auto!important; padding:4px!important; gap:2px; border:1px solid var(--pc-color-border)!important; border-radius:12px!important; background:var(--pc-color-surface)!important; }
+body.pc-app .topbar-locale-option { min-width:44px!important; min-height:34px!important; padding:6px 10px!important; border-radius:9px!important; font-size:14px!important; font-weight:700!important; color:var(--pc-color-text-muted)!important; background:transparent!important; box-shadow:none!important; }
+body.pc-app .topbar-locale-option:hover:not(.is-active) { color:var(--pc-color-text)!important; }
+body.pc-app .topbar-locale-option.is-active { background:var(--pc-color-primary-strong)!important; color:#fff!important; box-shadow:none!important; }
+body.pc-app .topbar-theme-switch { height:auto!important; padding:0!important; border:0!important; background:transparent!important; }
+body.pc-app :is(.topbar-theme-toggle,.notification-center .topbar-icon) { width:42px!important; height:42px!important; border:0!important; border-radius:50%!important; background:transparent!important; color:var(--pc-color-text)!important; box-shadow:none!important; }
+body.pc-app :is(.topbar-theme-toggle,.notification-center .topbar-icon):hover { background:var(--pc-color-background)!important; }
+body.pc-app :is(.topbar-theme-toggle,.notification-center .topbar-icon) .material-symbols-outlined { font-size:26px!important; font-variation-settings:'wght' 300; }
+body.pc-app .topbar-profile { gap:12px!important; padding:0!important; background:transparent!important; border:0!important; }
+body.pc-app .profile-avatar { width:44px!important; height:44px!important; display:grid!important; place-items:center; border-radius:50%!important; background:var(--pc-color-primary-strong)!important; color:#fff!important; font-size:17px!important; font-weight:500!important; }
+body.pc-app .topbar-profile-copy strong { font-size:16px!important; font-weight:700!important; color:var(--pc-color-text)!important; white-space:nowrap!important; }
+.profile-menu-email { margin:0; padding:0 8px 8px; border-bottom:1px solid var(--pc-color-border); color:var(--pc-color-text-muted); font-size:13px; overflow-wrap:anywhere; }
+:root[data-theme="dark"] body.pc-app .topbar-locale-switch { background:var(--pc-color-surface-subtle)!important; }
+:root[data-theme="dark"] body.pc-app .topbar-locale-option.is-active { background:var(--pc-color-primary-strong)!important; color:#fff!important; }
+:root[data-theme="dark"] body.pc-app :is(.topbar-theme-toggle,.notification-center .topbar-icon) { background:transparent!important; color:var(--pc-color-text)!important; }
+:root[data-theme="dark"] body.pc-app :is(.topbar-theme-toggle,.notification-center .topbar-icon):hover { background:var(--pc-color-surface-subtle)!important; }
+@media (max-width:760px) { body.pc-app .topbar-tools { gap:6px; } body.pc-app .topbar-locale-option { min-width:36px!important; padding:5px 7px!important; } }
+/* Mon profil — mode d'affichage. */
+.profile-theme-options { display:flex; flex-wrap:wrap; gap:10px; }
+body.pc-app .profile-theme-option { display:inline-flex!important; align-items:center; gap:8px; min-height:42px; padding:8px 16px!important; border:1px solid var(--pc-color-border)!important; border-radius:10px!important; background:var(--pc-color-surface)!important; color:var(--pc-color-text)!important; font:inherit; font-weight:600; cursor:pointer; box-shadow:none!important; }
+body.pc-app .profile-theme-option.is-active { border-color:var(--pc-color-primary-strong)!important; background:var(--pc-color-primary-soft)!important; color:var(--pc-color-primary-soft-text)!important; }

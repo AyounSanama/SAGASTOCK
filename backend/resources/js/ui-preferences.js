@@ -19,6 +19,16 @@ function applyTheme(preference) {
         option.classList.toggle('is-active', active);
         option.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
+    // Bouton unique de la barre du haut : lune en mode clair, soleil en mode sombre.
+    const dark = resolveTheme(preference) === 'dark';
+    document.querySelectorAll('[data-theme-toggle]').forEach(toggle => {
+        const label = dark ? 'Passer en mode clair' : 'Passer en mode sombre';
+        toggle.value = dark ? 'light' : 'dark';
+        toggle.setAttribute('aria-label', window.pcTranslate ? window.pcTranslate(label) : label);
+        toggle.title = toggle.getAttribute('aria-label');
+        const icon = toggle.querySelector('[data-theme-icon]');
+        if (icon) icon.textContent = dark ? 'light_mode' : 'dark_mode';
+    });
 }
 
 function translateText(root) {
@@ -80,17 +90,19 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(preference);
     systemDark?.addEventListener?.('change', () => { if (preference === 'system') applyTheme('system'); });
 
-    themeSwitch?.addEventListener('click', event => {
-        const option = event.target.closest('[data-theme-option]');
+    // Barre du haut (lune / soleil) et page « Mon profil » (Clair / Sombre / Système).
+    document.querySelectorAll('[data-theme-switch]').forEach(form => form.addEventListener('click', event => {
+        const option = event.target.closest('[data-theme-option],[data-theme-toggle]');
         if (!option) return;
         event.preventDefault();
-        preference = option.value;
+        // Le bouton unique bascule vers le mode inverse de celui affiché (y compris depuis « Système »).
+        preference = option.matches('[data-theme-toggle]') ? (resolveTheme(preference) === 'dark' ? 'light' : 'dark') : option.value;
         applyTheme(preference);
         try { localStorage.setItem(themeKey, preference); } catch (_) {}
-        const data = new FormData(themeSwitch);
+        const data = new FormData(form);
         data.set('theme', preference);
-        fetch(themeSwitch.action, { method: 'POST', body: data, headers: { Accept: 'application/json' }, credentials: 'same-origin' }).catch(() => {});
-    });
+        fetch(form.action, { method: 'POST', body: data, headers: { Accept: 'application/json' }, credentials: 'same-origin' }).catch(() => {});
+    }));
 
     translateText(document.body);
     document.title = window.pcTranslate(document.title);
