@@ -61,7 +61,7 @@ class SiteScopeStabilisationTest extends TestCase
         $this->get('/profile')->assertOk();
         $product = $organization->products()->create(['code' => 'MED', 'name' => 'Medicament test', 'product_type' => 'medicine', 'is_active' => true]);
         $receiptId = $this->postJson("$base/receipts", [
-            'site_id' => $siteId, 'reference' => 'RECEPTION-A', 'received_on' => today()->toDateString(),
+            'site_id' => $siteId, 'reference' => 'RECEPTION-A', 'received_on' => today()->toDateString(), 'origin_type' => 'other', 'origin_label' => 'Fournisseur test',
             'items' => [['product_id' => $product->id, 'batch_number' => 'LOT-A', 'expires_on' => today()->addYear()->toDateString(), 'quantity_ordered' => 10, 'quantity_received' => 10, 'quantity_accepted' => 10]],
         ])->assertCreated()->json('receipt.id');
         $this->postJson("$base/receipts/$receiptId/validate")->assertOk()->assertJsonPath('receipt.status', 'validated');

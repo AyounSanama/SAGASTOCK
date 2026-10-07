@@ -55,6 +55,18 @@ void main() {
     expect(source, contains('acceptée + rejetée'));
   });
 
+  test('niveau 7 : réception avec origine obligatoire (couple ONG/Bailleur ou Autre)', () {
+    final source = File(
+      'lib/src/features/receipts/presentation/receipts_page.dart',
+    ).readAsStringSync();
+    expect(source, contains("labelText: 'Origine (couple ONG/Bailleur) *'"));
+    expect(source, contains("'Choisissez l’origine de l’entrée.'"));
+    expect(source, contains("'origin_type': _originChoice == 'other' ? 'other' : 'project'"));
+    expect(source, contains("labelText: 'Nom du fournisseur tiers *'"));
+    // Les couples proposés sont ceux du site choisi (projets de sa FOSA).
+    expect(source, contains("?['origins']"));
+  });
+
   test('inventory uses four validated PageView steps', () {
     final source = File(
       'lib/src/features/inventories/presentation/inventories_page.dart',

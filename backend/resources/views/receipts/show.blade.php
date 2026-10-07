@@ -11,7 +11,7 @@
 <div class="meta-box"><span>Date de réception</span><strong>{{ $receipt->received_on?->format('d/m/Y') }}</strong></div>
 <div class="meta-box"><span>Site destinataire</span><strong>{{ $receipt->site?->name }}</strong></div>
 <div class="meta-box"><span>Formation sanitaire</span><strong>{{ $receipt->site?->healthFacility?->name }}</strong></div>
-<div class="meta-box"><span>Fournisseur / origine</span><strong>{{ $receipt->supplier?->name ?? 'Non renseigné' }}</strong></div>
+<div class="meta-box"><span>Origine (couple ONG/Bailleur)</span><strong>{{ $receipt->origin_type ? app(App\Services\StockOriginService::class)->label($receipt->originProject, $receipt->origin_label) : 'Non renseignée' }}</strong></div><div class="meta-box"><span>Fournisseur</span><strong>{{ $receipt->supplier?->name ?? 'Non renseigné' }}</strong></div>
 </section>
 <section class="report-stats">
 <div class="report-stat"><span>Quantité commandée</span><strong>{{ number_format($totals['ordered'],2,',',' ') }}</strong></div>

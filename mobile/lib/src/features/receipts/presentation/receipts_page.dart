@@ -397,7 +397,7 @@ class _ReceiptCard extends StatelessWidget {
             ),
             const SizedBox(height: 3),
             Text(
-              '${items.length} ligne(s) · ${receipt['supplier']?['name'] ?? 'Origine non renseignée'}',
+              '${items.length} ligne(s) · ${receipt['origin_display'] ?? receipt['supplier']?['name'] ?? 'Origine non renseignée'}',
               style: TextStyle(color: AppTheme.muted, fontSize: 11),
             ),
             if (onValidate != null) ...[
@@ -451,9 +451,26 @@ class _ReceiptFormState extends State<_ReceiptForm> {
   );
   final _orderReference = TextEditingController();
   final _notes = TextEditingController();
+  final _originLabel = TextEditingController();
   final _lines = <_ReceiptLine>[_ReceiptLine()];
   String? _siteId;
   String? _supplierId;
+  // Niveau 7 : origine = couple ONG/Bailleur (projet de la FOSA) ou « other ».
+  String? _originChoice;
+
+  List<Map<String, dynamic>> get _origins => [
+    for (final origin
+        in (widget.sites
+                    .where((site) => '${site['id']}' == _siteId)
+                    .firstOrNull?['origins']
+                as List? ??
+            const []))
+      Map<String, dynamic>.from(origin as Map),
+  ];
+
+  String get _originSummary => _originChoice == 'other'
+      ? 'Autre · ${_originLabel.text.trim()}'
+      : '${_origins.where((origin) => '${origin['project_id']}' == _originChoice).firstOrNull?['label'] ?? 'Non renseignée'}';
   DateTime _receivedOn = DateTime.now();
   bool _saving = false;
   String? _error;
@@ -464,6 +481,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
     _reference.dispose();
     _orderReference.dispose();
     _notes.dispose();
+    _originLabel.dispose();
     for (final line in _lines) {
       line.dispose();
     }
@@ -497,6 +515,9 @@ class _ReceiptFormState extends State<_ReceiptForm> {
       final online = await widget.onSubmit({
         'site_id': _siteId,
         if (_supplierId != null) 'supplier_id': _supplierId,
+        'origin_type': _originChoice == 'other' ? 'other' : 'project',
+        if (_originChoice != 'other') 'origin_project_id': _originChoice,
+        if (_originChoice == 'other') 'origin_label': _originLabel.text.trim(),
         'reference': _reference.text.trim(),
         if (_orderReference.text.trim().isNotEmpty)
           'order_reference': _orderReference.text.trim(),
@@ -580,16 +601,68 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                                 ),
                               )
                               .toList(),
-                          onChanged: (value) => _siteId = value,
+                          onChanged: (value) => setState(() {
+                            _siteId = value;
+                            // Les couples ONG/Bailleur dépendent de la FOSA du site.
+                            if (_originChoice != 'other') _originChoice = null;
+                          }),
                           validator: (value) => value == null
                               ? 'Sélectionnez un point de dispensation.'
                               : null,
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
+                          key: ValueKey('origin-$_siteId'),
+                          initialValue: _originChoice,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: 'Origine (couple ONG/Bailleur) *',
+                            prefixIcon: const Icon(Icons.handshake_outlined),
+                            helperText: _siteId != null && _origins.isEmpty
+                                ? 'Aucun projet pour ce site : choisissez « Autre ».'
+                                : null,
+                          ),
+                          items: [
+                            for (final origin in _origins)
+                              DropdownMenuItem(
+                                value: '${origin['project_id']}',
+                                child: Text(
+                                  '${origin['label']}',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            const DropdownMenuItem(
+                              value: 'other',
+                              child: Text('Autre (fournisseur tiers)'),
+                            ),
+                          ],
+                          onChanged: _siteId == null
+                              ? null
+                              : (value) =>
+                                    setState(() => _originChoice = value),
+                          validator: (value) => value == null
+                              ? 'Choisissez l’origine de l’entrée.'
+                              : null,
+                        ),
+                        if (_originChoice == 'other') ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _originLabel,
+                            decoration: const InputDecoration(
+                              labelText: 'Nom du fournisseur tiers *',
+                              hintText: 'Ex. Pharmacie régionale, don ponctuel',
+                            ),
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                ? 'Indiquez qui a livré ces produits.'
+                                : null,
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
                           initialValue: _supplierId,
                           decoration: const InputDecoration(
-                            labelText: 'Fournisseur / origine',
+                            labelText: 'Fournisseur',
                             prefixIcon: Icon(Icons.local_shipping_outlined),
                           ),
                           items: widget.suppliers
@@ -691,13 +764,14 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                 _body(
                   Column(
                     children: [
+                      _ReceiptSummaryLine('Origine', _originSummary),
                       _ReceiptSummaryLine(
-                        'Origine',
+                        'Fournisseur',
                         widget.suppliers
                                 .where((s) => '${s['id']}' == _supplierId)
                                 .firstOrNull?['name']
                                 ?.toString() ??
-                            'Non renseignée',
+                            'Non renseigné',
                       ),
                       _ReceiptSummaryLine('Date', _date(_receivedOn)),
                       _ReceiptSummaryLine('Référence', _reference.text),

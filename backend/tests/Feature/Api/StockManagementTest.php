@@ -198,7 +198,7 @@ class StockManagementTest extends TestCase
             ->assertJsonPath('sites.0.name', 'Magasin central')
             ->assertJsonPath('products.0.code', 'PARA');
         $receipt = $this->postJson("/api/v1/organizations/{$d['organization']->id}/receipts", [
-            'site_id' => $d['source']->id, 'reference' => 'REC_001', 'order_reference' => 'CMD_001',
+            'site_id' => $d['source']->id, 'reference' => 'REC_001', 'order_reference' => 'CMD_001', 'origin_type' => 'other', 'origin_label' => 'Fournisseur test',
             'received_on' => now()->toDateString(), 'items' => [[
                 'batch_id' => $d['early']->id, 'quantity_ordered' => 20, 'quantity_received' => 18,
                 'quantity_accepted' => 17, 'quantity_rejected' => 1, 'discrepancy_reason' => 'Deux manquants et une boîte endommagée',
@@ -223,6 +223,7 @@ class StockManagementTest extends TestCase
 
         $this->actingAs($user)->post("/organizations/{$d['organization']->id}/receipts", [
             'site_id' => $d['source']->id,
+            'origin_choice' => 'other', 'origin_label' => 'Fournisseur test',
             'reference' => 'REC_WEB_001',
             'order_reference' => 'CMD_WEB_001',
             'received_on' => now()->toDateString(),

@@ -9,6 +9,7 @@ use App\Models\Receipt;
 use App\Models\Site;
 use App\Notifications\OperationalNotification;
 use App\Services\AuditService;
+use App\Services\StockOriginService;
 use App\Services\ModuleActivationService;
 use App\Services\StockLedgerService;
 use App\Services\UserScopeService;
@@ -42,7 +43,7 @@ class ReceiptController extends Controller
     {
         $this->access($request, $organization, 'stocks.view');
         $siteIds = $this->siteIds($request, $organization);
-        $receipts = Receipt::with(['site.healthFacility', 'supplier', 'items.product', 'items.batch'])
+        $receipts = Receipt::with(['site.healthFacility', 'supplier', 'items.product', 'items.batch', 'originProject.organization:id,name', 'originProject.donors:id,name'])
             ->where('organization_id', $organization->id)
             ->whereIn('site_id', $siteIds)
             ->when($request->input('site_id'), fn ($query, $id) => $query->where('site_id', $id))
@@ -67,11 +68,17 @@ class ReceiptController extends Controller
                 ->sum('quantity_received'),
         ];
 
+        $origins = app(StockOriginService::class);
+        $sites = Site::with('healthFacility:id,name')->whereIn('id', $siteIds)->orderBy('name')->get();
+
         return view('receipts.index', [
             'organization' => $organization,
+            // Niveau 7 : couples ONG/Bailleur proposés pour chaque site.
+            'originsBySite' => $sites->mapWithKeys(fn (Site $site) => [$site->id => $origins->options($site)]),
+            'originLabel' => fn (Receipt $receipt) => $origins->label($receipt->originProject, $receipt->origin_label),
             'receipts' => $receipts,
             'stats' => $stats,
-            'sites' => Site::with('healthFacility:id,name')->whereIn('id', $siteIds)->orderBy('name')->get(),
+            'sites' => $sites,
             'suppliers' => $organization->suppliers()->where('is_active', true)->orderBy('name')->get(),
             'products' => $organization->products()->where('is_active', true)->orderBy('name')->get(),
             'canManage' => $request->user()->hasPermission('receipts.manage'),
@@ -81,6 +88,12 @@ class ReceiptController extends Controller
     public function store(Request $request, Organization $organization): RedirectResponse
     {
         $this->access($request, $organization, 'receipts.manage');
+        if ($request->has('origin_choice')) {
+            $choice = (string) $request->input('origin_choice');
+            $request->merge($choice === 'other'
+                ? ['origin_type' => StockOriginService::TYPE_OTHER, 'origin_project_id' => null]
+                : ['origin_type' => $choice === '' ? null : StockOriginService::TYPE_PROJECT, 'origin_project_id' => $choice ?: null]);
+        }
         $data = $request->validate([
             'site_id' => ['required', 'uuid'],
             'supplier_id' => ['nullable', 'uuid'],
@@ -98,15 +111,18 @@ class ReceiptController extends Controller
             'items.*.quantity_rejected' => ['nullable', 'numeric', 'gte:0'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'gte:0'],
             'items.*.discrepancy_reason' => ['nullable', 'string', 'max:1000'],
-        ]);
+            ...StockOriginService::rules(),
+        ], StockOriginService::messages(), StockOriginService::attributes());
         $site = $this->site($request, $organization, $data['site_id']);
+        $origin = app(StockOriginService::class)->resolve($site, $data);
         if (filled($data['supplier_id'] ?? null)) {
             abort_unless($organization->suppliers()->whereKey($data['supplier_id'])->exists(), 422);
         }
 
-        $receipt = DB::transaction(function () use ($organization, $site, $data, $request) {
+        $receipt = DB::transaction(function () use ($organization, $site, $data, $request, $origin) {
             $receipt = Receipt::create([
-                ...collect($data)->except('items')->all(),
+                ...collect($data)->except(['items', 'origin_type', 'origin_project_id', 'origin_label'])->all(),
+                ...collect($origin)->except('origin_key')->all(),
                 'organization_id' => $organization->id,
                 'site_id' => $site->id,
                 'created_by' => $request->user()->id,
@@ -123,14 +139,8 @@ class ReceiptController extends Controller
                 if (($rejected > 0 || abs($ordered - $received) > 0.0001) && blank($row['discrepancy_reason'] ?? null)) {
                     throw ValidationException::withMessages(["items.{$index}.discrepancy_reason" => 'Une justification est obligatoire en cas d’écart ou de rejet.']);
                 }
-                $batch = Batch::withTrashed()->firstOrNew([
-                    'organization_id' => $organization->id,
-                    'product_id' => $product->id,
-                    'batch_number' => trim($row['batch_number']),
-                ]);
-                if ($batch->exists && $batch->trashed()) {
-                    $batch->restore();
-                }
+                // Niveau 7 : lot propre à l'origine de l'entrée.
+                $batch = app(StockOriginService::class)->batch($organization, $product->id, $row['batch_number'], $origin);
                 if ($batch->exists && $batch->expires_on && $batch->expires_on->toDateString() !== $row['expires_on']) {
                     throw ValidationException::withMessages(["items.{$index}.expires_on" => 'Ce numéro de lot existe déjà avec une autre date de péremption.']);
                 }

@@ -32,7 +32,7 @@
 <article class="receipt">
 <div><h3>{{ $receipt->reference }}</h3><p>Commande : {{ $receipt->order_reference ?: 'Non renseignée' }}</p></div>
 <div><span class="label">Destination</span><strong>{{ $receipt->site?->name }}</strong><small>{{ $receipt->site?->healthFacility?->name }}</small></div>
-<div><span class="label">Fournisseur / origine</span><strong>{{ $receipt->supplier?->name ?? 'Non renseigné' }}</strong></div>
+<div><span class="label">Origine</span><strong>{{ $receipt->origin_type ? $originLabel($receipt) : 'Non renseignée' }}</strong>@if($receipt->supplier)<small>Fournisseur : {{ $receipt->supplier->name }}</small>@endif</div>
 <div><span class="label">Réception</span><strong>{{ $receipt->received_on?->format('d/m/Y') }}</strong><small>{{ $receipt->items->count() }} ligne(s)</small></div>
 <div class="actions"><span class="status {{ $receipt->status }}">{{ $receipt->status === 'validated' ? 'Validée' : 'Brouillon' }}</span><a class="button secondary btn-sm" href="{{ route('organizations.receipts.show',[$organization,$receipt]) }}">Voir le rapport</a>@if($canManage && $receipt->status==='draft')<form method="post" action="{{ route('organizations.receipts.validate',[$organization,$receipt]) }}" onsubmit="return confirm('Valider cette réception et créditer définitivement le stock ?')">@csrf<button class="success btn-sm">Valider</button></form>@endif</div>
 </article>
@@ -50,7 +50,9 @@
 <label>Référence de réception<input name="reference" value="{{ old('reference','REC-'.now()->format('Ymd-His')) }}" required></label>
 <label>Référence du bon de commande<input name="order_reference" value="{{ old('order_reference') }}"></label>
 <label>Site destinataire<select name="site_id" required><option value="">Sélectionner</option>@foreach($sites as $site)<option value="{{ $site->id }}" @selected(old('site_id')===$site->id)>{{ $site->name }} · {{ $site->healthFacility?->name }}</option>@endforeach</select></label>
-<label>Fournisseur / origine<select name="supplier_id"><option value="">Non renseigné</option>@foreach($suppliers as $supplier)<option value="{{ $supplier->id }}" @selected(old('supplier_id')===$supplier->id)>{{ $supplier->name }}</option>@endforeach</select></label>
+<label>Origine (couple ONG/Bailleur) *<select name="origin_choice" required data-origin-select><option value="">Sélectionner d’abord le site</option>@foreach($originsBySite as $siteId => $origins)@foreach($origins as $origin)<option value="{{ $origin['project_id'] }}" data-site="{{ $siteId }}" @selected(old('origin_choice')===$origin['project_id'] && old('site_id')===$siteId)>{{ $origin['label'] }}</option>@endforeach @endforeach<option value="other" @selected(old('origin_choice')==='other')>Autre (fournisseur tiers)</option></select></label>
+<label data-origin-other @if(old('origin_choice')!=='other') hidden @endif>Nom du fournisseur tiers *<input name="origin_label" value="{{ old('origin_label') }}" maxlength="190" placeholder="Ex. Pharmacie régionale, don ponctuel"></label>
+<label>Fournisseur<select name="supplier_id"><option value="">Non renseigné</option>@foreach($suppliers as $supplier)<option value="{{ $supplier->id }}" @selected(old('supplier_id')===$supplier->id)>{{ $supplier->name }}</option>@endforeach</select></label>
 <label>Date de réception<input type="date" name="received_on" value="{{ old('received_on',now()->toDateString()) }}" max="{{ now()->toDateString() }}" required></label>
 <label class="wide">Observations<textarea name="notes" placeholder="État de la livraison, document associé, remarques…">{{ old('notes') }}</textarea></label>
 </div>
@@ -80,6 +82,11 @@ document.addEventListener('DOMContentLoaded',()=>{
  const renumber=()=>[...list.children].forEach((item,index)=>{item.querySelector('[data-line-number]').textContent=index+1;item.querySelectorAll('[data-field]').forEach(field=>field.name=`items[${index}][${field.dataset.field}]`)});
  const append=()=>{const item=template.content.firstElementChild.cloneNode(true);item.querySelector('.remove-item').addEventListener('click',()=>{if(list.children.length>1){item.remove();renumber()}});const received=item.querySelector('[data-field="quantity_received"]'),accepted=item.querySelector('[data-field="quantity_accepted"]');received.addEventListener('input',()=>{if(!accepted.dataset.edited)accepted.value=received.value});accepted.addEventListener('input',()=>accepted.dataset.edited='true');list.appendChild(item);renumber()};
  add.addEventListener('click',append);append();
+ // Niveau 7 : couples ONG/Bailleur du site choisi ; « Autre » demande le nom du tiers.
+ const form=document.getElementById('receipt-form'),siteSelect=form.querySelector('[name="site_id"]'),originSelect=form.querySelector('[data-origin-select]'),other=form.querySelector('[data-origin-other]');
+ const filterOrigins=()=>{const site=siteSelect.value;let available=0;originSelect.querySelectorAll('option[data-site]').forEach(option=>{const show=option.dataset.site===site;option.hidden=!show;option.disabled=!show;if(show)available++;if(!show&&option.selected)originSelect.value='';});originSelect.options[0].textContent=site?(available?'Sélectionner le couple ONG/Bailleur':'Aucun projet pour ce site : choisissez « Autre »'):'Sélectionner d’abord le site';};
+ const toggleOther=()=>{const isOther=originSelect.value==='other';other.hidden=!isOther;other.querySelector('input').required=isOther;};
+ siteSelect.addEventListener('change',filterOrigins);originSelect.addEventListener('change',toggleOther);filterOrigins();toggleOther();
  @if($errors->any()) document.getElementById('receipt-create-sheet')?.showModal(); @endif
 });
 </script>

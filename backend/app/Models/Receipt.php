@@ -15,7 +15,9 @@ class Receipt extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['organization_id', 'site_id', 'supplier_id', 'reference', 'order_reference', 'received_on', 'status', 'notes', 'created_by', 'validated_by', 'validated_at'];
+    protected $fillable = ['organization_id', 'site_id', 'supplier_id', 'reference', 'order_reference', 'received_on', 'status', 'notes', 'created_by', 'validated_by', 'validated_at',
+        // Niveau 7 : origine (couple ONG/Bailleur = projet, ou « Autre »).
+        'origin_type', 'origin_project_id', 'origin_label'];
 
     protected function casts(): array
     {
@@ -35,6 +37,12 @@ class Receipt extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    /** Niveau 7 : couple ONG/Bailleur d'origine (projet de la FOSA). */
+    public function originProject(): BelongsTo
+    {
+        return $this->belongsTo(Project::class, 'origin_project_id');
     }
 
     public function items(): HasMany
