@@ -315,7 +315,7 @@ class _MissionFormSheetState extends State<MissionFormSheet> {
                 _endsOn != null &&
                 _endsOn!.isBefore(_startsOn!)) ...[
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'La date de fin doit être postérieure à la date de début.',
                 style: TextStyle(color: AppColors.dangerText),
               ),

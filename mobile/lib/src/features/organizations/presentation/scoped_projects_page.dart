@@ -936,7 +936,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                       _projectMode
                           ? 'Consultez les informations de votre projet.'
                           : 'Gérez les projets de votre coordination.',
-                      style: const TextStyle(color: AppTheme.muted),
+                      style: TextStyle(color: AppTheme.muted),
                     ),
                   ],
                 ),
@@ -1067,7 +1067,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: AppTheme.green.withValues(alpha: .1),
-                      child: const Icon(
+                      child: Icon(
                         Icons.account_tree_outlined,
                         color: AppTheme.green,
                       ),
@@ -1149,7 +1149,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
               _projectMode ? 'Mon projet' : 'Configuration des projets',
               style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
             ),
-            const Text(
+            Text(
               'Gérez les projets de votre coordination.',
               style: TextStyle(color: AppTheme.muted),
             ),
@@ -1269,7 +1269,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: AppTheme.green.withValues(alpha: .1),
-                        child: const Icon(
+                        child: Icon(
                           Icons.account_tree_outlined,
                           color: AppTheme.green,
                         ),

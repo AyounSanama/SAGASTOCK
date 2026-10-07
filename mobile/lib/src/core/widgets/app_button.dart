@@ -219,7 +219,7 @@ class AppButton extends StatelessWidget {
     final color = _color;
     final height = AppSizes.buttonHeight;
     final foreground = _filled ? Colors.white : color;
-    const disabledForeground = AppColors.disabledText;
+    final disabledForeground = AppColors.disabledText;
     final content = loading
         ? SizedBox.square(
             dimension: 20,

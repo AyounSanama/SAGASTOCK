@@ -185,7 +185,7 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(color: AppColors.dangerSurface, borderRadius: BorderRadius.circular(AppRadius.md)),
-                    child: Text(_error!, style: const TextStyle(color: AppColors.dangerText)),
+                    child: Text(_error!, style: TextStyle(color: AppColors.dangerText)),
                   ),
                 _section(
                   title: 'Informations générales',
@@ -201,7 +201,7 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Row(
                           children: [
-                            Text(label, style: const TextStyle(color: AppColors.textMuted)),
+                            Text(label, style: TextStyle(color: AppColors.textMuted)),
                             const SizedBox(width: 12),
                             Expanded(child: Text('${value ?? '—'}', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w600))),
                           ],
@@ -223,7 +223,7 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
                       if (_facility['refusal_reason'] != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
-                          child: Text('Motif du refus : ${_facility['refusal_reason']}', style: const TextStyle(color: AppColors.dangerText)),
+                          child: Text('Motif du refus : ${_facility['refusal_reason']}', style: TextStyle(color: AppColors.dangerText)),
                         ),
                       const SizedBox(height: 12),
                     ],
@@ -331,9 +331,9 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
                     children: [
                       Text(
                         'Liste Standard générée : ${_count == null ? '—' : '$_count produits'}',
-                        style: const TextStyle(color: AppColors.infoText, fontWeight: FontWeight.w700),
+                        style: TextStyle(color: AppColors.infoText, fontWeight: FontWeight.w700),
                       ),
-                      const Text('Modifiable uniquement par la Coordination.', style: TextStyle(color: AppColors.infoText)),
+                      Text('Modifiable uniquement par la Coordination.', style: TextStyle(color: AppColors.infoText)),
                     ],
                   ),
                 ),
@@ -345,7 +345,7 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
               top: false,
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.surface,
                   border: Border(top: BorderSide(color: AppColors.border)),
                 ),
@@ -384,7 +384,7 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        if (subtitle != null) Text(subtitle, style: const TextStyle(color: AppColors.textMuted)),
+        if (subtitle != null) Text(subtitle, style: TextStyle(color: AppColors.textMuted)),
         const SizedBox(height: 12),
         ...children,
       ],
@@ -397,7 +397,7 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
       Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
       const SizedBox(height: 8),
       if (items.isEmpty)
-        const Text('Aucune valeur configurée par la Coordination pour ce projet.', style: TextStyle(color: AppColors.textMuted)),
+        Text('Aucune valeur configurée par la Coordination pour ce projet.', style: TextStyle(color: AppColors.textMuted)),
       Wrap(
         spacing: 8,
         runSpacing: 8,
@@ -415,7 +415,7 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
             ),
         ],
       ),
-      if (error != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(error, style: const TextStyle(color: AppColors.dangerText, fontSize: 13))),
+      if (error != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(error, style: TextStyle(color: AppColors.dangerText, fontSize: 13))),
     ],
   );
 

@@ -136,7 +136,7 @@ class _ConfigurationFormState extends State<_ConfigurationForm> {
           if (error != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Text(error!, style: const TextStyle(color: AppTheme.red)),
+              child: Text(error!, style: TextStyle(color: AppTheme.red)),
             ),
           Row(
             children: [
@@ -346,7 +346,7 @@ class _PreviewDialog extends StatelessWidget {
                         ),
                         Text(
                           'Avant : ${change['old'] ?? 'Non défini'}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppTheme.muted,
                             fontSize: 12,
                           ),

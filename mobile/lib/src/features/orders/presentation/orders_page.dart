@@ -185,7 +185,7 @@ class _OrdersPageState extends State<OrdersPage> {
                   Card(
                     color: AppColors.infoSurface,
                     child: ListTile(
-                      leading: const Icon(
+                      leading: Icon(
                         Icons.cloud_off,
                         color: AppColors.infoText,
                       ),

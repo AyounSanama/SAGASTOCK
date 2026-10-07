@@ -66,7 +66,7 @@ class _ProjectAdminStandardListPageState extends State<ProjectAdminStandardListP
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'LISTE STANDARD',
                       style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6),
                     ),
@@ -75,7 +75,7 @@ class _ProjectAdminStandardListPageState extends State<ProjectAdminStandardListP
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(color: AppColors.infoSurface, borderRadius: BorderRadius.circular(AppRadius.md)),
-                      child: const Row(
+                      child: Row(
                         children: [
                           Icon(Icons.lock_outline, size: 16, color: AppColors.infoText),
                           SizedBox(width: 8),
@@ -167,16 +167,16 @@ class _ProjectAdminStandardListPageState extends State<ProjectAdminStandardListP
                               ],
                             ),
                             if (product['packaging'] != null)
-                              Text('${product['packaging']}', style: const TextStyle(color: AppColors.textMuted)),
+                              Text('${product['packaging']}', style: TextStyle(color: AppColors.textMuted)),
                             Row(
                               children: [
                                 Expanded(
                                   child: Text(
                                     '${product['code'] ?? ''}',
-                                    style: const TextStyle(fontFamily: 'monospace', color: AppColors.textMuted, fontSize: 13),
+                                    style: TextStyle(fontFamily: 'monospace', color: AppColors.textMuted, fontSize: 13),
                                   ),
                                 ),
-                                Text('${product['pathology'] ?? ''}', style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                                Text('${product['pathology'] ?? ''}', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
                               ],
                             ),
                           ],

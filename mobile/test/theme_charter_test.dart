@@ -35,7 +35,10 @@ void main() {
   group('contrastes de la charte', () {
     test('le texte blanc sur la teinte forte dépasse 4,5:1', () {
       expect(AppColors.primaryStrong, const Color(0xFFB85D00));
-      expect(contrast(Colors.white, AppColors.primaryStrong), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(Colors.white, AppColors.primaryStrong),
+        greaterThanOrEqualTo(4.5),
+      );
     });
 
     test('le survol / appui est plus foncé, jamais plus clair', () {
@@ -48,13 +51,25 @@ void main() {
     test('l’orange de marque ne sert pas au texte sur fond clair', () {
       expect(contrast(AppColors.primary, Colors.white), lessThan(4.5));
       // Mais il reste lisible comme texte actif sur le menu sombre.
-      expect(contrast(AppColors.sidebarActiveText, AppColors.sidebar), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(AppColors.sidebarActiveText, AppColors.sidebar),
+        greaterThanOrEqualTo(4.5),
+      );
     });
 
     test('textes et états respectent 4,5:1 sur leur fond', () {
-      expect(contrast(AppColors.text, AppColors.background), greaterThanOrEqualTo(4.5));
-      expect(contrast(AppColors.textMuted, AppColors.surface), greaterThanOrEqualTo(4.5));
-      expect(contrast(AppColors.sidebarText, AppColors.sidebar), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(AppColors.text, AppColors.background),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(AppColors.textMuted, AppColors.surface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(AppColors.sidebarText, AppColors.sidebar),
+        greaterThanOrEqualTo(4.5),
+      );
       for (final (text, surface) in [
         (AppColors.successText, AppColors.successSurface),
         (AppColors.infoText, AppColors.infoSurface),
@@ -72,35 +87,73 @@ void main() {
     test('boutons à texte blanc et bouton flottant : teinte forte', () {
       final style = theme.filledButtonTheme.style!;
       expect(style.backgroundColor!.resolve({}), AppColors.primaryStrong);
-      expect(style.backgroundColor!.resolve({WidgetState.pressed}), AppColors.primaryStrongPressed);
+      expect(
+        style.backgroundColor!.resolve({WidgetState.pressed}),
+        AppColors.primaryStrongPressed,
+      );
       expect(style.foregroundColor!.resolve({}), Colors.white);
-      expect(theme.floatingActionButtonTheme.backgroundColor, AppColors.primaryStrong);
+      expect(
+        theme.floatingActionButtonTheme.backgroundColor,
+        AppColors.primaryStrong,
+      );
     });
 
     test('indicateurs et focus : orange de marque ; texte : teinte forte', () {
       expect(theme.tabBarTheme.indicatorColor, AppColors.primary);
       expect(theme.tabBarTheme.labelColor, AppColors.primaryStrong);
-      final focused = theme.inputDecorationTheme.focusedBorder as OutlineInputBorder;
+      final focused =
+          theme.inputDecorationTheme.focusedBorder as OutlineInputBorder;
       expect(focused.borderSide.color, AppColors.primary);
-      expect(theme.textButtonTheme.style!.foregroundColor!.resolve({}), AppColors.primaryStrong);
+      expect(
+        theme.textButtonTheme.style!.foregroundColor!.resolve({}),
+        AppColors.primaryStrong,
+      );
       expect(AppTheme.orange, AppColors.primaryStrong);
     });
 
-    test('pastille sélectionnée : bordure marque, texte fort', () {
-      final chip = theme.chipTheme;
-      expect((chip.side! as WidgetStateBorderSide).resolve({WidgetState.selected})!.color, AppColors.primary);
-      expect(theme.colorScheme.onSecondaryContainer, AppColors.primaryStrong);
-    });
+    test(
+      'pastille sélectionnée : bordure marque, texte orange lisible (5,45:1)',
+      () {
+        final chip = theme.chipTheme;
+        expect(
+          (chip.side! as WidgetStateBorderSide).resolve({
+            WidgetState.selected,
+          })!.color,
+          AppColors.primary,
+        );
+        expect(
+          theme.colorScheme.onSecondaryContainer,
+          AppColors.primarySoftText,
+        );
+      },
+    );
 
-    testWidgets('texte de la pastille sélectionnée : teinte forte en Inter', (tester) async {
-      await tester.pumpWidget(MaterialApp(
-        theme: theme,
-        home: Scaffold(body: Row(children: [
-          FilterChip(label: const Text('Toutes'), selected: true, onSelected: (_) {}),
-          FilterChip(label: const Text('Actives'), selected: false, onSelected: (_) {}),
-        ])),
-      ));
-      TextStyle styleOf(String label) => tester.renderObject<RenderParagraph>(find.text(label)).text.style!;
+    testWidgets('texte de la pastille sélectionnée : teinte forte en Inter', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            body: Row(
+              children: [
+                FilterChip(
+                  label: const Text('Toutes'),
+                  selected: true,
+                  onSelected: (_) {},
+                ),
+                FilterChip(
+                  label: const Text('Actives'),
+                  selected: false,
+                  onSelected: (_) {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      TextStyle styleOf(String label) =>
+          tester.renderObject<RenderParagraph>(find.text(label)).text.style!;
       expect(styleOf('Toutes').fontFamily, 'Inter');
       expect(styleOf('Toutes').color, AppColors.primaryStrong);
       expect(styleOf('Actives').color, AppColors.text);
@@ -126,7 +179,11 @@ void main() {
     for (final variant in AppBadgeVariant.values) {
       final text = tester.widget<Text>(find.text(variant.name));
       final color = text.style?.color;
-      expect(color, isNot(anyOf(AppColors.primary, AppColors.primaryStrong)), reason: variant.name);
+      expect(
+        color,
+        isNot(anyOf(AppColors.primary, AppColors.primaryStrong)),
+        reason: variant.name,
+      );
     }
   });
 
@@ -143,7 +200,14 @@ void main() {
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
-      RepaintBoundary(key: key, child: MaterialApp(debugShowCheckedModeBanner: false, theme: AppTheme.light, home: const _CharterPreview())),
+      RepaintBoundary(
+        key: key,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          home: const _CharterPreview(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
     // Focus du champ pour montrer la bordure de marque.
@@ -153,7 +217,8 @@ void main() {
 
     if (!_capture) return;
     await tester.runAsync(() async {
-      final boundary = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      final boundary =
+          key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
       final image = await boundary.toImage(pixelRatio: 2);
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
       final file = File('../.tmp/ui-screenshots/am160/mobile-charte.png');
@@ -169,13 +234,22 @@ void main() {
 Future<void> _loadFonts() async {
   final inter = FontLoader('Inter');
   for (final weight in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
-    inter.addFont(Future.value(ByteData.sublistView(File('assets/fonts/Inter-$weight.ttf').readAsBytesSync())));
+    inter.addFont(
+      Future.value(
+        ByteData.sublistView(
+          File('assets/fonts/Inter-$weight.ttf').readAsBytesSync(),
+        ),
+      ),
+    );
   }
   await inter.load();
   final root = Platform.environment['FLUTTER_ROOT'];
-  final icons = File('$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
+  final icons = File(
+    '$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+  );
   if (root != null && icons.existsSync()) {
-    final loader = FontLoader('MaterialIcons')..addFont(Future.value(ByteData.sublistView(icons.readAsBytesSync())));
+    final loader = FontLoader('MaterialIcons')
+      ..addFont(Future.value(ByteData.sublistView(icons.readAsBytesSync())));
     await loader.load();
   }
 }
@@ -191,51 +265,142 @@ class _CharterPreview extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Formations sanitaires'),
-          bottom: const TabBar(tabs: [Tab(text: 'FOSA (14)'), Tab(text: 'Comptes (31)'), Tab(text: 'Appro.')]),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'FOSA (14)'),
+              Tab(text: 'Comptes (31)'),
+              Tab(text: 'Appro.'),
+            ],
+          ),
         ),
-        floatingActionButton: FloatingActionButton(onPressed: () {}, tooltip: 'Ajouter', child: const Icon(Icons.add)),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {},
+          tooltip: 'Ajouter',
+          child: const Icon(Icons.add),
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: 1,
           destinations: const [
-            NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Accueil'),
-            NavigationDestination(icon: Icon(Icons.local_hospital_outlined), label: 'FOSA'),
-            NavigationDestination(icon: Icon(Icons.list_alt_outlined), label: 'Liste'),
-            NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profil'),
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              label: 'Accueil',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.local_hospital_outlined),
+              label: 'FOSA',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.list_alt_outlined),
+              label: 'Liste',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              label: 'Profil',
+            ),
           ],
         ),
         body: ListView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
-            const TextField(decoration: InputDecoration(hintText: 'Rechercher une FOSA (nom ou code)', prefixIcon: Icon(Icons.search))),
+            const TextField(
+              decoration: InputDecoration(
+                hintText: 'Rechercher une FOSA (nom ou code)',
+                prefixIcon: Icon(Icons.search),
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
-            Wrap(spacing: AppSpacing.sm, children: [
-              FilterChip(label: const Text('Toutes'), selected: true, onSelected: (_) {}),
-              FilterChip(label: const Text('Actives'), selected: false, onSelected: (_) {}),
-              FilterChip(label: const Text('Inactives'), selected: false, onSelected: (_) {}),
-            ]),
+            Wrap(
+              spacing: AppSpacing.sm,
+              children: [
+                FilterChip(
+                  label: const Text('Toutes'),
+                  selected: true,
+                  onSelected: (_) {},
+                ),
+                FilterChip(
+                  label: const Text('Actives'),
+                  selected: false,
+                  onSelected: (_) {},
+                ),
+                FilterChip(
+                  label: const Text('Inactives'),
+                  selected: false,
+                  onSelected: (_) {},
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.md),
-            const Row(children: [
-              Expanded(child: AppKpiCard(label: 'FOSA actives', value: '12/14', icon: Icons.local_hospital_outlined, caption: '2 désactivées')),
-              SizedBox(width: AppSpacing.sm),
-              Expanded(child: AppKpiCard(label: 'Échecs de synchro', value: '1', icon: Icons.sync_problem_outlined, tone: AppKpiTone.red)),
-            ]),
+            const Row(
+              children: [
+                Expanded(
+                  child: AppKpiCard(
+                    label: 'FOSA actives',
+                    value: '12/14',
+                    icon: Icons.local_hospital_outlined,
+                    caption: '2 désactivées',
+                  ),
+                ),
+                SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: AppKpiCard(
+                    label: 'Échecs de synchro',
+                    value: '1',
+                    icon: Icons.sync_problem_outlined,
+                    tone: AppKpiTone.red,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.md),
-            const Wrap(spacing: AppSpacing.sm, runSpacing: AppSpacing.sm, children: [
-              AppBadge(label: 'À jour', variant: AppBadgeVariant.success),
-              AppBadge(label: 'En attente · 3 op.', variant: AppBadgeVariant.info),
-              AppBadge(label: 'Échec de synchro', variant: AppBadgeVariant.danger),
-              AppBadge(label: 'Inactive', variant: AppBadgeVariant.neutral),
-            ]),
+            const Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                AppBadge(label: 'À jour', variant: AppBadgeVariant.success),
+                AppBadge(
+                  label: 'En attente · 3 op.',
+                  variant: AppBadgeVariant.info,
+                ),
+                AppBadge(
+                  label: 'Échec de synchro',
+                  variant: AppBadgeVariant.danger,
+                ),
+                AppBadge(label: 'Inactive', variant: AppBadgeVariant.neutral),
+              ],
+            ),
             const SizedBox(height: AppSpacing.lg),
-            Row(children: [
-              Expanded(child: OutlinedButton(onPressed: () {}, child: const Text('Annuler'))),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(child: FilledButton(onPressed: () {}, child: const Text('Enregistrer'))),
-            ]),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {},
+                    child: const Text('Annuler'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {},
+                    child: const Text('Enregistrer'),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.sm),
-            FilledButton.icon(onPressed: () {}, icon: const Icon(Icons.add), label: const Text('Ajouter une FOSA')),
-            TextButton(onPressed: () {}, child: const Text('Voir toutes les FOSA')),
-            SwitchListTile(value: true, onChanged: (_) {}, title: const Text('FOSA active')),
+            FilledButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter une FOSA'),
+            ),
+            TextButton(
+              onPressed: () {},
+              child: const Text('Voir toutes les FOSA'),
+            ),
+            SwitchListTile(
+              value: true,
+              onChanged: (_) {},
+              title: const Text('FOSA active'),
+            ),
           ],
         ),
       ),

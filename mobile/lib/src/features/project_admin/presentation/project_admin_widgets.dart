@@ -136,7 +136,7 @@ class ProjectAdminKpi extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+        Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
         const SizedBox(height: 6),
         Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: color ?? AppColors.text)),
       ],
@@ -152,6 +152,6 @@ class ProjectAdminMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.all(AppSpacing.xl),
-    child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textMuted)),
+    child: Text(text, textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted)),
   );
 }

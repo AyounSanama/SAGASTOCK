@@ -127,7 +127,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                     ? const [Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))]
                     : _data.isEmpty
                     ? [
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.all(24),
                           child: Text(
                             'Aucune donnée enregistrée sur ce téléphone. Connectez-vous à internet une première fois.',
@@ -211,7 +211,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                           title: 'À traiter',
                           children: [
                             if (_list('todo').isEmpty)
-                              const Text('Rien à traiter pour le moment.', style: TextStyle(color: AppColors.textMuted)),
+                              Text('Rien à traiter pour le moment.', style: TextStyle(color: AppColors.textMuted)),
                             for (final item in _list('todo'))
                               InkWell(
                                 onTap: () => context.go('/missions'),
@@ -234,7 +234,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text('${item['title']}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                                            Text('${item['detail']}', style: const TextStyle(color: AppColors.textMuted)),
+                                            Text('${item['detail']}', style: TextStyle(color: AppColors.textMuted)),
                                           ],
                                         ),
                                       ),
@@ -249,7 +249,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                           title: 'Synchronisation des FOSA',
                           children: [
                             if (_list('facilities').isEmpty)
-                              const Text('Aucune FOSA validée.', style: TextStyle(color: AppColors.textMuted)),
+                              Text('Aucune FOSA validée.', style: TextStyle(color: AppColors.textMuted)),
                             for (final facility in _list('facilities'))
                               Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -262,7 +262,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                                           Text('${facility['name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
                                           Text(
                                             '${facility['category'] ?? '—'} · ${_ago(facility['last_contact_days'])}',
-                                            style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                                            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                                           ),
                                         ],
                                       ),
@@ -282,7 +282,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                           ],
                         ),
                         const SizedBox(height: 14),
-                        const Text(
+                        Text(
                           'Ruptures, péremptions et graphiques : disponibles avec les analyses de base.',
                           style: TextStyle(color: AppColors.textMuted),
                         ),
@@ -345,7 +345,7 @@ class _Kpi extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+          Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
           const SizedBox(height: 6),
           Text(
             value,
@@ -355,7 +355,7 @@ class _Kpi extends StatelessWidget {
               color: unavailable ? AppColors.textMuted : AppColors.text,
             ),
           ),
-          Text(note, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+          Text(note, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
         ],
       ),
     );

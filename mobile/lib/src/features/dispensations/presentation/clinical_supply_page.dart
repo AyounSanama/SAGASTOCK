@@ -261,7 +261,7 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
         if (error != null)
           Padding(
             padding: const EdgeInsets.all(8),
-            child: Text(error!, style: const TextStyle(color: AppTheme.red)),
+            child: Text(error!, style: TextStyle(color: AppTheme.red)),
           ),
         Expanded(
           child: loading
@@ -297,7 +297,7 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
               final p = patients[i];
               return Card(
                 child: ListTile(
-                  leading: const CircleAvatar(
+                  leading: CircleAvatar(
                     backgroundColor: AppTheme.orangeSoft,
                     child: Icon(Icons.person_outline, color: AppTheme.orange),
                   ),
@@ -346,7 +346,7 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
                       ),
                       Text(
                         '${(p['items'] as List? ?? []).length} produit(s) · ${p['prescriber_name']}',
-                        style: const TextStyle(color: AppTheme.muted),
+                        style: TextStyle(color: AppTheme.muted),
                       ),
                       if (draft && AppConfig.clinicalValidation) ...[
                         const SizedBox(height: 10),
@@ -375,7 +375,7 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
               final d = dispensations[i];
               return Card(
                 child: ListTile(
-                  leading: const CircleAvatar(
+                  leading: CircleAvatar(
                     backgroundColor: AppColors.successSurface,
                     child: Icon(
                       Icons.medication_outlined,
@@ -389,7 +389,7 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
                   subtitle: Text(
                     '${d['patient']?['last_name'] ?? ''} · ${(d['items'] as List? ?? []).length} lot(s)',
                   ),
-                  trailing: const Icon(
+                  trailing: Icon(
                     Icons.verified_outlined,
                     color: AppTheme.green,
                   ),
@@ -768,7 +768,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
         ),
         clipBehavior: Clip.antiAlias,
         child: _attachmentPreview == null
-            ? const Center(
+            ? Center(
                 child: Icon(
                   Icons.document_scanner_outlined,
                   size: 72,
@@ -843,7 +843,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
             title: Text('${entry.value['name']}'),
             subtitle: Text('Quantité : ${entry.value['quantity']}'),
             trailing: IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppTheme.red),
+              icon: Icon(Icons.delete_outline, color: AppTheme.red),
               onPressed: () => setState(() => _items.removeAt(entry.key)),
             ),
           ),
@@ -878,7 +878,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
           '${_items.length} produit(s) · ${_items.fold<double>(0, (sum, item) => sum + (item['quantity'] as num).toDouble())} unité(s)',
         ),
       ),
-      const Card(
+      Card(
         child: Padding(
           padding: EdgeInsets.all(14),
           child: Row(
@@ -908,7 +908,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
-          Text(subtitle, style: const TextStyle(color: AppTheme.muted)),
+          Text(subtitle, style: TextStyle(color: AppTheme.muted)),
           const SizedBox(height: 20),
           ...children,
         ],

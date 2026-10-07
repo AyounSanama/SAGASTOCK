@@ -230,7 +230,7 @@ class _FacilitiesPageState extends State<FacilitiesPage>
     return await showAppDialogAsFormSheet<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            icon: const Icon(
+            icon: Icon(
               Icons.archive_outlined,
               color: AppTheme.red,
               size: 34,
@@ -273,7 +273,7 @@ class _FacilitiesPageState extends State<FacilitiesPage>
             const Text('Formations sanitaires'),
             Text(
               widget.organizationName,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppTheme.muted,
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -300,7 +300,7 @@ class _FacilitiesPageState extends State<FacilitiesPage>
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
               color: AppTheme.blue.withValues(alpha: .09),
-              child: const Row(
+              child: Row(
                 children: [
                   Icon(Icons.cloud_off_rounded, color: AppTheme.blue, size: 18),
                   SizedBox(width: 8),
@@ -1238,7 +1238,7 @@ class _SummaryLine extends StatelessWidget {
       children: [
         SizedBox(
           width: 125,
-          child: Text(label, style: const TextStyle(color: AppTheme.muted)),
+          child: Text(label, style: TextStyle(color: AppTheme.muted)),
         ),
         Expanded(
           child: Text(
@@ -1522,7 +1522,7 @@ class _ChildFormState extends State<_ChildForm> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           backgroundColor: AppTheme.red,
           content: Text('Enregistrement impossible. Vérifiez le code.'),
         ),
@@ -1710,7 +1710,7 @@ class _FacilityCard extends StatelessWidget {
                       color: AppTheme.blue.withValues(alpha: .10),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.local_hospital_outlined,
                       color: AppTheme.blue,
                     ),
@@ -1722,7 +1722,7 @@ class _FacilityCard extends StatelessWidget {
                       children: [
                         Text(
                           '${facility['name']}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppTheme.ink,
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
@@ -1731,7 +1731,7 @@ class _FacilityCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${facility['code']} • ${_facilityType('${facility['facility_type']}')}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppTheme.muted,
                             fontSize: 12,
                           ),
@@ -1740,7 +1740,7 @@ class _FacilityCard extends StatelessWidget {
                     ),
                   ),
                   if (onTap != null)
-                    const Icon(
+                    Icon(
                       Icons.chevron_right_rounded,
                       color: AppTheme.gray,
                     ),
@@ -1776,7 +1776,7 @@ class _FacilityCard extends StatelessWidget {
                     'Projet : ${projects.map((item) => item['name']).join(', ')}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppTheme.muted, fontSize: 11),
+                    style: TextStyle(color: AppTheme.muted, fontSize: 11),
                   ),
                 ),
               ],
@@ -1815,7 +1815,7 @@ class _FacilityHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColors.sidebar, AppColors.text],
         ),
         borderRadius: BorderRadius.circular(20),
@@ -1894,7 +1894,7 @@ class _ChildSection extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '$title (${values.length})',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppTheme.ink,
                       fontWeight: FontWeight.w800,
                     ),
@@ -1909,7 +1909,7 @@ class _ChildSection extends StatelessWidget {
               ],
             ),
             if (values.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 16),
                 child: Text(
                   'Aucun élément enregistré.',
@@ -1930,7 +1930,7 @@ class _ChildSection extends StatelessWidget {
                     tooltip: 'Actions',
                     onSelected: (action) =>
                         action == 'edit' ? onEdit(value) : onArchive(value),
-                    itemBuilder: (_) => const [
+                    itemBuilder: (_) => [
                       PopupMenuItem(
                         value: 'edit',
                         child: ListTile(
@@ -1958,13 +1958,13 @@ class _ChildSection extends StatelessWidget {
               const Divider(),
               ExpansionTile(
                 tilePadding: EdgeInsets.zero,
-                leading: const Icon(
+                leading: Icon(
                   Icons.inventory_2_outlined,
                   color: AppTheme.gray,
                 ),
                 title: Text(
                   'Archivés (${archivedValues.length})',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppTheme.muted,
                     fontWeight: FontWeight.w700,
                   ),
@@ -2058,7 +2058,7 @@ class _EmptyState extends StatelessWidget {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppTheme.ink,
             fontWeight: FontWeight.w800,
             fontSize: 17,
@@ -2068,7 +2068,7 @@ class _EmptyState extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: AppTheme.muted),
+          style: TextStyle(color: AppTheme.muted),
         ),
         if (action != null) ...[
           const SizedBox(height: 18),

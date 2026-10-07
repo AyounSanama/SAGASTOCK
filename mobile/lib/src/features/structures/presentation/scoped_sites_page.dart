@@ -467,7 +467,7 @@ class _ScopedSitesPageState extends State<ScopedSitesPage> {
                 context,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
             ),
-            const Text(
+            Text(
               'Gérez les sites de stockage et de dispensation de votre organisation.',
               style: TextStyle(color: AppTheme.muted),
             ),
@@ -476,7 +476,7 @@ class _ScopedSitesPageState extends State<ScopedSitesPage> {
                 margin: const EdgeInsets.only(top: 12),
                 padding: const EdgeInsets.all(10),
                 color: AppTheme.blue.withValues(alpha: .08),
-                child: const Text(
+                child: Text(
                   'Mode hors connexion — les modifications seront synchronisées automatiquement.',
                   style: TextStyle(color: AppTheme.blue),
                 ),

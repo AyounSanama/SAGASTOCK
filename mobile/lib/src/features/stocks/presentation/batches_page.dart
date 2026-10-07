@@ -505,7 +505,7 @@ class _BatchFormState extends State<_BatchForm> {
             ],
           ),
           if (_expiresOn == null)
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'La date d’expiration est obligatoire.',

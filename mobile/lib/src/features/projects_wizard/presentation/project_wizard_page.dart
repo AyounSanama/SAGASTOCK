@@ -426,7 +426,7 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
               top: false,
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.surface,
                   border: Border(top: BorderSide(color: AppColors.border)),
                 ),
@@ -533,14 +533,14 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
           ),
           const SizedBox(height: AppSpacing.md),
           InputDecorator(
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Coordination',
               filled: true,
               fillColor: AppColors.disabledSurface,
             ),
             child: Text(
               '${mission?['name'] ?? '—'} (votre coordination)',
-              style: const TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.textMuted),
             ),
           ),
         ],
@@ -651,7 +651,7 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Le bailleur est ajouté au référentiel et sélectionné pour ce projet.',
                 style: TextStyle(color: AppColors.textMuted),
               ),
@@ -767,7 +767,7 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
                         'Liste Standard : $retained / ${products.length}',
                         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                       ),
-                      const Text(
+                      Text(
                         'produits retenus',
                         style: TextStyle(color: AppColors.textMuted),
                       ),
@@ -788,7 +788,7 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
             ],
             if (_fieldErrors['retained'] != null) ...[
               const SizedBox(height: AppSpacing.sm),
-              Text(_fieldErrors['retained']!, style: const TextStyle(color: AppColors.dangerText)),
+              Text(_fieldErrors['retained']!, style: TextStyle(color: AppColors.dangerText)),
             ],
             if (products.isEmpty && !_refreshing) ...[
               const SizedBox(height: AppSpacing.sm),
@@ -796,7 +796,7 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
                 _levels.isEmpty || _populations.isEmpty
                     ? 'Sélectionnez au moins un niveau de soins et une population cible pour générer la liste.'
                     : 'Aucun produit du catalogue ne correspond à ces choix.',
-                style: const TextStyle(color: AppColors.textMuted),
+                style: TextStyle(color: AppColors.textMuted),
               ),
             ],
           ],
@@ -836,7 +836,7 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
                         'Liste Standard : $retained / ${products.length} produits retenus',
                         style: AppTypography.title,
                       ),
-                      const Text(
+                      Text(
                         'Cochez ou décochez selon les protocoles de votre organisation.',
                         style: TextStyle(color: AppColors.textMuted),
                       ),
@@ -1053,7 +1053,7 @@ class _Section extends StatelessWidget {
         Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         if (subtitle != null) ...[
           const SizedBox(height: AppSpacing.xs),
-          Text(subtitle!, style: const TextStyle(color: AppColors.textMuted)),
+          Text(subtitle!, style: TextStyle(color: AppColors.textMuted)),
         ],
         const SizedBox(height: AppSpacing.lg),
         ...children,
@@ -1103,7 +1103,7 @@ class _TypeCard extends StatelessWidget {
                 children: [
                   Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                  Text(subtitle, style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
                 ],
               ),
             ),
@@ -1157,7 +1157,7 @@ class _ChoiceGroupState extends State<_ChoiceGroup> {
           Text(widget.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: AppSpacing.sm),
           if (items.isEmpty)
-            const Text('Aucune valeur dans le référentiel médical.', style: TextStyle(color: AppColors.textMuted)),
+            Text('Aucune valeur dans le référentiel médical.', style: TextStyle(color: AppColors.textMuted)),
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
@@ -1171,7 +1171,7 @@ class _ChoiceGroupState extends State<_ChoiceGroup> {
               if (hidden > 0)
                 ActionChip(
                   label: Text('+ $hidden autres'),
-                  shape: const StadiumBorder(side: BorderSide(color: AppColors.border)),
+                  shape: StadiumBorder(side: BorderSide(color: AppColors.border)),
                   backgroundColor: AppColors.surface,
                   onPressed: () => setState(() => _expanded = true),
                 ),
@@ -1179,7 +1179,7 @@ class _ChoiceGroupState extends State<_ChoiceGroup> {
           ),
           if (widget.errorText != null) ...[
             const SizedBox(height: AppSpacing.xs),
-            Text(widget.errorText!, style: const TextStyle(color: AppColors.dangerText, fontSize: 13)),
+            Text(widget.errorText!, style: TextStyle(color: AppColors.dangerText, fontSize: 13)),
           ],
         ],
       ),
@@ -1285,7 +1285,7 @@ class _Failure extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.cloud_off_outlined, size: 40, color: AppColors.textMuted),
+          Icon(Icons.cloud_off_outlined, size: 40, color: AppColors.textMuted),
           const SizedBox(height: AppSpacing.md),
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.md),

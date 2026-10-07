@@ -60,7 +60,7 @@ class AppKpiCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (onTap != null) const Icon(Icons.arrow_outward, size: 18, color: AppColors.textMuted),
+              if (onTap != null) Icon(Icons.arrow_outward, size: 18, color: AppColors.textMuted),
             ],
           ),
         ),

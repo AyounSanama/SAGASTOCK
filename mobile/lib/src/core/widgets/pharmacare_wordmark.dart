@@ -15,7 +15,7 @@ class PharmaCareWordmark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text.rich(
-      const TextSpan(
+      TextSpan(
         children: [
           TextSpan(
             text: 'Pharma',

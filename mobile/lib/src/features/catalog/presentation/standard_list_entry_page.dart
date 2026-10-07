@@ -105,7 +105,7 @@ class _ProjectStandardListPageState extends State<ProjectStandardListPage> {
             else ...[
               Card(
                 child: ListTile(
-                  leading: const CircleAvatar(
+                  leading: CircleAvatar(
                     backgroundColor: AppTheme.orangeSoft,
                     child: Icon(
                       Icons.business_center_outlined,
@@ -136,7 +136,7 @@ class _ProjectStandardListPageState extends State<ProjectStandardListPage> {
                 const SizedBox(height: 4),
                 Text(
                   'Version ${version?['version_number'] ?? '—'}',
-                  style: const TextStyle(color: AppTheme.muted),
+                  style: TextStyle(color: AppTheme.muted),
                 ),
                 const SizedBox(height: 16),
                 if (products.isEmpty)

@@ -94,16 +94,16 @@ class _OrganizationAssistancePageState
                   const SizedBox(height: 6),
                   Text(
                     '${organization['access_type'] == 'multi_country' ? 'Multipays' : 'Unipays'} · ${organization['code']}',
-                    style: const TextStyle(color: AppTheme.muted),
+                    style: TextStyle(color: AppTheme.muted),
                   ),
                   const SizedBox(height: 14),
                   AppCard(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.shield_outlined, color: AppTheme.blue),
+                        Icon(Icons.shield_outlined, color: AppTheme.blue),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -184,7 +184,7 @@ class _OrganizationAssistancePageState
                                       configuration == null
                                           ? 'Configurer'
                                           : 'Modifier · Version ${configuration['configuration_version']}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: AppTheme.muted,
                                         fontSize: 12,
                                       ),

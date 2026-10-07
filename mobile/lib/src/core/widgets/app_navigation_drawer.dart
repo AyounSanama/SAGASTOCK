@@ -22,7 +22,7 @@ class AppNavigationDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return NavigationDrawer(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       children: [
         if (!compact) const _BrandHeader(),
         if (onToggle != null)
@@ -59,7 +59,7 @@ class AppNavigationDrawer extends StatelessWidget {
         if (compact)
           IconButton(
             tooltip: 'Déconnexion',
-            icon: const Icon(Icons.logout_outlined, color: AppTheme.danger),
+            icon: Icon(Icons.logout_outlined, color: AppTheme.danger),
             onPressed: () async {
               await AuthService().logout();
               if (context.mounted) context.go('/login');
@@ -67,8 +67,8 @@ class AppNavigationDrawer extends StatelessWidget {
           )
         else
           ListTile(
-            leading: const Icon(Icons.logout_rounded, color: AppTheme.danger),
-            title: const Text(
+            leading: Icon(Icons.logout_rounded, color: AppTheme.danger),
+            title: Text(
               'Déconnexion',
               style: TextStyle(
                 color: AppTheme.danger,

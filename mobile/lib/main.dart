@@ -9,6 +9,7 @@ import 'src/core/access/application_access.dart';
 import 'src/features/auth/data/auth_service.dart';
 import 'src/core/sync/sync_bootstrap.dart';
 import 'src/core/localization/app_locale.dart';
+import 'src/core/theme/app_theme_mode.dart';
 import 'src/core/config/server_settings.dart';
 
 Future<void> main() async {
@@ -27,6 +28,7 @@ Future<void> main() async {
 
 Future<String> _resolveInitialLocation() async {
   await AppLocale.restore();
+  await AppThemeMode.restore();
   await ServerSettings.load();
   try {
     final service = AuthService();
@@ -34,6 +36,10 @@ Future<String> _resolveInitialLocation() async {
     if (!hasSession) return '/login';
     final user = await service.cachedUser();
     AppLocale.apply('${user?['preferred_locale'] ?? 'fr'}');
+    // Niveau 4 : mode d'affichage du profil (Clair / Sombre / Système).
+    if (user?['theme_preference'] != null) {
+      AppThemeMode.apply(user!['theme_preference']);
+    }
     return ApplicationAccess.landingPath(user);
   } catch (_) {
     return '/login';

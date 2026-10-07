@@ -80,7 +80,7 @@ class MedicalConfigurationSection extends StatelessWidget {
             _Chips(values: populations.map((p) => '${p['name']}').toList()),
             const _Label('Pathologies'),
             if (pathologies.isEmpty)
-              const Text('—', style: TextStyle(color: AppTheme.muted))
+              Text('—', style: TextStyle(color: AppTheme.muted))
             else
               ...pathologies.map(
                 (pathology) => Padding(
@@ -99,7 +99,7 @@ class MedicalConfigurationSection extends StatelessWidget {
                                   .map((id) => names['$id'] ?? '')
                                   .where((name) => name.isNotEmpty)
                                   .join(', '),
-                          style: const TextStyle(color: AppTheme.muted),
+                          style: TextStyle(color: AppTheme.muted),
                         ),
                       ],
                     ),
@@ -121,7 +121,7 @@ class _Label extends StatelessWidget {
     padding: const EdgeInsets.only(top: 10, bottom: 6),
     child: Text(
       text,
-      style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+      style: TextStyle(color: AppTheme.muted, fontSize: 12),
     ),
   );
 }
@@ -131,7 +131,7 @@ class _Chips extends StatelessWidget {
   final List<String> values;
   @override
   Widget build(BuildContext context) => values.isEmpty
-      ? const Text('—', style: TextStyle(color: AppTheme.muted))
+      ? Text('—', style: TextStyle(color: AppTheme.muted))
       : Wrap(
           spacing: 6,
           runSpacing: 6,
@@ -305,7 +305,7 @@ Future<bool?> showMedicalConfigurationEditor(
                     : () => addReference('pathology', 'Pathologie'),
               ),
               if (selectedPopulations.isEmpty)
-                const Text(
+                Text(
                   'Sélectionnez d’abord les populations cibles.',
                   style: TextStyle(color: AppTheme.muted),
                 )

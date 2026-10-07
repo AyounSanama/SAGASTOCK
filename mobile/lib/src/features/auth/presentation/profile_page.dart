@@ -4,6 +4,7 @@ import '../../../core/widgets/app_button.dart';
 import '../data/auth_service.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
 import '../../../core/localization/app_locale.dart';
+import '../../../core/theme/app_theme_mode.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -169,6 +170,36 @@ class _ProfilePageState extends State<ProfilePage> {
                         expanded: true,
                         loading: _savingLocale,
                         onPressed: _savingLocale ? null : _saveLocale,
+                      ),
+                      const SizedBox(height: 18),
+                      // Niveau 4 : Clair / Sombre / Système, appliqué immédiatement.
+                      const Text('Mode d’affichage', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      SegmentedButton<String>(
+                        segments: [
+                          for (final (value, icon) in const [
+                            ('light', Icons.light_mode_outlined),
+                            ('dark', Icons.dark_mode_outlined),
+                            ('system', Icons.contrast),
+                          ])
+                            ButtonSegment(
+                              value: value,
+                              icon: Icon(icon),
+                              label: Text(AppThemeMode.labels[value]!),
+                            ),
+                        ],
+                        selected: {AppThemeMode.preference.value},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (selection) {
+                          final preference = selection.first;
+                          AppThemeMode.apply(preference);
+                          _auth.updateThemePreference(preference);
+                        },
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        '« Système » suit le réglage du téléphone.',
+                        style: TextStyle(fontSize: 13),
                       ),
                     ],
                   ),

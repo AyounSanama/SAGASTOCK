@@ -130,7 +130,7 @@ class _Home extends StatelessWidget {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           'Assistance et traçabilité des configurations.',
           style: TextStyle(color: AppTheme.muted),
         ),
@@ -228,7 +228,7 @@ class _ActionCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     text,
-                    style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+                    style: TextStyle(color: AppTheme.muted, fontSize: 12),
                   ),
                 ],
               ),
@@ -249,11 +249,11 @@ class _Assistance extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text(
+      Text(
         'Périmètre protégé',
         style: TextStyle(fontWeight: FontWeight.w800, color: AppTheme.purple),
       ),
-      const Text(
+      Text(
         'Aucune donnée métier n’est accessible.',
         style: TextStyle(color: AppTheme.muted, fontSize: 12),
       ),
@@ -291,7 +291,7 @@ class _Assistance extends StatelessWidget {
                   const SizedBox(height: 5),
                   Text(
                     '${org['access_type'] == 'multi_country' ? 'Multipays' : 'Unipays'} · ${org['code']}',
-                    style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+                    style: TextStyle(color: AppTheme.muted, fontSize: 12),
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -355,7 +355,7 @@ class _History extends StatelessWidget {
                   const SizedBox(height: 5),
                   Text(
                     '${item['category_label']} · ${item['version']}',
-                    style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+                    style: TextStyle(color: AppTheme.muted, fontSize: 12),
                   ),
                   const SizedBox(height: 7),
                   Text(
@@ -433,7 +433,7 @@ class _Error extends StatelessWidget {
   Widget build(BuildContext context) => AppCard(
     child: Column(
       children: [
-        const Icon(Icons.cloud_off, color: AppTheme.red),
+        Icon(Icons.cloud_off, color: AppTheme.red),
         const SizedBox(height: 8),
         Text(message),
         TextButton(onPressed: retry, child: const Text('Réessayer')),

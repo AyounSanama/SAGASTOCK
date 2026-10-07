@@ -876,7 +876,7 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
-          const Text(
+          Text(
             'Gérez les comptes autorisés dans votre organisation.',
             style: TextStyle(color: AppTheme.muted),
           ),
@@ -885,7 +885,7 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
               margin: const EdgeInsets.only(top: 12),
               padding: const EdgeInsets.all(10),
               color: AppTheme.blue.withValues(alpha: .08),
-              child: const Text(
+              child: Text(
                 'Mode hors connexion — consultation locale uniquement pour protéger les comptes.',
                 style: TextStyle(color: AppTheme.blue),
               ),

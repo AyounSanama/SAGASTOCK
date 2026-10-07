@@ -107,7 +107,7 @@ class _DashboardHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
-        const Expanded(
+        Expanded(
           child: Text(
             'Tableau de bord',
             maxLines: 2,
@@ -141,12 +141,12 @@ class _HeaderButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     this.onPressed,
-    this.color = AppTheme.ink,
+    this.color,
   });
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => IconButton(
@@ -155,8 +155,8 @@ class _HeaderButton extends StatelessWidget {
     style: IconButton.styleFrom(
       minimumSize: const Size.square(44),
       fixedSize: const Size.square(44),
-      foregroundColor: color,
-      backgroundColor: color.withValues(alpha: .08),
+      foregroundColor: color ?? AppTheme.ink,
+      backgroundColor: (color ?? AppTheme.ink).withValues(alpha: .08),
       disabledForegroundColor: AppTheme.muted,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
     ),
@@ -187,7 +187,7 @@ class _Welcome extends StatelessWidget {
             children: [
               Text(
                 name.isEmpty ? 'Bonjour 👋' : 'Bonjour, $name 👋',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppTheme.ink,
                   fontSize: 19,
                   fontWeight: FontWeight.w800,
@@ -196,7 +196,7 @@ class _Welcome extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 message,
-                style: const TextStyle(color: AppTheme.muted, fontSize: 13),
+                style: TextStyle(color: AppTheme.muted, fontSize: 13),
               ),
             ],
           ),
@@ -359,7 +359,7 @@ class _SummaryCard extends StatelessWidget {
             Text(
               data.label,
               maxLines: 2,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppTheme.ink,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -377,7 +377,7 @@ class _SummaryCard extends StatelessWidget {
             Text(
               data.caption,
               maxLines: 2,
-              style: const TextStyle(color: AppTheme.muted, fontSize: 11),
+              style: TextStyle(color: AppTheme.muted, fontSize: 11),
             ),
           ],
         ),
@@ -392,7 +392,7 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     title,
-    style: const TextStyle(
+    style: TextStyle(
       color: AppTheme.ink,
       fontSize: 18,
       fontWeight: FontWeight.w800,
@@ -504,7 +504,7 @@ class _QuickAction extends StatelessWidget {
             data.label,
             maxLines: 2,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppTheme.ink,
               fontSize: 11,
               fontWeight: FontWeight.w700,
@@ -585,7 +585,7 @@ class _RecentActivities extends StatelessWidget {
     icon: Icons.history_rounded,
     color: AppTheme.orange,
     child: activities.isEmpty
-        ? const ListTile(
+        ? ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.info_outline_rounded, color: AppTheme.muted),
             title: Text('Aucune activité récente'),

@@ -136,12 +136,12 @@ class _ProjectAdminHomePageState extends State<ProjectAdminHomePage> {
                               children: [
                                 Text(
                                   '$watch FOSA à surveiller',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: AppColors.dangerText,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                const Text(
+                                Text(
                                   'Pas de synchronisation depuis plus de 3 jours, ou opérations refusées.',
                                   style: TextStyle(color: AppColors.dangerText),
                                 ),

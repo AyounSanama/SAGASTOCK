@@ -257,7 +257,7 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
                 ),
               )
             else if (_receipts.isEmpty)
-              const Card(
+              Card(
                 child: Padding(
                   padding: EdgeInsets.all(24),
                   child: Column(
@@ -327,7 +327,7 @@ class _Summary extends StatelessWidget {
                 ),
                 Text(
                   label,
-                  style: const TextStyle(fontSize: 11, color: AppTheme.muted),
+                  style: TextStyle(fontSize: 11, color: AppTheme.muted),
                 ),
               ],
             ),
@@ -393,12 +393,12 @@ class _ReceiptCard extends StatelessWidget {
             const SizedBox(height: 9),
             Text(
               '${receipt['site']?['name'] ?? 'Site'} · ${receipt['received_on'] ?? ''}',
-              style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+              style: TextStyle(color: AppTheme.muted, fontSize: 12),
             ),
             const SizedBox(height: 3),
             Text(
               '${items.length} ligne(s) · ${receipt['supplier']?['name'] ?? 'Origine non renseignée'}',
-              style: const TextStyle(color: AppTheme.muted, fontSize: 11),
+              style: TextStyle(color: AppTheme.muted, fontSize: 11),
             ),
             if (onValidate != null) ...[
               const SizedBox(height: 12),
@@ -737,7 +737,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                           padding: const EdgeInsets.only(top: 10),
                           child: Text(
                             _error!,
-                            style: const TextStyle(color: AppTheme.red),
+                            style: TextStyle(color: AppTheme.red),
                           ),
                         ),
                     ],
@@ -1193,7 +1193,7 @@ class _ReceiptSummaryLine extends StatelessWidget {
       children: [
         SizedBox(
           width: 120,
-          child: Text(label, style: const TextStyle(color: AppTheme.muted)),
+          child: Text(label, style: TextStyle(color: AppTheme.muted)),
         ),
         Expanded(
           child: Text(

@@ -182,7 +182,7 @@ class _InventoriesPageState extends State<InventoriesPage> {
         if (error != null)
           Padding(
             padding: const EdgeInsets.all(8),
-            child: Text(error!, style: const TextStyle(color: AppTheme.red)),
+            child: Text(error!, style: TextStyle(color: AppTheme.red)),
           ),
         Expanded(
           child: loading
@@ -226,12 +226,12 @@ class _InventoriesPageState extends State<InventoriesPage> {
             ),
             Text(
               '${inv['site']?['name'] ?? ''} · ${inv['period_date']}',
-              style: const TextStyle(color: AppTheme.muted),
+              style: TextStyle(color: AppTheme.muted),
             ),
             if (status == 'counting')
               Text(
                 '${lines.length} lot(s) à compter',
-                style: const TextStyle(color: AppTheme.muted),
+                style: TextStyle(color: AppTheme.muted),
               ),
             const SizedBox(height: 8),
             if (status == 'draft')
@@ -622,7 +622,7 @@ class _InventorySummaryLine extends StatelessWidget {
     child: Row(
       children: [
         Expanded(
-          child: Text(label, style: const TextStyle(color: AppTheme.muted)),
+          child: Text(label, style: TextStyle(color: AppTheme.muted)),
         ),
         Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
       ],

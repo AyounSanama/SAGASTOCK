@@ -86,7 +86,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     ),
                   ),
                 if (_items.isEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 80),
                     child: Column(
                       children: [

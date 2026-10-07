@@ -214,7 +214,7 @@ class _CoordinationPageState extends State<CoordinationPage>
                 _Muted(isProjectAdmin ? 'Admin Projet' : 'Coordination (lecture seule)'),
                 const SizedBox(height: 12),
                 if (error != null) ...[
-                  Text(error!, style: const TextStyle(color: AppColors.dangerText)),
+                  Text(error!, style: TextStyle(color: AppColors.dangerText)),
                   const SizedBox(height: 8),
                 ],
                 TextField(
@@ -292,7 +292,7 @@ class _CoordinationPageState extends State<CoordinationPage>
                   style: account['is_active'] == true
                       ? OutlinedButton.styleFrom(
                           foregroundColor: AppColors.dangerText,
-                          side: const BorderSide(color: AppColors.dangerText),
+                          side: BorderSide(color: AppColors.dangerText),
                         )
                       : null,
                   onPressed: saving ? null : () => Navigator.pop(sheetContext, 'toggle'),
@@ -407,7 +407,7 @@ class _CoordinationPageState extends State<CoordinationPage>
               width: double.infinity,
               color: AppColors.infoSurface,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: const Text(
+              child: Text(
                 'Hors ligne : données de la dernière synchronisation.',
                 style: TextStyle(color: AppColors.infoText),
               ),
@@ -497,7 +497,7 @@ class _CoordinationPageState extends State<CoordinationPage>
                 if (project['donor_name'] != null)
                   Text(
                     '${project['donor_name']}',
-                    style: const TextStyle(color: AppColors.textMuted),
+                    style: TextStyle(color: AppColors.textMuted),
                   ),
               ],
             ),
@@ -548,7 +548,7 @@ class _CoordinationPageState extends State<CoordinationPage>
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.dangerText,
-                      side: const BorderSide(color: AppColors.dangerText),
+                      side: BorderSide(color: AppColors.dangerText),
                       minimumSize: const Size.fromHeight(46),
                     ),
                     onPressed: _busy ? null : () => _refuse(facility),
@@ -617,7 +617,7 @@ class _CoordinationPageState extends State<CoordinationPage>
                 'validated' => OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.dangerText,
-                    side: const BorderSide(color: AppColors.dangerText),
+                    side: BorderSide(color: AppColors.dangerText),
                   ),
                   onPressed: _busy ? null : () => _suspend(facility),
                   child: const Text('Suspendre la FOSA'),
@@ -788,8 +788,9 @@ class _CountTab extends StatelessWidget {
           ),
           child: Text(
             '${count ?? 0}',
+            // Pastille blanche sur l'en-tête sombre dans les deux modes : chiffre foncé fixe.
             style: const TextStyle(
-              color: AppColors.text,
+              color: Color(0xFF1C1F23),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -946,7 +947,7 @@ class _AccountRow extends StatelessWidget {
               style: active
                   ? OutlinedButton.styleFrom(
                       foregroundColor: AppColors.dangerText,
-                      side: const BorderSide(color: AppColors.dangerText),
+                      side: BorderSide(color: AppColors.dangerText),
                     )
                   : null,
               onPressed: onToggle,
@@ -977,7 +978,7 @@ class _Banner extends StatelessWidget {
       children: [
         Expanded(
           child: DefaultTextStyle.merge(
-            style: const TextStyle(color: AppColors.infoText),
+            style: TextStyle(color: AppColors.infoText),
             child: text,
           ),
         ),
@@ -1048,7 +1049,7 @@ class _Line extends StatelessWidget {
     final text = '${value ?? ''}'.trim();
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: Row(
@@ -1068,7 +1069,7 @@ class _Muted extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: 2),
-    child: Text(text, style: const TextStyle(color: AppColors.textMuted)),
+    child: Text(text, style: TextStyle(color: AppColors.textMuted)),
   );
 }
 
@@ -1083,7 +1084,7 @@ class _Message extends StatelessWidget {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(text, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textMuted)),
+        Text(text, textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted)),
         if (onRetry != null) ...[
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Réessayer')),

@@ -80,7 +80,7 @@ class _ProjectAdminFacilitiesPageState extends State<ProjectAdminFacilitiesPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(project.isEmpty ? 'Mon projet' : 'Projet ${project['code']}', style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    Text(project.isEmpty ? 'Mon projet' : 'Projet ${project['code']}', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
                     const Text('Formations sanitaires', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 12),
                     TextField(
@@ -140,12 +140,12 @@ class _ProjectAdminFacilitiesPageState extends State<ProjectAdminFacilitiesPage>
                               ),
                               Text(
                                 [facility['code'], facility['category_code']?.toString().replaceFirst('CAT-', '') ?? facility['category']].whereType<String>().join(' · '),
-                                style: const TextStyle(color: AppColors.textMuted),
+                                style: TextStyle(color: AppColors.textMuted),
                               ),
                               const SizedBox(height: 8),
                               Text(
                                 '${facility['care_level'] ?? '—'}     ${facility['accounts_count'] ?? 0} ${(facility['accounts_count'] ?? 0) == 1 ? 'compte' : 'comptes'}',
-                                style: const TextStyle(color: AppColors.textMuted),
+                                style: TextStyle(color: AppColors.textMuted),
                               ),
                             ],
                           ),

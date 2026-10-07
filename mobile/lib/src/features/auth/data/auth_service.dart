@@ -268,6 +268,25 @@ class AuthService {
     }
   }
 
+  /// Niveau 4 — Mode d'affichage (Clair / Sombre / Système) : appliqué tout de
+  /// suite sur le téléphone, envoyé au serveur dès que possible.
+  Future<void> updateThemePreference(String preference) async {
+    final user = await cachedUser();
+    if (user != null) {
+      user['theme_preference'] = preference;
+      await _storage.write(key: _userKey, value: jsonEncode(user));
+    }
+    try {
+      await _client.dio.put<void>(
+        '/auth/theme',
+        data: {'theme_preference': preference},
+        options: await _authorized(),
+      );
+    } catch (_) {
+      // Hors connexion : le choix reste actif sur le téléphone.
+    }
+  }
+
   Future<List<Map<String, dynamic>>> devices() async {
     final response = await _client.dio.get<Map<String, dynamic>>(
       '/auth/devices',

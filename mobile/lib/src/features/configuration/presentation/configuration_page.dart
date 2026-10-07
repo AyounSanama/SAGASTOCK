@@ -61,7 +61,7 @@ class _ConfigurationPageState extends State<ConfigurationPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Le parcours n’a pas pu être créé.'),
             backgroundColor: AppTheme.danger,
           ),
@@ -183,7 +183,7 @@ class _ActiveWorkflow extends StatelessWidget {
           const SizedBox(height: 7),
           Text(
             '${percent.round()} % · étape ${workflow['current_step'] ?? 1} sur 12',
-            style: const TextStyle(color: AppTheme.gray),
+            style: TextStyle(color: AppTheme.gray),
           ),
         ],
       ),
@@ -226,7 +226,7 @@ class _FlowCard extends StatelessWidget {
                 ),
                 Text(
                   'Démarre à l’étape ${flow['start_step']}',
-                  style: const TextStyle(color: AppTheme.gray, fontSize: 12),
+                  style: TextStyle(color: AppTheme.gray, fontSize: 12),
                 ),
               ],
             ),
@@ -268,7 +268,7 @@ class _WorkflowCard extends StatelessWidget {
           const SizedBox(height: 7),
           Text(
             '${workflow['progress_percent'] ?? 0} % · étape ${workflow['current_step'] ?? 1}',
-            style: const TextStyle(color: AppTheme.gray),
+            style: TextStyle(color: AppTheme.gray),
           ),
         ],
       ),
@@ -285,7 +285,7 @@ class _ErrorCard extends StatelessWidget {
   Widget build(BuildContext context) => _Panel(
     child: Column(
       children: [
-        const Icon(Icons.cloud_off_rounded, color: AppTheme.danger, size: 34),
+        Icon(Icons.cloud_off_rounded, color: AppTheme.danger, size: 34),
         const SizedBox(height: 10),
         Text(message, textAlign: TextAlign.center),
         const SizedBox(height: 12),

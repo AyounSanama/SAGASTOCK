@@ -450,7 +450,7 @@ class _MissionsPageState extends State<MissionsPage> {
                         ),
                         if (mission['_sync_status'] == 'pending') ...[
                           const SizedBox(height: 4),
-                          const Text(
+                          Text(
                             'En attente de synchronisation',
                             style: TextStyle(
                               color: AppColors.infoText,

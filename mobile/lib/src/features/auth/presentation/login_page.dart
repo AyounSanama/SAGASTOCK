@@ -127,7 +127,7 @@ class _LoginPageState extends State<LoginPage> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.error_outline,
                                 size: 18,
                                 color: AppColors.danger,

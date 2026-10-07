@@ -132,7 +132,7 @@ class _ProjectHeader extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       child: Row(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             backgroundColor: AppTheme.orangeSoft,
             child: Icon(Icons.business_center_outlined, color: AppTheme.orange),
           ),
@@ -150,7 +150,7 @@ class _ProjectHeader extends StatelessWidget {
                 ),
                 Text(
                   'Code : ${project['code'] ?? '—'}',
-                  style: const TextStyle(color: AppTheme.muted),
+                  style: TextStyle(color: AppTheme.muted),
                 ),
               ],
             ),
@@ -202,7 +202,7 @@ class _RelationsSection extends StatelessWidget {
   Widget build(BuildContext context) => _Section(
     title: title,
     children: values.isEmpty
-        ? const [
+        ? [
             Text(
               'Aucun élément associé.',
               style: TextStyle(color: AppTheme.muted),
@@ -213,7 +213,7 @@ class _RelationsSection extends StatelessWidget {
                 (item) => ListTile(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.check_circle_outline,
                     color: AppTheme.green,
                   ),
@@ -280,7 +280,7 @@ class _Line extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Text(label, style: const TextStyle(color: AppTheme.muted)),
+          child: Text(label, style: TextStyle(color: AppTheme.muted)),
         ),
         const SizedBox(width: 12),
         Expanded(
