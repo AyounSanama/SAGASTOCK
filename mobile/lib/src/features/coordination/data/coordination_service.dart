@@ -73,6 +73,13 @@ class CoordinationService {
   Future<void> updateAccount(String userId, Map<String, dynamic> data) =>
       _post('/coordination/accounts/$userId', data, 'PUT');
 
+  /// Langues de la coordination, choisies par la Coordination elle-même.
+  Future<void> updateLanguages(String missionId, String defaultLanguage, List<String> additional) => _post(
+    '/coordination/missions/$missionId/languages',
+    {'default_language': defaultLanguage, 'additional_languages': additional},
+    'PUT',
+  );
+
   /// Niveau 6 — Liste Standard d'un projet, ou d'une FOSA ([facilityId]).
   /// Gardée sur le téléphone pour la consultation hors ligne.
   Future<Map<String, dynamic>> standardList({String? projectId, String? facilityId}) =>

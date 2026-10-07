@@ -49,8 +49,6 @@ class _ConfigurationFormState extends State<_ConfigurationForm> {
 
   Map<String, dynamic> _defaults(String category) => switch (category) {
     'general' => {
-      'default_language': 'fr',
-      'additional_languages': <String>[],
       'timezone': 'Africa/Douala',
       'locale': 'fr_FR',
       'date_format': 'd/m/Y',
@@ -169,8 +167,7 @@ class _ConfigurationFormState extends State<_ConfigurationForm> {
 
   List<Widget> _fields() => switch (key) {
     'general' => [
-      _select('Langue principale', 'default_language', languageCatalog),
-      _languages(),
+      // Les langues sont choisies par chaque Coordination, plus par l'Admin Sago.
       _select('Fuseau horaire', 'timezone', const {
         'Africa/Douala': 'Africa/Douala',
         'Africa/Dakar': 'Africa/Dakar',
@@ -275,95 +272,6 @@ class _ConfigurationFormState extends State<_ConfigurationForm> {
           onChanged: (value) => values[name] = value,
         ),
       );
-
-  /// Langues supplémentaires : toutes les langues ISO, avec recherche.
-  Widget _languages() {
-    final selected = [
-      for (final code in (values['additional_languages'] as List? ?? const [])) '$code',
-    ];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: InputDecorator(
-        decoration: const InputDecoration(labelText: 'Langues supplémentaires'),
-        child: Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            for (final code in selected)
-              InputChip(
-                label: Text(languageCatalog[code] ?? code),
-                onDeleted: () => setState(() => values['additional_languages'] = [...selected]..remove(code)),
-              ),
-            TextButton.icon(
-              icon: const Icon(Icons.add),
-              label: Text(selected.isEmpty ? 'Choisir des langues' : 'Modifier'),
-              onPressed: () async {
-                final chosen = await _pickLanguages(selected);
-                if (chosen != null) setState(() => values['additional_languages'] = chosen);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<List<String>?> _pickLanguages(List<String> initial) {
-    final chosen = {...initial};
-    var search = '';
-    return showDialog<List<String>>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          final term = search.trim().toLowerCase();
-          final entries = languageCatalog.entries
-              .where((entry) => term.isEmpty || entry.value.toLowerCase().contains(term) || entry.key.contains(term))
-              .toList();
-          return AlertDialog(
-            title: const Text('Langues supplémentaires'),
-            content: SizedBox(
-              width: double.maxFinite,
-              height: 420,
-              child: Column(
-                children: [
-                  TextField(
-                    decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Rechercher une langue'),
-                    onChanged: (value) => setDialogState(() => search = value),
-                  ),
-                  Expanded(
-                    child: ListView(
-                      children: [
-                        for (final entry in entries)
-                          CheckboxListTile(
-                            dense: true,
-                            value: chosen.contains(entry.key),
-                            title: Text(entry.value),
-                            onChanged: (checked) => setDialogState(
-                              () => checked == true ? chosen.add(entry.key) : chosen.remove(entry.key),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, [
-                  for (final code in languageCatalog.keys)
-                    if (chosen.contains(code)) code,
-                ]),
-                child: Text('Valider (${chosen.length})'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
 
   Widget _toggle(String label, String name) => SwitchListTile(
     contentPadding: EdgeInsets.zero,

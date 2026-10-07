@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/connectivity/connectivity_service.dart';
+import '../../../core/localization/language_catalog.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_badge.dart';
+import '../../../core/widgets/language_picker.dart';
 import '../../users/presentation/coordination_account_sheet.dart';
 import '../data/coordination_service.dart';
 
@@ -91,6 +93,88 @@ class _CoordinationPageState extends State<CoordinationPage>
   List<Map<String, dynamic>> get _pending => _list('facilities')
       .where((facility) => facility['validation_status'] == 'pending')
       .toList(growable: false);
+
+  /// Langues de la coordination : choisies par la Coordination elle-même.
+  Future<void> _editLanguages() async {
+    final missionId = '${_mission['id'] ?? ''}';
+    if (missionId.isEmpty) return;
+    var primary = '${_mission['default_language'] ?? 'fr'}';
+    var additional = [
+      for (final code in (_mission['additional_languages'] as List? ?? const [])) '$code',
+    ];
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.viewInsetsOf(sheetContext).bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Langues de la coordination', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text('Choisies par votre coordination.', style: TextStyle(color: AppColors.textMuted)),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: languageCatalog.containsKey(primary) ? primary : 'fr',
+                isExpanded: true,
+                menuMaxHeight: 420,
+                decoration: const InputDecoration(labelText: 'Langue principale *'),
+                items: [
+                  for (final entry in languageCatalog.entries)
+                    DropdownMenuItem(value: entry.key, child: Text(entry.value, overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (value) => setSheetState(() {
+                  primary = value ?? primary;
+                  additional = [...additional]..remove(primary);
+                }),
+              ),
+              const SizedBox(height: 16),
+              const Text('Langues supplémentaires', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  for (final code in additional)
+                    InputChip(
+                      label: Text(languageCatalog[code] ?? code),
+                      onDeleted: () => setSheetState(() => additional = [...additional]..remove(code)),
+                    ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: Text(additional.isEmpty ? 'Choisir des langues' : 'Modifier'),
+                    onPressed: () async {
+                      final chosen = await showLanguagePicker(sheetContext, initial: additional, excluded: {primary});
+                      if (chosen != null) setSheetState(() => additional = chosen);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primaryStrong,
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: () => Navigator.pop(sheetContext, true),
+                child: const Text('Enregistrer'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    await _run(
+      () => _service.updateLanguages(missionId, primary, additional),
+      'Langues de la coordination enregistrées.',
+    );
+  }
 
   Future<void> _run(Future<void> Function() action, String success) async {
     if (_busy) return;
@@ -383,6 +467,12 @@ class _CoordinationPageState extends State<CoordinationPage>
                                 ),
                               ),
                             ),
+                            if (_canAct)
+                              IconButton(
+                                tooltip: 'Langues de la coordination',
+                                icon: const Icon(Icons.translate, color: Colors.white),
+                                onPressed: _busy ? null : _editLanguages,
+                              ),
                             // Niveau 6 : Liste Standard (décochage par FOSA, code-barres).
                             IconButton(
                               tooltip: 'Liste Standard',

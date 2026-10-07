@@ -28,15 +28,38 @@ details.mc-row>summary{list-style:none;cursor:pointer}details.mc-row>summary::-w
 .mc-grid-acc{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;align-items:start}.mc-journal{padding:18px}.mc-journal header{display:flex;justify-content:space-between}.mc-journal h2{font-size:16px;margin:0}.mc-journal ul{list-style:none;padding:0;margin:10px 0}.mc-journal li{display:grid;grid-template-columns:10px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--pc-color-border)}.mc-journal li i{width:8px;height:8px;border-radius:50%;background:var(--pc-color-primary);margin-top:7px}.mc-journal small{display:block;color:var(--pc-color-text-muted)}
 .mc-notice{padding:12px 15px;border-radius:10px;margin:0 0 16px;background:var(--pc-status-success-bg);color:var(--pc-status-success-text)}.mc-notice.error{background:var(--pc-status-danger-bg);color:var(--pc-status-danger-text)}.mc-empty{padding:30px;text-align:center;color:var(--pc-color-text-muted)}
 .mc-field{display:block;font-weight:600;font-size:14px}.mc-field :is(input:not([type=checkbox]),select){display:block;width:100%;margin-top:6px;min-height:40px;border:1px solid var(--pc-color-border);border-radius:10px;padding:8px 10px;font:inherit}.mc-field textarea{display:block;width:100%;margin-top:6px;border:1px solid var(--pc-color-border);border-radius:10px;padding:10px;font:inherit}
+.mc-langs{display:flex;align-items:center;gap:6px;margin-top:6px!important;color:var(--pc-color-text-muted);font-size:14px}.mc-langs .material-symbols-outlined{font-size:18px}.mc-lang-search{width:100%;min-height:40px;border:1px solid var(--pc-color-border);border-radius:10px;padding:8px 10px;font:inherit;margin-bottom:8px;background:var(--pc-color-surface,#fff);color:inherit}.mc-lang-list{max-height:320px;overflow:auto;border:1px solid var(--pc-color-border);border-radius:10px;padding:6px 10px}.mc-lang-list label{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:14px}
 @media(max-width:1100px){.mc-kpis{grid-template-columns:repeat(2,1fr)}.mc-split,.mc-grid-acc{grid-template-columns:1fr}}
 @media(max-width:650px){.mc{padding:18px 16px 40px}.mc-head{flex-direction:column}.mc-head .mc-btn{width:100%}.mc-kpis{grid-template-columns:1fr}.mc-cols{grid-template-columns:1fr}.mc-filters input,.mc-filters select{width:100%!important;flex:1 1 100%!important;min-width:0}}
 </style>@endpush
 @section('content')
 <div class="mc">
     <header class="mc-head">
-        <div><h1>Ma Coordination</h1><p>{{ $organization->name }}, {{ $mission->name }}, {{ $mission->country->name }}</p></div>
-        @if($c['can_act'] && $canManageProjects)<a class="mc-btn primary" href="{{ route('projects.wizard.create') }}"><span class="material-symbols-outlined">add</span> Créer un projet / programme</a>@endif
+        <div><h1>Ma Coordination</h1><p>{{ $organization->name }}, {{ $mission->name }}, {{ $mission->country->name }}</p>
+            <p class="mc-langs"><span class="material-symbols-outlined" aria-hidden="true">translate</span> Langues : {{ implode(' · ', $mission->languageLabels()) }}</p></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+            @if($c['can_act'])<button class="mc-btn" type="button" data-sheet-open="languages-sheet"><span class="material-symbols-outlined">translate</span> Langues</button>@endif
+            @if($c['can_act'] && $canManageProjects)<a class="mc-btn primary" href="{{ route('projects.wizard.create') }}"><span class="material-symbols-outlined">add</span> Créer un projet / programme</a>@endif
+        </div>
     </header>
+    @if($c['can_act'])
+        {{-- Les langues sont choisies par la Coordination elle-même, plus par l'Admin Sago. --}}
+        <x-form-sheet id="languages-sheet" title="Langues de la coordination" description="Langue principale et langues supplémentaires utilisées par votre coordination ({{ $mission->country->name }}).">
+            <form method="post" action="{{ route('coordination.languages.update', $mission) }}">@csrf @method('PUT')
+                <label class="mc-field">Langue principale *
+                    <select name="default_language" required>@foreach(config('pharmacare_languages.catalog') as $code => $label)<option value="{{ $code }}" @selected(old('default_language', $mission->default_language ?: 'fr') === $code)>{{ $label }}</option>@endforeach</select>
+                </label>
+                <p class="mc-field" style="margin:16px 0 6px">Langues supplémentaires</p>
+                <input type="search" class="mc-lang-search" placeholder="Rechercher une langue" aria-label="Rechercher une langue" data-language-search>
+                <div class="mc-lang-list">
+                    @foreach(config('pharmacare_languages.catalog') as $code => $label)
+                        <label data-language="{{ mb_strtolower($code.' '.$label) }}"><input type="checkbox" name="additional_languages[]" value="{{ $code }}" @checked(in_array($code, old('additional_languages', $mission->additional_languages ?? []), true))> {{ $label }}</label>
+                    @endforeach
+                </div>
+                <div class="mc-foot" style="margin-top:18px;border:0"><button class="mc-btn secondary" type="button" data-sheet-close="languages-sheet">Annuler</button><button class="mc-btn primary">Enregistrer</button></div>
+            </form>
+        </x-form-sheet>
+    @endif
     @if(session('status'))<div class="mc-notice" style="margin-top:16px">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="mc-notice error" style="margin-top:16px">{{ $errors->first() }}</div>@endif
 
@@ -270,3 +293,11 @@ document.addEventListener('DOMContentLoaded', () => document.querySelectorAll('[
 @endif
 @if($errors->has('reason') && $tab === 'pending')<script>document.addEventListener('DOMContentLoaded', () => document.getElementById('refuse-sheet')?.showModal())</script>@endif
 @endsection
+
+@push('scripts')<script>
+// Recherche dans la liste des langues de la coordination.
+document.querySelector('[data-language-search]')?.addEventListener('input', (event) => {
+    const term = event.target.value.trim().toLowerCase();
+    document.querySelectorAll('[data-language]').forEach((row) => { row.hidden = term !== '' && !row.dataset.language.includes(term); });
+});
+</script>@endpush

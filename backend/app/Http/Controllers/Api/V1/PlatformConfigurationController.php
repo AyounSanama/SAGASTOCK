@@ -143,9 +143,7 @@ class PlatformConfigurationController extends Controller
     {
         $rules = match ($category) {
             'general' => [
-                'settings.default_language' => ['required', 'string', Rule::in(array_keys(config('pharmacare_languages.catalog', [])))],
-                'settings.additional_languages' => ['nullable', 'array'],
-                'settings.additional_languages.*' => ['string', 'distinct', Rule::in(array_keys(config('pharmacare_languages.catalog', [])))],
+                // Les langues sont choisies par chaque Coordination (Ma Coordination), plus par l'Admin Sago.
                 'settings.timezone' => ['required', 'timezone:all'],
                 'settings.locale' => ['required', Rule::in(array_keys(config('pharmacare_languages.regional_formats', [])))],
                 'settings.date_format' => ['required', Rule::in(['d/m/Y', 'Y-m-d', 'm/d/Y'])],

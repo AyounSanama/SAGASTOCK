@@ -113,6 +113,16 @@ class _FakeService implements CoordinationService {
 
   @override
   Future<void> saveBarcode(String projectId, String productId, String barcode) async {}
+
+  final savedLanguages = <String, Object>{};
+
+  @override
+  Future<void> updateLanguages(String missionId, String defaultLanguage, List<String> additional) async {
+    savedLanguages
+      ..['mission'] = missionId
+      ..['default'] = defaultLanguage
+      ..['additional'] = additional;
+  }
 }
 
 Future<void> _pump(WidgetTester tester, CoordinationService service, {bool online = true}) async {
@@ -193,6 +203,30 @@ void main() {
     await tester.tap(find.text('Enregistrer pour cette FOSA (1 / 2)'));
     await tester.pumpAndSettle();
     expect(service.savedFacilityLists['f1'], ['a1']);
+  });
+
+  testWidgets('langues : la Coordination choisit elle-même ses langues', (tester) async {
+    final service = _FakeService();
+    await _pump(tester, service);
+    await tester.tap(find.byTooltip('Langues de la coordination'));
+    await tester.pumpAndSettle();
+    expect(find.text('Langues de la coordination'), findsOneWidget);
+    await tester.tap(find.text('Choisir des langues'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Rechercher une langue'), 'wolof');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Wollof (wolof)'));
+    await tester.pump();
+    await tester.tap(find.text('Valider (1)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    expect(service.savedLanguages, {'mission': 'm1', 'default': 'fr', 'additional': ['wo']});
+  });
+
+  testWidgets('langues : bouton absent en lecture seule', (tester) async {
+    await _pump(tester, _FakeService(canAct: false));
+    expect(find.byTooltip('Langues de la coordination'), findsNothing);
   });
 
   testWidgets('niveau 6 : lecture seule, aucune modification de la Liste Standard', (tester) async {

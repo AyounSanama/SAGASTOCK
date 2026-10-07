@@ -158,6 +158,34 @@ class CoordinationService
         return $target->refresh();
     }
 
+    /**
+     * Langues de la Coordination : choisies par la Coordination elle-même
+     * (langue principale + langues supplémentaires, liste ISO 639-1).
+     */
+    public function updateLanguages(Request $request, Mission $mission): Mission
+    {
+        $actor = $request->user();
+        $this->assertCoordinator($actor);
+        abort_if($actor->read_only, 403, 'Compte en lecture seule.');
+        abort_unless($this->scopes->coordinationMissionIds($actor)->contains($mission->id), 404);
+        $codes = array_keys(config('pharmacare_languages.catalog', []));
+        $data = $request->validate([
+            'default_language' => ['required', 'string', \Illuminate\Validation\Rule::in($codes)],
+            'additional_languages' => ['nullable', 'array'],
+            'additional_languages.*' => ['string', 'distinct', \Illuminate\Validation\Rule::in($codes)],
+        ], [], ['default_language' => 'langue principale', 'additional_languages' => 'langues supplémentaires', 'additional_languages.*' => 'langue supplémentaire']);
+
+        $old = $mission->only(['default_language', 'additional_languages']);
+        $mission->update([
+            'default_language' => $data['default_language'],
+            // La langue principale n'est pas répétée parmi les langues supplémentaires.
+            'additional_languages' => collect($data['additional_languages'] ?? [])->reject(fn ($code) => $code === $data['default_language'])->values()->all(),
+        ]);
+        $this->audit->record($request, 'mission.languages.updated', $mission, $old, $mission->only(['default_language', 'additional_languages']));
+
+        return $mission->refresh();
+    }
+
     /** Comptes que la Coordination peut suspendre ou réactiver. */
     public function manageableAccounts(User $actor): Builder
     {

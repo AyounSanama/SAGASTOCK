@@ -45,6 +45,14 @@ class CoordinationController extends Controller
         return back()->with('status', "FOSA « {$model->name} » réactivée.");
     }
 
+    /** Langues de la Coordination, choisies par elle-même. */
+    public function updateLanguages(Request $request, \App\Models\Mission $mission): RedirectResponse
+    {
+        $mission = $this->coordination->updateLanguages($request, $mission);
+
+        return back()->with('status', 'Langues de la coordination enregistrées : '.implode(', ', $mission->languageLabels()).'.');
+    }
+
     public function updateAccount(Request $request, User $user): RedirectResponse
     {
         $user = $this->coordination->updateAccount($request, $user);

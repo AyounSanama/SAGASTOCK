@@ -27,11 +27,23 @@ class Mission extends Model
         'email',
         'description',
         'is_active',
+        // Langues choisies par la Coordination elle-même (Ma Coordination).
+        'default_language',
+        'additional_languages',
     ];
 
     protected function casts(): array
     {
-        return ['starts_on' => 'date', 'ends_on' => 'date', 'is_active' => 'boolean'];
+        return ['starts_on' => 'date', 'ends_on' => 'date', 'is_active' => 'boolean', 'additional_languages' => 'array'];
+    }
+
+    /** Langue principale puis langues supplémentaires, avec leur nom. @return array<string,string> */
+    public function languageLabels(): array
+    {
+        $catalog = config('pharmacare_languages.catalog', []);
+
+        return collect([$this->default_language ?: 'fr', ...($this->additional_languages ?? [])])->unique()
+            ->mapWithKeys(fn (string $code) => [$code => $catalog[$code] ?? $code])->all();
     }
 
     public function organization(): BelongsTo

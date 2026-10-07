@@ -116,6 +116,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/facilities/{facility}/refuse', [\App\Http\Controllers\Web\CoordinationController::class, 'refuseFacility'])->name('facilities.refuse');
         Route::post('/facilities/{facility}/suspend', [\App\Http\Controllers\Web\CoordinationController::class, 'suspendFacility'])->name('facilities.suspend');
         Route::post('/facilities/{facility}/reactivate', [\App\Http\Controllers\Web\CoordinationController::class, 'reactivateFacility'])->name('facilities.reactivate');
+        Route::put('/missions/{mission}/languages', [\App\Http\Controllers\Web\CoordinationController::class, 'updateLanguages'])->name('languages.update');
         Route::put('/accounts/{user}', [\App\Http\Controllers\Web\CoordinationController::class, 'updateAccount'])->name('accounts.update');
         Route::post('/accounts/{user}/suspend', [\App\Http\Controllers\Web\CoordinationController::class, 'suspendAccount'])->name('accounts.suspend');
         Route::post('/accounts/{user}/reactivate', [\App\Http\Controllers\Web\CoordinationController::class, 'reactivateAccount'])->name('accounts.reactivate');

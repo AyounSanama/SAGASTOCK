@@ -30,7 +30,7 @@ class CoordinationController extends Controller
         $projectCodes = $data['projects']->pluck('code', 'id');
 
         return response()->json([
-            'mission' => $mission->only(['id', 'code', 'name']) + ['country' => $mission->country?->name],
+            'mission' => $mission->only(['id', 'code', 'name', 'default_language', 'additional_languages']) + ['country' => $mission->country?->name],
             'can_act' => ! $request->user()->read_only,
             'stats' => $data['stats'],
             'projects' => $data['projects']->map(fn ($project) => $project->only(['id', 'code', 'name', 'type', 'type_label', 'status', 'status_label',
@@ -119,6 +119,14 @@ class CoordinationController extends Controller
         $this->coordination->reactivate($request, $model);
 
         return response()->json(['facility' => $model->fresh()]);
+    }
+
+    /** Langues de la Coordination, choisies par elle-même. */
+    public function updateLanguages(Request $request, Mission $mission): JsonResponse
+    {
+        $mission = $this->coordination->updateLanguages($request, $mission);
+
+        return response()->json(['mission' => $mission->only(['id', 'default_language', 'additional_languages'])]);
     }
 
     public function updateAccount(Request $request, User $user): JsonResponse

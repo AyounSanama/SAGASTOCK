@@ -219,6 +219,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/facilities/{facility}/refuse', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'refuseFacility']);
             Route::post('/facilities/{facility}/suspend', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'suspendFacility']);
             Route::post('/facilities/{facility}/reactivate', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'reactivateFacility']);
+            Route::put('/missions/{mission}/languages', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'updateLanguages']);
             Route::put('/accounts/{user}', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'updateAccount']);
             Route::post('/accounts/{user}/suspend', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'suspendAccount']);
             Route::post('/accounts/{user}/reactivate', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'reactivateAccount']);

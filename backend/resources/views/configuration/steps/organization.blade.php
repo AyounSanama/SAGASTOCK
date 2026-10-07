@@ -79,7 +79,6 @@
                 <div><dt>Admin Coordination</dt><dd>{{ $item->users->first()?->name ?? '—' }}</dd></div>
                 <div><dt>Projets actifs</dt><dd>{{ $item->projects_count }}</dd></div>
                 <div><dt>Code</dt><dd>{{ $item->code }}</dd></div>
-                <div><dt>Langue</dt><dd>{{ config('pharmacare_languages.catalog.'.($item->default_language ?: 'fr'), $item->default_language ?: 'Français') }}</dd></div>
                 <div><dt>Téléphone</dt><dd>{{ $item->phone ?: '—' }}</dd></div>
                 <div><dt>E-mail</dt><dd>{{ $item->email ?: '—' }}</dd></div>
                 <div class="full"><dt>Adresse</dt><dd>{{ $item->address ?: '—' }}</dd></div>

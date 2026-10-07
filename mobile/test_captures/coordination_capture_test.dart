@@ -182,6 +182,16 @@ class _FakeService implements CoordinationService {
 
   @override
   Future<void> saveBarcode(String projectId, String productId, String barcode) async {}
+
+  final savedLanguages = <String, Object>{};
+
+  @override
+  Future<void> updateLanguages(String missionId, String defaultLanguage, List<String> additional) async {
+    savedLanguages
+      ..['mission'] = missionId
+      ..['default'] = defaultLanguage
+      ..['additional'] = additional;
+  }
 }
 
 Future<void> _fonts() async {
