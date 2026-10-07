@@ -33,6 +33,7 @@ class MedicalReferenceController extends Controller
             'tree' => $this->hierarchy->tree($organization, activeOnly: false),
             'target_populations' => $this->flat($organization, 'target_population'),
             'pathologies' => $this->flat($organization, 'pathology'),
+            'laboratory_exams' => $this->flat($organization, 'laboratory_exam'),
             'can_manage' => $this->canManage($request),
         ]);
     }

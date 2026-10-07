@@ -44,6 +44,8 @@ class MedicalReferenceController extends Controller
             'levels' => CareLevelHierarchyService::DEPTH_LABELS,
             'populations' => $this->flat($organization, 'target_population'),
             'pathologies' => $this->flat($organization, 'pathology'),
+            // Niveau 6 : examens proposés avec « Programme Laboratoire ».
+            'laboratoryExams' => $this->flat($organization, 'laboratory_exam'),
             'canManage' => $this->canManage($request),
         ]);
     }
@@ -73,7 +75,11 @@ class MedicalReferenceController extends Controller
         $reference = $this->medical->createReference($organization, $type, $data);
         $this->audit->record($request, 'reference.created', $reference, [], $reference->only(['reference_type', 'code', 'name']));
 
-        return back()->with('status', $type === 'pathology' ? 'Pathologie ajoutée.' : 'Population cible ajoutée.');
+        return back()->with('status', match ($type) {
+            'pathology' => 'Pathologie ajoutée.',
+            'laboratory_exam' => 'Examen de laboratoire ajouté.',
+            default => 'Population cible ajoutée.',
+        });
     }
 
     public function archiveCareLevel(Request $request, CatalogReference $reference): RedirectResponse

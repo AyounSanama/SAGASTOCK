@@ -371,13 +371,25 @@ class _CoordinationPageState extends State<CoordinationPage>
                           ),
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          '${_mission['name'] ?? 'Ma Coordination'}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${_mission['name'] ?? 'Ma Coordination'}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            // Niveau 6 : Liste Standard (décochage par FOSA, code-barres).
+                            IconButton(
+                              tooltip: 'Liste Standard',
+                              icon: const Icon(Icons.format_list_bulleted, color: Colors.white),
+                              onPressed: () => context.push('/coordination/standard-list'),
+                            ),
+                          ],
                         ),
                       ],
                     ),

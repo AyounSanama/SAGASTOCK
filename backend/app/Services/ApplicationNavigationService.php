@@ -94,7 +94,7 @@ class ApplicationNavigationService
                 }
                 if ($item['key'] === 'standard-lists') {
                     // /standard-lists redirige vers la Liste Standard du catalogue.
-                    $item['active_routes'] = ['modules.standard-lists', 'organizations.catalog.*', 'projects.standard-list.*'];
+                    $item['active_routes'] = ['modules.standard-lists', 'organizations.catalog.*', 'projects.standard-list.*', 'coordination.standard-list.*'];
                 }
                 if ($role === GovernanceService::PROJECT_ADMIN && $item['key'] === 'users') {
                     $item['label'] = 'Équipe FOSA';

@@ -27,12 +27,16 @@
         </div>
         @error('target_population_ids')<span class="wz-error">{{ $message }}</span>@enderror
 
-        <h3>Pathologies et activités *</h3>
-        <p class="wz-sub" style="margin-top:-4px">Proposées selon le niveau de soins et la population choisis.</p>
-        <div class="wz-chips" data-choice-group>
-            @forelse($pathologies as $pathology)
-                <label class="wz-chip"><input type="checkbox" name="pathology_ids[]" value="{{ $pathology['id'] }}" @checked($selected('pathology_ids', $pathology['id']))>{{ $pathology['name'] }}</label>
-            @empty<p class="wz-sub">Aucune pathologie dans le référentiel médical.</p>@endforelse
+        <div id="wizard-activities">
+            @php($others = $pathologies->where('suggested', false))
+            <h3>Pathologies et activités *</h3>
+            <p class="wz-sub" style="margin-top:-4px">{{ $suggestions ? 'Proposées selon le niveau de soins et la population choisis.' : 'Aucune correspondance enregistrée pour ces choix : toutes les pathologies et activités sont proposées.' }}</p>
+            <div class="wz-chips" data-choice-group>
+                @forelse($pathologies as $pathology)
+                    <label class="wz-chip" @unless($pathology['suggested']) hidden data-other-activity @endunless><input type="checkbox" name="pathology_ids[]" value="{{ $pathology['id'] }}" @checked($selected('pathology_ids', $pathology['id']))>{{ $pathology['name'] }}@if($pathology['type'] === 'laboratory_exam')<small>Examen</small>@endif</label>
+                @empty<p class="wz-sub">Aucune pathologie dans le référentiel médical.</p>@endforelse
+                @if($others->isNotEmpty())<button class="wz-link" type="button" style="align-self:center;border:0;background:none;cursor:pointer;font:inherit" data-show-activities>+ {{ $others->count() }} autres</button>@endif
+            </div>
         </div>
     </section>
 
@@ -42,9 +46,14 @@
                 <h2>Liste Standard générée : <span data-total>{{ $state['total'] }}</span> produits, <span data-retained>{{ $state['retained_count'] }}</span> retenus</h2>
                 <p class="wz-sub" style="margin:4px 0 0">Cochez ou décochez selon les protocoles de votre organisation. Seule la Coordination peut modifier cette liste.</p>
             </div>
-            @if($addable->isNotEmpty())<button class="wz-btn sm" type="button" data-open-dialog="product-dialog">+ Ajouter un produit</button>@endif
+            @if($canAddService)<div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="wz-btn sm" type="button" data-open-dialog="import-dialog">Importer depuis Excel</button>
+                <button class="wz-btn sm" type="button" data-open-dialog="product-dialog">+ Ajouter un produit</button>
+            </div>@endif
         </header>
         @error('retained')<p class="wz-error" style="padding:0 20px">{{ $message }}</p>@enderror
+        @if(session('import_errors'))<ul class="wz-error" style="margin:0 20px 12px;padding-left:18px">@foreach(session('import_errors') as $error)<li>{{ $error }}</li>@endforeach</ul>@endif
+        @if($errors->hasAny(['import_file', 'new_product.code', 'new_product.name', 'new_product.barcode', 'code', 'barcode', 'file']))<ul class="wz-error" style="margin:0 20px 12px;padding-left:18px">@foreach(collect(['import_file', 'new_product.code', 'new_product.name', 'new_product.barcode', 'code', 'barcode', 'file'])->map(fn ($key) => $errors->first($key))->filter() as $error)<li>{{ $error }}</li>@endforeach</ul>@endif
         @if($state['rows']->isEmpty())
             <p class="wz-sub" style="padding:0 20px 20px;margin:0">
                 @if(empty($state['care_level_ids']) || empty($state['target_population_ids']))
@@ -86,19 +95,53 @@
     </div>
 </form>
 
-@if($addable->isNotEmpty())
-<dialog class="wz-dialog" id="product-dialog" aria-labelledby="product-dialog-title">
-    <form method="dialog" data-product-form>
-        <h2 id="product-dialog-title">Ajouter un produit</h2>
-        <p>Produit du catalogue de l’organisation, ajouté à la Liste Standard du projet en plus des produits générés.</p>
-        <label class="wz-field">Produit *
-            <select name="product" required>
-                <option value="">Sélectionner un produit</option>
-                @foreach($addable as $product)<option value="{{ $product->id }}">{{ trim($product->name.' '.$product->strength) }}{{ $product->code ? ' · '.$product->code : '' }}</option>@endforeach
+@if($canAddService)
+{{-- Niveau 6 : les champs « Nouveau produit » et le fichier sont envoyés avec le formulaire de l'étape (choix en cours conservés). --}}
+<dialog class="wz-dialog" id="product-dialog" aria-labelledby="product-dialog-title" style="width:min(560px,calc(100% - 32px))">
+    <h2 id="product-dialog-title">Ajouter un produit</h2>
+    @if($addable->isNotEmpty())
+        <form method="dialog" data-product-form>
+            <p>Produit déjà au catalogue de l’organisation, ajouté en plus des produits générés.</p>
+            <div style="display:flex;gap:10px;align-items:flex-end">
+                <label class="wz-field" style="flex:1;margin-bottom:0">Produit du catalogue
+                    <select name="product">
+                        <option value="">Sélectionner un produit</option>
+                        @foreach($addable as $product)<option value="{{ $product->id }}">{{ trim($product->name.' '.$product->strength) }}{{ $product->code ? ' · '.$product->code : '' }}</option>@endforeach
+                    </select>
+                </label>
+                <button class="wz-btn" type="submit">Ajouter</button>
+            </div>
+        </form>
+        <hr style="border:0;border-top:1px solid var(--pc-color-border);margin:18px 0">
+    @endif
+    <p>Nouveau produit, avec la codification de votre organisation.</p>
+    <div class="wz-fields">
+        <label class="wz-field">Code *<input form="wizard-form" name="new_product[code]" maxlength="60" disabled data-dialog-input></label>
+        <label class="wz-field">Code-barres<input form="wizard-form" name="new_product[barcode]" maxlength="190" inputmode="numeric" disabled data-dialog-input></label>
+        <label class="wz-field wide">Désignation *<input form="wizard-form" name="new_product[name]" maxlength="190" placeholder="Ex. Amoxicilline 500 mg" disabled data-dialog-input></label>
+        <label class="wz-field wide">Conditionnement<input form="wizard-form" name="new_product[packaging]" maxlength="190" placeholder="Ex. Gélule, boîte de 1000" disabled data-dialog-input></label>
+        <label class="wz-field">Niveau de soins
+            <select form="wizard-form" name="new_product[care_level_id]" disabled data-dialog-input>
+                <option value="">Ajout manuel (toutes les FOSA)</option>
+                @foreach($selectedCareLevels as $level)<option value="{{ $level['id'] }}">{{ $level['name'] }}</option>@endforeach
             </select>
         </label>
-        <footer><button class="wz-btn" type="button" data-close-dialog>Annuler</button><button class="wz-btn primary" type="submit">Ajouter</button></footer>
-    </form>
+        <label class="wz-field">Pathologie / activité
+            <select form="wizard-form" name="new_product[activity_id]" disabled data-dialog-input>
+                <option value="">Aucune</option>
+                @foreach($selectedActivities as $activity)<option value="{{ $activity['id'] }}">{{ $activity['name'] }}</option>@endforeach
+            </select>
+        </label>
+    </div>
+    <footer><button class="wz-btn" type="button" data-close-dialog>Annuler</button><button class="wz-btn primary" type="submit" form="wizard-form" formaction="{{ route('projects.wizard.standard-list.products.store', $project) }}" formnovalidate>Créer et retenir</button></footer>
+</dialog>
+
+<dialog class="wz-dialog" id="import-dialog" aria-labelledby="import-dialog-title" style="width:min(560px,calc(100% - 32px))">
+    <h2 id="import-dialog-title">Importer depuis Excel</h2>
+    <p>Liste standard totale de votre organisation. Colonnes : Code, Désignation, Conditionnement, Niveau de soins, Population, Pathologie / activité, Catégorie FOSA, Code-barres. Un produit déjà connu (même code) est mis à jour ; les produits importés sont retenus dans la liste.</p>
+    <label class="wz-field">Fichier Excel (.xlsx) *<input form="wizard-form" type="file" name="import_file" accept=".xlsx,.xls" disabled data-dialog-input></label>
+    <p><a class="wz-link" href="{{ route('coordination.standard-list.template') }}">Télécharger le modèle Excel</a></p>
+    <footer><button class="wz-btn" type="button" data-close-dialog>Annuler</button><button class="wz-btn primary" type="submit" form="wizard-form" formaction="{{ route('projects.wizard.standard-list.import', $project) }}" formenctype="multipart/form-data" formnovalidate>Importer</button></footer>
 </dialog>
 @endif
 @endsection
@@ -128,13 +171,45 @@
         const page = new DOMParser().parseFromString(await response.text(), 'text/html');
         const list = page.getElementById('wizard-list');
         if (list) document.getElementById('wizard-list').replaceWith(list);
+        // Niveau 6 : pathologies et activités proposées selon le niveau de soins et la population.
+        const activities = page.getElementById('wizard-activities');
+        const expanded = !document.querySelector('[data-show-activities]');
+        if (activities) {
+            document.getElementById('wizard-activities').replaceWith(activities);
+            if (expanded) showActivities();
+        }
         const dialog = page.getElementById('product-dialog');
         const current = document.getElementById('product-dialog');
         if (current && dialog) current.replaceWith(dialog); else if (current) current.remove(); else if (dialog) document.body.appendChild(dialog);
         bindList();
     };
     let timer;
-    form.querySelectorAll('[data-choice-group]').forEach((group) => group.addEventListener('change', () => { clearTimeout(timer); timer = setTimeout(refresh, 250); }));
+    form.addEventListener('change', (event) => {
+        if (!event.target.closest('[data-choice-group]')) return;
+        clearTimeout(timer);
+        timer = setTimeout(refresh, 250);
+    });
+    const showActivities = () => {
+        document.querySelectorAll('[data-other-activity]').forEach((chip) => { chip.hidden = false; });
+        document.querySelector('[data-show-activities]')?.remove();
+    };
+
+    // Boîtes de dialogue : leurs champs ne partent avec le formulaire que lorsqu'elles sont ouvertes.
+    const toggleInputs = (dialog, enabled) => dialog.querySelectorAll('[data-dialog-input]').forEach((input) => { input.disabled = !enabled; });
+    document.addEventListener('click', (event) => {
+        if (event.target.closest('[data-show-activities]')) { showActivities(); return; }
+        const opener = event.target.closest('[data-open-dialog]');
+        if (opener) {
+            const dialog = document.getElementById(opener.dataset.openDialog);
+            if (!dialog) return;
+            toggleInputs(dialog, true);
+            dialog.showModal();
+            return;
+        }
+        const closer = event.target.closest('[data-close-dialog]');
+        if (closer) closer.closest('dialog')?.close();
+    });
+    document.addEventListener('close', (event) => { if (event.target.matches?.('dialog')) toggleInputs(event.target, false); }, true);
 
     const bindList = () => {
         const list = document.getElementById('wizard-list');
@@ -148,11 +223,9 @@
             list.querySelector('[data-visible]').textContent = visible;
         });
         const dialog = document.getElementById('product-dialog');
-        list.querySelector('[data-open-dialog="product-dialog"]')?.addEventListener('click', () => dialog?.showModal());
         if (dialog && !dialog.dataset.bound) {
             dialog.dataset.bound = '1';
-            dialog.querySelector('[data-close-dialog]').addEventListener('click', () => dialog.close());
-            dialog.querySelector('[data-product-form]').addEventListener('submit', (event) => {
+            dialog.querySelector('[data-product-form]')?.addEventListener('submit', (event) => {
                 event.preventDefault();
                 const id = event.target.product.value;
                 if (!id) return;

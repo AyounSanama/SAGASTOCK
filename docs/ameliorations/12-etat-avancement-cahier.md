@@ -46,10 +46,10 @@ Limites : vérification dans le code et par les tests automatiques (354 tests ba
 | Pays, ONG/MoH, bailleurs (un bailleur peut soutenir plusieurs projets), codes projet / programme MoH, intitulé | ✅ | |
 | Assistant « Créer un projet / programme » en 4 étapes, brouillon | ✅ Web · 🟡 mobile | 06/10 ; mobile écrit, à compiler sur Codemagic |
 | Niveaux de soins + « Ajouter un service » | ✅ | |
-| Niveau « Programme Laboratoire » | ❌ | Niveau 6 |
+| Niveau « Programme Laboratoire » | ✅ | 07/10 (niveau 6) : niveau global, ses examens proposés comme activités |
 | Populations par défaut (Adultes, Femmes enceintes, Enfants < 5 ans) | ✅ | Ajout d'une population : possible, à confirmer (annexe C) |
-| Pathologies selon le couple niveau de soins × population | 🟡 | Aujourd'hui par population seulement ; niveau 6 |
-| Examens de laboratoire par population | 🟡 | Référentiel présent, pas de saisie dédiée ; niveau 6 |
+| Pathologies selon le couple niveau de soins × population | ✅ | 07/10 : proposées d’après les correspondances du catalogue, les autres derrière « + N autres » |
+| Examens de laboratoire par population | ✅ | 07/10 : saisie dans Référentiels, import Excel par population |
 | 5 catégories de FOSA (HR, HD, CMA, CSI, centre ambulatoire) | ✅ | |
 | Liste générée en tableau, produits retenus ou non | ✅ | Assistant, étape 3 |
 | Liste cochée selon la catégorie dès la configuration du projet | 🟡 | La catégorie s'applique à la FOSA ; niveau 6 |
@@ -76,11 +76,11 @@ Limites : vérification dans le code et par les tests automatiques (354 tests ba
 | Seule la Coordination modifie la liste (refus serveur) | ✅ | |
 | Code, désignation, conditionnement ; en-tête ONG / bailleur | ✅ | |
 | Organisation par pathologie / activité, filtres | 🟡 | Colonne pathologie ; filtres de la maquette Admin Projet au niveau 5 |
-| Ajout de produit, codification propre à l'ONG, import Excel | 🟡 | Ajout dans l'assistant ✅ ; catalogue et import existants mais fermés à la Coordination en V1 ; niveau 6 |
-| Décocher des articles **par FOSA** | ❌ | Niveau 6 |
-| Article hors liste livré par un tiers | ❌ | Règle à valider par le client ; niveau 6 |
+| Ajout de produit, codification propre à l'ONG, import Excel | ✅ Web · 🟡 mobile | 07/10 : nouveau produit et import Excel (modèle fourni) ; sur mobile, ajout sans import de fichier |
+| Décocher des articles **par FOSA** | ✅ | 07/10 : Coordination (Web et mobile), appliqué à la dispensation ; l’Admin Projet voit « Non » |
+| Article hors liste livré par un tiers | ❌ | Reporté au niveau 7 (dépend du champ « Origine ») ; règle à valider par le client |
 | Transfert d'une liste de pathologies d'un protocole à un autre | ❌ | V2 |
-| Lien code-barres ↔ produit géré par la Coordination | ❌ | Niveau 6 |
+| Lien code-barres ↔ produit géré par la Coordination | ✅ | 07/10 : un code-barres = un seul produit ; scan au niveau 8 |
 | Prix unitaires dans la liste | ❌ | V3 (« Modification de l'application ») |
 
 ## 5. Entrées en stock (cahier 4-ii)

@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
  */
 class ProjectMedicalConfigurationService
 {
-    public const REFERENCE_TYPES = ['target_population', 'pathology'];
+    public const REFERENCE_TYPES = ['target_population', 'pathology', 'laboratory_exam'];
 
     /** Configuration actuelle, prête pour l'affichage Web, l'API et le mobile. */
     public function get(Project $project): array
@@ -27,13 +27,13 @@ class ProjectMedicalConfigurationService
         $populations = $this->references($project, 'target_population')
             ->whereIn('id', DB::table('project_target_populations')->where('project_id', $project->id)->pluck('target_population_id'));
         $links = DB::table('project_pathology_populations')->where('project_id', $project->id)->get();
-        $pathologies = $this->references($project, 'pathology')->whereIn('id', $links->pluck('pathology_id')->unique());
+        $pathologies = $this->references($project, StandardListGenerationService::ACTIVITY_TYPES)->whereIn('id', $links->pluck('pathology_id')->unique());
 
         return [
             'care_levels' => $careLevels->values(),
             'target_populations' => $populations->values(),
             'pathologies' => $pathologies->map(fn (CatalogReference $pathology) => [
-                ...$pathology->only(['id', 'code', 'name', 'organization_id']),
+                ...$pathology->only(['id', 'code', 'name', 'organization_id', 'reference_type']),
                 'target_population_ids' => $links->where('pathology_id', $pathology->id)->pluck('target_population_id')->values(),
             ])->values(),
             'is_configured' => $careLevels->isNotEmpty() && $populations->isNotEmpty(),
@@ -46,7 +46,7 @@ class ProjectMedicalConfigurationService
         return [
             'care_level_tree' => app(CareLevelHierarchyService::class)->tree($project->organization),
             'target_populations' => $this->references($project, 'target_population')->where('is_active', true)->values(),
-            'pathologies' => $this->references($project, 'pathology')->where('is_active', true)->values(),
+            'pathologies' => $this->references($project, StandardListGenerationService::ACTIVITY_TYPES)->where('is_active', true)->values(),
         ];
     }
 
@@ -73,7 +73,7 @@ class ProjectMedicalConfigurationService
 
             return $targets->map(fn (string $populationId) => ['pathology_id' => $row['pathology_id'], 'target_population_id' => $populationId]);
         })->unique(fn (array $link) => $link['pathology_id'].'|'.$link['target_population_id'])->values();
-        $this->assertReferences($project, 'pathology', $links->pluck('pathology_id')->unique()->values(), 'pathologies');
+        $this->assertReferences($project, StandardListGenerationService::ACTIVITY_TYPES, $links->pluck('pathology_id')->unique()->values(), 'pathologies');
 
         DB::transaction(function () use ($project, $careLevelIds, $populationIds, $links): void {
             $now = now();
@@ -103,17 +103,19 @@ class ProjectMedicalConfigurationService
         ]);
     }
 
-    private function references(Project $project, string $type): Collection
+    /** @param  string|list<string>  $type */
+    private function references(Project $project, string|array $type): Collection
     {
-        return CatalogReference::where('reference_type', $type)
+        return CatalogReference::whereIn('reference_type', (array) $type)
             ->where(fn ($query) => $query->whereNull('organization_id')->orWhere('organization_id', $project->organization_id))
             ->orderBy('depth')->orderBy('name')
-            ->get(['id', 'organization_id', 'parent_id', 'depth', 'code', 'name', 'is_active']);
+            ->get(['id', 'organization_id', 'reference_type', 'parent_id', 'depth', 'code', 'name', 'is_active']);
     }
 
-    private function assertReferences(Project $project, string $type, Collection $ids, string $field): void
+    /** @param  string|list<string>  $type */
+    private function assertReferences(Project $project, string|array $type, Collection $ids, string $field): void
     {
-        $valid = CatalogReference::whereIn('id', $ids)->where('reference_type', $type)->where('is_active', true)
+        $valid = CatalogReference::whereIn('id', $ids)->whereIn('reference_type', (array) $type)->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('organization_id')->orWhere('organization_id', $project->organization_id))
             ->count();
         if ($valid !== $ids->count()) {

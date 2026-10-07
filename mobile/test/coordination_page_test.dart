@@ -4,6 +4,7 @@ import 'package:sagastock_mobile/src/core/connectivity/connectivity_service.dart
 import 'package:sagastock_mobile/src/features/coordination/data/coordination_service.dart';
 import 'package:sagastock_mobile/src/features/coordination/presentation/coordination_dashboard_page.dart';
 import 'package:sagastock_mobile/src/features/coordination/presentation/coordination_page.dart';
+import 'package:sagastock_mobile/src/features/coordination/presentation/coordination_standard_list_page.dart';
 
 class _FakeConnectivity implements ConnectivityService {
   _FakeConnectivity(this.online);
@@ -83,6 +84,35 @@ class _FakeService implements CoordinationService {
   Future<void> setAccountActive(String userId, {required bool active}) async {}
   @override
   Future<void> updateAccount(String userId, Map<String, dynamic> data) async {}
+
+  final savedFacilityLists = <String, List<String>>{};
+
+  @override
+  Future<Map<String, dynamic>> standardList({String? projectId, String? facilityId}) async => {
+    'projects': [
+      {'id': 'p1', 'code': 'GFFO5', 'name': 'Appui aux soins', 'status': 'active'},
+    ],
+    'project': {'id': 'p1', 'code': 'GFFO5', 'name': 'Appui aux soins', 'status': 'active'},
+    'title': 'ONG Santé · Bailleur A GFFO5',
+    'facilities': [
+      {'id': 'f1', 'code': 'FOSA-001', 'name': 'CSI de Nkolndongo'},
+    ],
+    'facility': facilityId == null ? null : {'id': 'f1', 'code': 'FOSA-001', 'name': 'CSI de Nkolndongo'},
+    'can_manage': canAct,
+    'pathologies': ['Paludisme simple'],
+    'products': [
+      {'id': 'a1', 'code': 'ACT', 'name': 'Artéméther / Luméfantrine', 'packaging': 'Plaquette de 24', 'pathology': 'Paludisme simple', 'retained': true, 'barcode': '6001234567890'},
+      {'id': 'd1', 'code': 'DIAZ', 'name': 'Diazépam injectable', 'packaging': 'Ampoule', 'pathology': 'Paludisme simple', 'retained': true, 'barcode': null},
+    ],
+  };
+
+  @override
+  Future<void> saveFacilityList(String projectId, String facilityId, List<String> retainedIds) async {
+    savedFacilityLists[facilityId] = retainedIds;
+  }
+
+  @override
+  Future<void> saveBarcode(String projectId, String productId, String barcode) async {}
 }
 
 Future<void> _pump(WidgetTester tester, CoordinationService service, {bool online = true}) async {
@@ -139,6 +169,38 @@ void main() {
     expect(find.text('CSI d’Ekoumdoum'), findsOneWidget);
     expect(find.text('Valider'), findsNothing);
     expect(find.text('Refuser'), findsNothing);
+  });
+
+  testWidgets('niveau 6 : la Coordination décoche un article pour une FOSA', (tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final service = _FakeService();
+    await tester.pumpWidget(MaterialApp(home: CoordinationStandardListPage(service: service)));
+    await tester.pumpAndSettle();
+    expect(find.text('ONG Santé · Bailleur A GFFO5'), findsOneWidget);
+    expect(find.text('6001234567890'), findsOneWidget);
+    expect(find.text('Associer'), findsOneWidget);
+    expect(find.byType(Switch), findsNothing, reason: 'liste du projet : consultation');
+
+    await tester.tap(find.text('Toutes les FOSA du projet'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CSI de Nkolndongo').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(Switch), findsNWidgets(2));
+    await tester.tap(find.byType(Switch).last);
+    await tester.pump();
+    await tester.tap(find.text('Enregistrer pour cette FOSA (1 / 2)'));
+    await tester.pumpAndSettle();
+    expect(service.savedFacilityLists['f1'], ['a1']);
+  });
+
+  testWidgets('niveau 6 : lecture seule, aucune modification de la Liste Standard', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: CoordinationStandardListPage(service: _FakeService(canAct: false))));
+    await tester.pumpAndSettle();
+    expect(find.text('Artéméther / Luméfantrine'), findsOneWidget);
+    expect(find.text('Associer'), findsNothing);
+    expect(find.text('Modifier'), findsNothing);
   });
 
   testWidgets('tableau de bord : chiffres réels FOSA et synchro, le reste annoncé (maquette 08)', (tester) async {

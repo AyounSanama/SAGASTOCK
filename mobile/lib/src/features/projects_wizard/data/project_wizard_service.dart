@@ -74,6 +74,18 @@ class ProjectWizardService {
     if (draft) 'intent': 'draft',
   });
 
+  /// Niveau 6 — « + Nouveau produit » : [product] est créé dans le catalogue
+  /// de l'organisation et retenu ; [selection] (choix en cours) est enregistrée
+  /// en brouillon avec lui.
+  Future<Map<String, dynamic>> createProduct(
+    String id,
+    Map<String, dynamic> product,
+    Map<String, dynamic> selection,
+  ) => _send('POST', '/projects/$id/wizard/standard-list/products', {
+    ...selection,
+    'product': product,
+  });
+
   /// Étape 4 : sans [draft], le projet passe « Actif » et sa Liste Standard est validée.
   Future<Map<String, dynamic>> saveSupply(
     String id,

@@ -112,6 +112,18 @@ class _FakeWizard implements ProjectWizardService {
     required String name,
     required String code,
   }) async => const {};
+
+  Map<String, dynamic>? createdProduct;
+
+  @override
+  Future<Map<String, dynamic>> createProduct(
+    String id,
+    Map<String, dynamic> product,
+    Map<String, dynamic> selection,
+  ) async {
+    createdProduct = product;
+    return {'product': product};
+  }
 }
 
 void main() {

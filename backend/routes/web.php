@@ -93,13 +93,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/projects/{project}/wizard/{step}', 'show')->whereIn('step', ['identity', 'standard-list', 'supply'])->name('projects.wizard.show');
         Route::put('/projects/{project}/wizard/identity', 'updateIdentity')->name('projects.wizard.identity.update');
         Route::put('/projects/{project}/wizard/standard-list', 'updateStandardList')->middleware('permission:standard_lists.manage')->name('projects.wizard.standard-list.update');
+        // Niveau 6 : « + Ajouter un produit » et « Importer depuis Excel » à l'étape 3.
+        Route::put('/projects/{project}/wizard/standard-list/products', 'storeProduct')->middleware('permission:standard_lists.manage')->name('projects.wizard.standard-list.products.store');
+        Route::put('/projects/{project}/wizard/standard-list/import', 'importProducts')->middleware('permission:standard_lists.manage')->name('projects.wizard.standard-list.import');
         Route::put('/projects/{project}/wizard/supply', 'updateSupply')->name('projects.wizard.supply.update');
         Route::post('/projects/{project}/supply/apply-to-facilities', 'applySupplyToFacilities')->name('projects.supply.apply');
     });
     Route::get('/projects/medical-references', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'show'])->middleware('permission:standard_lists.view')->name('projects.medical-references');
     Route::post('/projects/medical-references/care-levels', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'storeCareLevel'])->middleware('permission:standard_lists.manage')->name('projects.medical-references.care-levels.store');
     Route::delete('/projects/medical-references/care-levels/{reference}', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'archiveCareLevel'])->middleware('permission:standard_lists.manage')->name('projects.medical-references.care-levels.archive');
-    Route::post('/projects/medical-references/{type}', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'storeReference'])->whereIn('type', ['target_population', 'pathology'])->middleware('permission:standard_lists.manage')->name('projects.medical-references.store');
+    Route::post('/projects/medical-references/{type}', [\App\Http\Controllers\Web\MedicalReferenceController::class, 'storeReference'])->whereIn('type', ['target_population', 'pathology', 'laboratory_exam'])->middleware('permission:standard_lists.manage')->name('projects.medical-references.store');
     Route::get('/projects/{project}/medical-configuration', [\App\Http\Controllers\Web\ProjectMedicalConfigurationController::class, 'show'])->middleware('permission:projects.view')->name('projects.medical-configuration');
     Route::put('/projects/{project}/medical-configuration', [\App\Http\Controllers\Web\ProjectMedicalConfigurationController::class, 'update'])->middleware('permission:standard_lists.manage')->name('projects.medical-configuration.update');
     Route::get('/projects/{project}/standard-list', [ProjectStandardListController::class, 'show'])->middleware('permission:standard_lists.view')->name('projects.standard-list.show');
@@ -133,6 +136,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/dispensing-sites', [StructureController::class, 'sites'])->middleware('permission:dispensing_sites.view')->name('modules.dispensing-sites');
     Route::get('/users', [WebUserController::class, 'index'])->middleware('permission:users.view')->name('users.index');
     Route::get('/standard-lists', [CatalogController::class, 'home'])->defaults('section', 'lists')->middleware('permission:standard_lists.view')->name('modules.standard-lists');
+    // Niveau 6 — Liste Standard de la Coordination (décochage par FOSA, code-barres, ajout, import Excel).
+    Route::controller(\App\Http\Controllers\Web\CoordinationStandardListController::class)->prefix('/standard-lists')->name('coordination.standard-list.')->group(function (): void {
+        Route::get('/coordination', 'show')->middleware('permission:standard_lists.view')->name('show');
+        Route::get('/template', 'template')->middleware('permission:standard_lists.manage')->name('template');
+        Route::put('/coordination/{project}/facilities/{facility}', 'updateFacility')->middleware('permission:standard_lists.manage')->name('facility.update');
+        Route::post('/coordination/{project}/products', 'storeProduct')->middleware('permission:standard_lists.manage')->name('products.store');
+        Route::post('/coordination/{project}/import', 'import')->middleware('permission:standard_lists.manage')->name('import');
+        Route::put('/coordination/{project}/products/{product}/barcode', 'updateBarcode')->middleware('permission:standard_lists.manage')->name('barcode.update');
+    });
     Route::get('/products', [CatalogController::class, 'home'])->defaults('section', 'products')->middleware('permission:products.view')->name('modules.products');
     Route::get('/stocks', [StockController::class, 'home'])->middleware('permission:stocks.view')->name('modules.stocks');
     Route::get('/receipts', [ReceiptController::class, 'home'])->middleware('permission:receipts.view')->name('modules.receipts');

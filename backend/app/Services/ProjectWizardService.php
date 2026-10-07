@@ -263,8 +263,15 @@ class ProjectWizardService
     /**
      * Étape 3 — Valeurs sélectionnables : niveaux de soins (arbre à plat),
      * populations cibles et pathologies (référentiel global + organisation).
+     *
+     * Niveau 6 : « Pathologies et activités » regroupe pathologies et examens
+     * de laboratoire ; chacune porte `suggested` selon le couple niveau de
+     * soins × population choisi (`suggestions` : faux si le catalogue n'a
+     * encore aucune correspondance pour ces choix, tout est alors proposé).
+     *
+     * @param  array{care_level_ids?: list<string>, target_population_ids?: list<string>, pathology_ids?: list<string>}  $state
      */
-    public function standardListOptions(Project $project): array
+    public function standardListOptions(Project $project, array $state = []): array
     {
         $references = fn (string $type) => CatalogReference::where('reference_type', $type)->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('organization_id')->orWhere('organization_id', $project->organization_id))
@@ -273,8 +280,56 @@ class ProjectWizardService
         return [
             'care_levels' => collect($this->flatten(app(CareLevelHierarchyService::class)->tree($project->organization))),
             'target_populations' => $references('target_population'),
-            'pathologies' => $references('pathology'),
+            ...$this->activityOptions($project, $state),
         ];
+    }
+
+    /** @return array{pathologies: Collection, suggestions: bool} */
+    private function activityOptions(Project $project, array $state): array
+    {
+        $suggested = $this->generator->suggestedActivityIds(
+            $project->organization_id,
+            $this->ids($state['care_level_ids'] ?? []),
+            $this->ids($state['target_population_ids'] ?? []),
+        );
+        $selected = $this->ids($state['pathology_ids'] ?? []);
+        $activities = CatalogReference::whereIn('reference_type', StandardListGenerationService::ACTIVITY_TYPES)->where('is_active', true)
+            ->where(fn ($query) => $query->whereNull('organization_id')->orWhere('organization_id', $project->organization_id))
+            ->orderBy('name')->get(['id', 'name', 'reference_type'])
+            ->map(fn (CatalogReference $reference) => [
+                'id' => $reference->id,
+                'name' => $reference->name,
+                'type' => $reference->reference_type,
+                'suggested' => $suggested->isEmpty() || $suggested->contains($reference->id) || $selected->contains($reference->id),
+            ])
+            // Proposées d'abord, puis les autres.
+            ->sortBy(fn (array $activity) => ($activity['suggested'] ? '0' : '1').mb_strtolower($activity['name']))->values();
+
+        return ['pathologies' => $activities, 'suggestions' => $suggested->isNotEmpty()];
+    }
+
+    /**
+     * Niveau 6 — Produits ajoutés pendant l'étape 3 (« + Ajouter un produit »,
+     * import Excel) : la configuration en cours est enregistrée en brouillon
+     * avec ces produits retenus.
+     *
+     * @param  list<string>  $productIds
+     */
+    public function addProducts(Project $project, array $input, array $productIds): array
+    {
+        $state = $this->standardListState($project, [...$input, 'added' => [...($input['added'] ?? []), ...$productIds]]);
+        $rows = $state['rows'];
+        $retained = $this->ids($input['retained'] ?? [])->concat($productIds)
+            ->concat($rows->reject(fn (array $row) => in_array($row['product']->id, $input['listed'] ?? [], true))->pluck('product.id'))
+            ->unique()->values();
+
+        return $this->saveStandardList($project, [
+            'care_level_ids' => $state['care_level_ids'],
+            'target_population_ids' => $state['target_population_ids'],
+            'pathology_ids' => $state['pathology_ids'],
+            'retained' => $retained->all(),
+            'added' => $rows->where('added', true)->pluck('product.id')->concat($productIds)->unique()->values()->all(),
+        ], draft: true);
     }
 
     /** Produits du catalogue que la Coordination peut ajouter hors génération. */

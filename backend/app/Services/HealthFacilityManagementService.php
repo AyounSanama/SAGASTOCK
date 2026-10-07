@@ -6,6 +6,7 @@ use App\Http\Requests\SaveHealthFacilityRequest;
 use App\Models\HealthFacility;
 use App\Models\Organization;
 use App\Models\Product;
+use App\Models\ProductStandardMapping;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -81,8 +82,12 @@ class HealthFacilityManagementService
      * Liste Standard générée pour la FOSA : critères de la FOSA (niveau,
      * catégorie, populations, pathologies) appliqués aux règles de la Liste
      * Standard ; limitée aux produits publiés par la Coordination pour le projet.
+     *
+     * Niveau 6 : un produit ajouté à la main par la Coordination (sans
+     * correspondance de catalogue) vaut pour toutes les FOSA du projet ; les
+     * articles décochés pour la FOSA sont retirés ($applyExclusions).
      */
-    public function standardList(HealthFacility $facility): Collection
+    public function standardList(HealthFacility $facility, bool $applyExclusions = true): Collection
     {
         $project = $facility->projects()->first();
         if (! $project || ! $facility->care_level_id) {
@@ -95,8 +100,20 @@ class HealthFacilityManagementService
             'pathology_ids' => $facility->pathologies()->pluck('catalog_references.id')->all(),
         ]);
         $published = $this->standardLists->publishedProductIds($project);
+        if ($published !== null) {
+            $mapped = ProductStandardMapping::where('organization_id', $project->organization_id)
+                ->whereIn('product_id', $published)->distinct()->pluck('product_id');
+            $manual = collect($published)->diff($mapped)->diff($products->pluck('id'));
+            $products = $products->whereIn('id', $published)
+                ->concat(Product::whereIn('id', $manual)->where('is_active', true)->with(['baseUnit:id,name', 'dosageForm:id,name', 'category:id,name'])->get())
+                ->sortBy('name')->values();
+        }
+        if ($applyExclusions) {
+            $excluded = DB::table('health_facility_product_exclusions')->where('health_facility_id', $facility->id)->pluck('product_id');
+            $products = $products->whereNotIn('id', $excluded)->values();
+        }
 
-        return $published === null ? $products : $products->whereIn('id', $published)->values();
+        return $products;
     }
 
     /** Fiche FOSA renvoyée par l'API. */

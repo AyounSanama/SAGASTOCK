@@ -153,6 +153,35 @@ class _FakeService implements CoordinationService {
   Future<void> setAccountActive(String userId, {required bool active}) async {}
   @override
   Future<void> updateAccount(String userId, Map<String, dynamic> data) async {}
+
+  final savedFacilityLists = <String, List<String>>{};
+
+  @override
+  Future<Map<String, dynamic>> standardList({String? projectId, String? facilityId}) async => {
+    'projects': [
+      {'id': 'p1', 'code': 'GFFO5', 'name': 'Appui aux soins', 'status': 'active'},
+    ],
+    'project': {'id': 'p1', 'code': 'GFFO5', 'name': 'Appui aux soins', 'status': 'active'},
+    'title': 'ONG Santé · Bailleur A GFFO5',
+    'facilities': [
+      {'id': 'f1', 'code': 'FOSA-001', 'name': 'CSI de Nkolndongo'},
+    ],
+    'facility': facilityId == null ? null : {'id': 'f1', 'code': 'FOSA-001', 'name': 'CSI de Nkolndongo'},
+    'can_manage': canAct,
+    'pathologies': ['Paludisme simple'],
+    'products': [
+      {'id': 'a1', 'code': 'ACT', 'name': 'Artéméther / Luméfantrine', 'packaging': 'Plaquette de 24', 'pathology': 'Paludisme simple', 'retained': true, 'barcode': '6001234567890'},
+      {'id': 'd1', 'code': 'DIAZ', 'name': 'Diazépam injectable', 'packaging': 'Ampoule', 'pathology': 'Paludisme simple', 'retained': true, 'barcode': null},
+    ],
+  };
+
+  @override
+  Future<void> saveFacilityList(String projectId, String facilityId, List<String> retainedIds) async {
+    savedFacilityLists[facilityId] = retainedIds;
+  }
+
+  @override
+  Future<void> saveBarcode(String projectId, String productId, String barcode) async {}
 }
 
 Future<void> _fonts() async {

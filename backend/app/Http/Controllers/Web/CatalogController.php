@@ -43,6 +43,10 @@ class CatalogController extends Controller
         if (app(\App\Services\GovernanceService::class)->roleCode($request->user()) === \App\Services\GovernanceService::PROJECT_ADMIN) {
             return redirect()->route('project-admin.standard-list');
         }
+        // Niveau 6 : Liste Standard de la Coordination (par projet et par FOSA).
+        if ($section === 'lists' && app(\App\Services\GovernanceService::class)->roleCode($request->user()) === \App\Services\GovernanceService::COORDINATION_ADMIN) {
+            return redirect()->route('coordination.standard-list.show');
+        }
         $organization = $this->scopes->organizations($request->user())
             ->where('is_active', true)
             ->orderBy('name')

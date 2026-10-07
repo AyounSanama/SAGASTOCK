@@ -73,6 +73,29 @@ class CoordinationService {
   Future<void> updateAccount(String userId, Map<String, dynamic> data) =>
       _post('/coordination/accounts/$userId', data, 'PUT');
 
+  /// Niveau 6 — Liste Standard d'un projet, ou d'une FOSA ([facilityId]).
+  /// Gardée sur le téléphone pour la consultation hors ligne.
+  Future<Map<String, dynamic>> standardList({String? projectId, String? facilityId}) =>
+      _repository.document(
+        collection: 'coordination_standard_list',
+        endpoint: '/coordination/standard-list',
+        query: {'project': ?projectId, 'facility': ?facilityId},
+      );
+
+  /// Décochage par FOSA : seuls [retainedIds] restent dans la liste de la FOSA.
+  Future<void> saveFacilityList(String projectId, String facilityId, List<String> retainedIds) => _post(
+    '/coordination/standard-list/$projectId/facilities/$facilityId',
+    {'retained': retainedIds},
+    'PUT',
+  );
+
+  /// Lien code-barres ↔ produit (vide : lien retiré).
+  Future<void> saveBarcode(String projectId, String productId, String barcode) => _post(
+    '/coordination/standard-list/$projectId/products/$productId/barcode',
+    {'barcode': barcode},
+    'PUT',
+  );
+
   Future<void> _post(
     String path, [
     Map<String, dynamic>? data,

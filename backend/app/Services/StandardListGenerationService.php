@@ -9,6 +9,9 @@ use App\Models\StandardListVersion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 class StandardListGenerationService {
+ /** Niveau 6 : « Pathologies et activités » regroupe pathologies et examens de laboratoire. */
+ public const ACTIVITY_TYPES=['pathology','laboratory_exam'];
+
  public function options(Organization $organization): array {
   $types=['care_level','target_population','pathology','laboratory_exam','facility_category'];
   $refs=CatalogReference::query()->where(fn($q)=>$q->whereNull('organization_id')->orWhere('organization_id',$organization->id))->where('is_active',true)->whereIn('reference_type',$types)->orderBy('depth')->orderBy('name')->get()->groupBy('reference_type');
@@ -45,9 +48,28 @@ class StandardListGenerationService {
   $query=ProductStandardMapping::query()->where('organization_id',$project->organization_id)->whereIn('care_level_id',$careLevelIds)
    ->when($context['facility_category_id']??null,fn($q,$id)=>$q->where(fn($n)=>$n->whereNull('facility_category_id')->orWhere('facility_category_id',$id)))
    ->where(fn($q)=>$q->whereNull('target_population_id')->orWhereIn('target_population_id',$context['target_population_ids']??[]));
-  $ids=($context['laboratory_exam_ids']??[])?:($context['pathology_ids']??[]); $field=!empty($context['laboratory_exam_ids'])?'laboratory_exam_id':'pathology_id';
-  $query->where(fn($q)=>$q->whereNull($field)->orWhereIn($field,$ids));
+  // Niveau 6 : pathologies et examens de laboratoire forment une seule liste
+  // d'activités ; une correspondance vaut si chacun de ses critères est retenu.
+  $ids=array_values(array_unique([...($context['pathology_ids']??[]),...($context['laboratory_exam_ids']??[])]));
+  foreach(['pathology_id','laboratory_exam_id'] as $field) $query->where(fn($q)=>$q->whereNull($field)->orWhereIn($field,$ids));
   return Product::query()->where('organization_id',$project->organization_id)->where('is_active',true)->whereIn('id',$query->pluck('product_id')->unique())->with(['baseUnit:id,name','dosageForm:id,name','category:id,name'])->orderBy('name')->get();
+ }
+
+ /**
+  * Niveau 6 — Pathologies et examens de laboratoire proposés pour le couple
+  * niveau de soins × population : ceux qui portent au moins un produit de
+  * l'organisation pour ces choix (correspondances du catalogue).
+  * @param Collection<int,string> $careLevelIds
+  * @param Collection<int,string> $populationIds
+  * @return Collection<int,string>
+  */
+ public function suggestedActivityIds(string $organizationId,Collection $careLevelIds,Collection $populationIds): Collection {
+  if($careLevelIds->isEmpty()) return collect();
+  $mappings=ProductStandardMapping::query()->where('organization_id',$organizationId)
+   ->whereIn('care_level_id',$this->expandHierarchy($careLevelIds->filter()->unique()->values()))
+   ->where(fn($q)=>$q->whereNull('target_population_id')->orWhereIn('target_population_id',$populationIds))
+   ->get(['pathology_id','laboratory_exam_id']);
+  return $mappings->pluck('pathology_id')->concat($mappings->pluck('laboratory_exam_id'))->filter()->unique()->values();
  }
 
  /** Vrai lorsque la configuration médicale a changé depuis la version publiée. */

@@ -68,12 +68,14 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/projects/{project}/wizard/identity', 'updateIdentity');
             Route::get('/projects/{project}/wizard/standard-list', 'standardList');
             Route::put('/projects/{project}/wizard/standard-list', 'updateStandardList')->middleware('permission:standard_lists.manage');
+            // Niveau 6 : nouveau produit retenu à l'étape 3.
+            Route::post('/projects/{project}/wizard/standard-list/products', 'storeProduct')->middleware('permission:standard_lists.manage');
             Route::put('/projects/{project}/wizard/supply', 'updateSupply');
         });
         Route::get('/projects/medical-references', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'show'])->middleware('permission:standard_lists.view');
         Route::post('/projects/medical-references/care-levels', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'storeCareLevel'])->middleware('permission:standard_lists.manage');
         Route::delete('/projects/medical-references/care-levels/{reference}', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'archiveCareLevel'])->middleware('permission:standard_lists.manage');
-        Route::post('/projects/medical-references/{type}', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'storeReference'])->whereIn('type', ['target_population', 'pathology'])->middleware('permission:standard_lists.manage');
+        Route::post('/projects/medical-references/{type}', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'storeReference'])->whereIn('type', ['target_population', 'pathology', 'laboratory_exam'])->middleware('permission:standard_lists.manage');
         Route::get('/projects/{project}/medical-configuration', [\App\Http\Controllers\Api\V1\ProjectMedicalConfigurationController::class, 'show'])->middleware('permission:projects.view');
         // DEC-08 : action explicite, jamais automatique.
         Route::post('/projects/{project}/supply-settings/apply-to-facilities', [ProjectController::class, 'applySupplyToFacilities'])->middleware('permission:projects.manage');
@@ -220,6 +222,13 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/accounts/{user}', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'updateAccount']);
             Route::post('/accounts/{user}/suspend', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'suspendAccount']);
             Route::post('/accounts/{user}/reactivate', [\App\Http\Controllers\Api\V1\CoordinationController::class, 'reactivateAccount']);
+            // Niveau 6 — Liste Standard de la Coordination (décochage par FOSA, code-barres, ajout).
+            Route::controller(\App\Http\Controllers\Api\V1\CoordinationStandardListController::class)->prefix('standard-list')->group(function (): void {
+                Route::get('/', 'show')->middleware('permission:standard_lists.view');
+                Route::put('/{project}/facilities/{facility}', 'updateFacility')->middleware('permission:standard_lists.manage');
+                Route::post('/{project}/products', 'storeProduct')->middleware('permission:standard_lists.manage');
+                Route::put('/{project}/products/{product}/barcode', 'updateBarcode')->middleware('permission:standard_lists.manage');
+            });
         });
         // AM-162 : choix limités à la configuration validée du projet (avant {facility}).
         Route::get('/organizations/{organization}/facilities/options', [StructureController::class, 'facilityOptions'])->middleware('permission:structures.view|health_facilities.view');

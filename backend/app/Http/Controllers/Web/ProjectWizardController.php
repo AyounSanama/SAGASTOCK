@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Services\AuditService;
 use App\Services\GovernanceService;
 use App\Services\ProjectWizardService;
+use App\Services\StandardListCatalogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ class ProjectWizardController extends Controller
     public function __construct(
         private ProjectWizardService $wizard,
         private AuditService $audit,
+        private StandardListCatalogService $catalog,
     ) {}
 
     /** Étapes 1-2 d'un nouveau projet. */
@@ -72,6 +74,35 @@ class ProjectWizardController extends Controller
         }
 
         return $this->next($request, $project, 'supply');
+    }
+
+    /** Niveau 6 — « + Ajouter un produit » : nouveau produit de l'organisation, retenu dans la liste. */
+    public function storeProduct(Request $request, Project $project): RedirectResponse
+    {
+        Gate::authorize('configure', $project);
+        $data = $request->validate(...StandardListCatalogService::productRules('new_product.'));
+        $product = $this->catalog->createProduct($project->organization, $data['new_product']);
+        $this->audit->record($request, 'product.created', $product, [], $product->only(['organization_id', 'code', 'name', 'packaging']));
+        $this->wizard->addProducts($project, $this->listInput($request), [$product->id]);
+
+        return redirect()->route('projects.wizard.show', [$project, 'standard-list'])
+            ->with('status', 'Produit '.$product->code.' ajouté au catalogue et retenu dans la Liste Standard.');
+    }
+
+    /** Niveau 6 — « Importer depuis Excel » : produits importés retenus dans la liste. */
+    public function importProducts(Request $request, Project $project): RedirectResponse
+    {
+        Gate::authorize('configure', $project);
+        $request->validate(['import_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240']], [], ['import_file' => 'fichier Excel']);
+        $result = $this->catalog->import($project->organization, $request->file('import_file')->getRealPath());
+        $this->audit->record($request, 'standard_list.imported', $project, [], collect($result)->except('product_ids')->all());
+        if ($result['product_ids'] !== []) {
+            $this->wizard->addProducts($project, $this->listInput($request), $result['product_ids']);
+        }
+
+        return redirect()->route('projects.wizard.show', [$project, 'standard-list'])
+            ->with('status', StandardListCatalogService::importMessage($result))
+            ->with('import_errors', $result['errors']);
     }
 
     public function updateSupply(SaveProjectWizardSupplyRequest $request, Project $project): RedirectResponse
@@ -125,6 +156,12 @@ class ProjectWizardController extends Controller
         ], ['name' => 'nom du bailleur', 'code' => 'sigle']];
     }
 
+    /** Choix en cours de l'étape 3, envoyés avec l'ajout ou l'import. */
+    private function listInput(Request $request): array
+    {
+        return $request->only(['care_level_ids', 'target_population_ids', 'pathology_ids', 'listed', 'retained', 'added']);
+    }
+
     private function identityView(Request $request, ?Project $project, $missions): View
     {
         return view('projects.wizard.identity', [
@@ -142,7 +179,7 @@ class ProjectWizardController extends Controller
     {
         $input = $request->boolean('refresh') ? $request->only(['care_level_ids', 'target_population_ids', 'pathology_ids', 'listed', 'retained', 'added']) : null;
         $state = $this->wizard->standardListState($project, $input);
-        $options = $this->wizard->standardListOptions($project);
+        $options = $this->wizard->standardListOptions($project, $state);
 
         return view('projects.wizard.standard-list', [
             'project' => $project,
@@ -150,6 +187,9 @@ class ProjectWizardController extends Controller
             'careLevels' => $options['care_levels'],
             'populations' => $options['target_populations'],
             'pathologies' => $options['pathologies'],
+            'suggestions' => $options['suggestions'],
+            'selectedCareLevels' => collect($options['care_levels'])->whereIn('id', $state['care_level_ids'])->values(),
+            'selectedActivities' => $options['pathologies']->whereIn('id', $state['pathology_ids'])->values(),
             'addable' => $this->wizard->addableProducts($project, $state['rows']->pluck('product.id')),
             'canAddService' => $request->user()->hasPermission('standard_lists.manage'),
             'summary' => $this->wizard->summary($project),

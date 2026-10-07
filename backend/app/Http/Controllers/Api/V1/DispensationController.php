@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Dispensation;
 use App\Models\DispensationItem;
+use App\Models\HealthFacility;
 use App\Models\Organization;
 use App\Models\Patient;
 use App\Models\Prescription;
@@ -14,6 +15,7 @@ use App\Models\Site;
 use App\Models\StandardList;
 use App\Models\StandardListVersion;
 use App\Services\AuditService;
+use App\Services\HealthFacilityManagementService;
 use App\Services\StockLedgerService;
 use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
@@ -331,6 +333,13 @@ class DispensationController extends Controller
             ->where('status', 'published')->pluck('id');
         $productIds = DB::table('standard_list_items')
             ->whereIn('standard_list_version_id', $versionIds)->pluck('product_id');
+        // Niveau 6 : une FOSA configurée suit sa propre Liste Standard (critères
+        // de la FOSA, articles décochés par la Coordination retirés).
+        $facilities = HealthFacility::whereIn('id', Site::whereIn('id', $siteIds)->pluck('health_facility_id'))->get();
+        if ($facilities->isNotEmpty() && $facilities->every(fn ($facility) => $facility->care_level_id)) {
+            $management = app(HealthFacilityManagementService::class);
+            $productIds = $facilities->flatMap(fn ($facility) => $management->standardList($facility)->pluck('id'))->unique()->values();
+        }
         return $query->whereIn('id', $productIds);
     }
     private function siteIds(Request $request, Organization $organization) { return $this->scopes->sites($request->user())->whereHas('healthFacility', fn ($q) => $q->where('organization_id', $organization->id))->pluck('id'); }

@@ -13,6 +13,7 @@ use App\Models\Project;
 use App\Services\AuditService;
 use App\Services\GovernanceService;
 use App\Services\ProjectWizardService;
+use App\Services\StandardListCatalogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -26,6 +27,7 @@ class ProjectWizardController extends Controller
     public function __construct(
         private ProjectWizardService $wizard,
         private AuditService $audit,
+        private StandardListCatalogService $catalog,
     ) {}
 
     /** Missions, bailleurs et valeurs des listes déroulantes des étapes 1, 2 et 4. */
@@ -83,7 +85,7 @@ class ProjectWizardController extends Controller
         $state = $this->wizard->standardListState($project, $input);
 
         return response()->json([
-            'options' => $this->wizard->standardListOptions($project),
+            'options' => $this->wizard->standardListOptions($project, $state),
             'care_level_ids' => $state['care_level_ids'],
             'target_population_ids' => $state['target_population_ids'],
             'pathology_ids' => $state['pathology_ids'],
@@ -101,6 +103,22 @@ class ProjectWizardController extends Controller
             'addable' => $this->wizard->addableProducts($project, $state['rows']->pluck('product.id'))
                 ->map(fn ($product) => ['id' => $product->id, 'code' => $product->code, 'name' => trim($product->name.' '.$product->strength)])->values(),
         ]);
+    }
+
+    /**
+     * Niveau 6 — « + Ajouter un produit » (nouveau produit) : créé dans le
+     * catalogue de l'organisation et retenu ; les choix en cours sont envoyés
+     * avec la demande et enregistrés en brouillon.
+     */
+    public function storeProduct(Request $request, Project $project): JsonResponse
+    {
+        Gate::authorize('configure', $project);
+        $data = $request->validate(...StandardListCatalogService::productRules('product.'));
+        $product = $this->catalog->createProduct($project->organization, $data['product']);
+        $this->audit->record($request, 'product.created', $product, [], $product->only(['organization_id', 'code', 'name', 'packaging']));
+        $this->wizard->addProducts($project, $request->only(['care_level_ids', 'target_population_ids', 'pathology_ids', 'listed', 'retained', 'added']), [$product->id]);
+
+        return response()->json(['product' => $product->only(['id', 'code', 'name', 'packaging'])], 201);
     }
 
     public function updateStandardList(SaveProjectWizardStandardListRequest $request, Project $project): JsonResponse

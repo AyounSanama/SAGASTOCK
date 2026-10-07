@@ -848,17 +848,30 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
                         ),
                         onChanged: (value) => setSheetState(() => search = value),
                       ),
-                      if (addable.isNotEmpty)
-                        TextButton(
-                          onPressed: () async {
-                            final id = await _pickProduct(sheetContext, addable);
-                            if (id == null) return;
-                            _added.add(id);
-                            if (sheetContext.mounted) Navigator.pop(sheetContext);
-                            _scheduleRefresh();
-                          },
-                          child: const Text('+ Ajouter un produit'),
-                        ),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        children: [
+                          if (addable.isNotEmpty)
+                            TextButton(
+                              onPressed: () async {
+                                final id = await _pickProduct(sheetContext, addable);
+                                if (id == null) return;
+                                _added.add(id);
+                                if (sheetContext.mounted) Navigator.pop(sheetContext);
+                                _scheduleRefresh();
+                              },
+                              child: const Text('+ Ajouter un produit'),
+                            ),
+                          // Niveau 6 : nouveau produit avec la codification de l'organisation.
+                          TextButton(
+                            onPressed: () async {
+                              final created = await _createProduct(sheetContext);
+                              if (created && sheetContext.mounted) Navigator.pop(sheetContext);
+                            },
+                            child: const Text('+ Nouveau produit'),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -930,6 +943,90 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
         ],
       ),
     );
+  }
+
+  /// Niveau 6 — « + Nouveau produit » : créé dans le catalogue de
+  /// l'organisation et retenu ; les choix en cours sont enregistrés en brouillon.
+  Future<bool> _createProduct(BuildContext context) async {
+    final code = TextEditingController();
+    final name = TextEditingController();
+    final packaging = TextEditingController();
+    final barcode = TextEditingController();
+    String? error;
+    var saving = false;
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Nouveau produit'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: code, decoration: const InputDecoration(labelText: 'Code *')),
+                TextField(controller: name, decoration: const InputDecoration(labelText: 'Désignation *')),
+                TextField(controller: packaging, decoration: const InputDecoration(labelText: 'Conditionnement')),
+                TextField(
+                  controller: barcode,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Code-barres'),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(error!, style: TextStyle(color: AppColors.dangerText)),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(dialogContext, false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.primaryStrong),
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (code.text.trim().isEmpty || name.text.trim().isEmpty) {
+                        setDialogState(() => error = 'Le code et la désignation sont obligatoires.');
+                        return;
+                      }
+                      setDialogState(() {
+                        saving = true;
+                        error = null;
+                      });
+                      try {
+                        await _service.createProduct(_projectId!, {
+                          'code': code.text.trim(),
+                          'name': name.text.trim(),
+                          'packaging': packaging.text.trim(),
+                          'barcode': barcode.text.trim(),
+                          if (_levels.length == 1) 'care_level_id': _levels.first,
+                        }, {
+                          ..._listData(),
+                          'listed': [for (final product in _maps(_list['products'])) '${product['id']}'],
+                        });
+                        if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                      } on ProjectWizardException catch (failure) {
+                        setDialogState(() {
+                          saving = false;
+                          error = failure.message;
+                        });
+                      }
+                    },
+              child: const Text('Créer et retenir'),
+            ),
+          ],
+        ),
+      ),
+    );
+    for (final controller in [code, name, packaging, barcode]) {
+      controller.dispose();
+    }
+    if (created != true || !mounted) return false;
+    await _loadList();
+    return true;
   }
 
   // Étape 4 ---------------------------------------------------------------
@@ -1141,10 +1238,14 @@ class _ChoiceGroupState extends State<_ChoiceGroup> {
   @override
   Widget build(BuildContext context) {
     final items = widget.items;
+    // Niveau 6 : quand le serveur indique les valeurs proposées (pathologies
+    // selon niveau de soins × population), seules celles-ci sont affichées
+    // d'emblée ; les autres restent derrière « + N autres ».
+    final suggestedOnly = items.any((item) => item.containsKey('suggested'));
     final visible = [
       for (var index = 0; index < items.length; index++)
         if (_expanded ||
-            index < _collapsedCount ||
+            (suggestedOnly ? items[index]['suggested'] == true : index < _collapsedCount) ||
             widget.selected.contains('${items[index]['id']}'))
           items[index],
     ];
@@ -1164,7 +1265,7 @@ class _ChoiceGroupState extends State<_ChoiceGroup> {
             children: [
               for (final item in visible)
                 _choiceChip(
-                  label: '${item['name']}',
+                  label: item['type'] == 'laboratory_exam' ? '${item['name']} (examen)' : '${item['name']}',
                   selected: widget.selected.contains('${item['id']}'),
                   onSelected: () => widget.onToggle('${item['id']}'),
                 ),

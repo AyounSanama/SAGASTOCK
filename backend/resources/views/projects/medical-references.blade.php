@@ -40,7 +40,7 @@
 </div>
 
 <div class="med-layout med-flat">
- @foreach(['target_population' => ['Populations cibles', $populations, 'Ex. Adultes, Femmes enceintes, Enfants < 5 ans'], 'pathology' => ['Pathologies', $pathologies, 'Ex. Paludisme, Tuberculose, Malnutrition aiguë']] as $type => [$title, $items, $hint])
+ @foreach(['target_population' => ['Populations cibles', $populations, 'Ex. Adultes, Femmes enceintes, Enfants < 5 ans'], 'pathology' => ['Pathologies', $pathologies, 'Ex. Paludisme, Tuberculose, Malnutrition aiguë'], 'laboratory_exam' => ['Examens de laboratoire', $laboratoryExams, 'Ex. Goutte épaisse, Charge virale VIH']] as $type => [$title, $items, $hint])
  <x-app-card>
   <h3 class="med-title">{{ $title }}</h3>
   <p class="med-muted">Référentiel configurable, jamais codé en dur. Les éléments retenus pour chaque projet se choisissent dans sa configuration médicale.</p>

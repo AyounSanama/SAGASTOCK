@@ -71,7 +71,8 @@ class CatalogArchiveAndNavigationTest extends TestCase
 
         $this->actingAs($user)->get('/products')
             ->assertRedirect(route('organizations.catalog.index', [$organization, 'section' => 'products']));
+        // Niveau 6 : la Coordination ouvre sa Liste Standard (par projet et par FOSA).
         $this->actingAs($user)->get('/standard-lists')
-            ->assertRedirect(route('organizations.catalog.index', [$organization, 'section' => 'lists']));
+            ->assertRedirect(route('coordination.standard-list.show'));
     }
 }

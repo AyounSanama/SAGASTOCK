@@ -39,6 +39,7 @@ import '../../features/auth/data/auth_service.dart';
 import '../../features/catalog/presentation/catalog_page.dart';
 import '../../features/catalog/presentation/standard_list_entry_page.dart';
 import '../../features/projects_wizard/presentation/project_wizard_page.dart';
+import '../../features/coordination/presentation/coordination_standard_list_page.dart';
 import '../../features/project_admin/presentation/project_admin_facilities_page.dart';
 import '../../features/project_admin/presentation/project_admin_facility_page.dart';
 import '../../features/project_admin/presentation/project_admin_standard_list_page.dart';
@@ -98,6 +99,11 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
       builder: (context, state) => ProjectAdminFacilityPage(
         facilityId: state.pathParameters['facilityId'],
       ),
+    ),
+    // Niveau 6 — Liste Standard de la Coordination (décochage par FOSA, code-barres).
+    GoRoute(
+      path: '/coordination/standard-list',
+      builder: (context, state) => const CoordinationStandardListPage(),
     ),
     // Niveau 2 — Assistant « Créer un projet / programme », plein écran.
     GoRoute(
