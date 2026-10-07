@@ -345,7 +345,11 @@ class CatalogController extends Controller
     {
         $this->manage($r, $o);
         $r->validate(['file' => ['required', 'file', 'mimes:csv,txt', 'max:5120']]);
-        $handle = fopen($r->file('file')->getRealPath(), 'r');
+        // Fichier converti en UTF-8 : un CSV enregistré par Excel sous Windows
+        // (Windows-1252) garde ses accents.
+        $handle = fopen('php://temp', 'w+');
+        fwrite($handle, \App\Support\Utf8::clean((string) file_get_contents($r->file('file')->getRealPath())));
+        rewind($handle);
         $header = fgetcsv($handle, 0, ';');
         $header = array_map(fn ($value) => trim(str_replace("\xEF\xBB\xBF", '', $value)), $header ?: []);
         abort_unless(empty(array_diff(['code', 'name', 'product_type'], $header)), 422, 'Colonnes requises : code, name, product_type.');

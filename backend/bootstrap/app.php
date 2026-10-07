@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\EnsureUtf8Input;
 use App\Http\Middleware\EnforceSagoPlatformBoundary;
 use App\Http\Middleware\EnforceV1ModuleAvailability;
 use App\Http\Middleware\EnsureIdempotentApiRequest;
@@ -23,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Saisies toujours en UTF-8 (accents corrects), avant tout autre traitement.
+        $middleware->prepend(EnsureUtf8Input::class);
         $middleware->append(AddSecurityHeaders::class);
         $middleware->append(EnforceSagoPlatformBoundary::class);
         $middleware->append(EnforceV1ModuleAvailability::class);
