@@ -316,6 +316,10 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
   void _close(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    // Une liste déroulante ou une boîte de dialogue encore ouverte pendant
+    // l'enregistrement est fermée d'abord : sinon le retour la fermerait elle,
+    // et l'assistant resterait bloqué à l'écran.
+    Navigator.of(context).popUntil((route) => route is! PopupRoute);
     context.pop(true);
   }
 
@@ -408,17 +412,21 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
           ? const Center(child: CircularProgressIndicator())
           : _options.isEmpty
           ? _Failure(message: _error ?? ProjectWizardService.offlineMessage, onRetry: _load)
-          : ListView(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              children: [
-                if (_error != null) _Notice(text: _error!, danger: true),
-                ...switch (_step) {
-                  0 => _identityStep(),
-                  1 => _donorStep(),
-                  2 => _standardListStep(),
-                  _ => _supplyStep(),
-                },
-              ],
+          // Pendant un enregistrement, le formulaire ne se modifie plus.
+          : AbsorbPointer(
+              absorbing: _busy,
+              child: ListView(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                children: [
+                  if (_error != null) _Notice(text: _error!, danger: true),
+                  ...switch (_step) {
+                    0 => _identityStep(),
+                    1 => _donorStep(),
+                    2 => _standardListStep(),
+                    _ => _supplyStep(),
+                  },
+                ],
+              ),
             ),
       bottomNavigationBar: _loading || _options.isEmpty
           ? null

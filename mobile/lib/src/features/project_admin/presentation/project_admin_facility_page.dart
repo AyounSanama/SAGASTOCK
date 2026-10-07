@@ -141,6 +141,8 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
           ),
         ),
       );
+      // Liste déroulante encore ouverte pendant l'enregistrement : fermée d'abord.
+      Navigator.of(context).popUntil((route) => route is! PopupRoute);
       context.pop(true);
     } on ProjectAdminException catch (error) {
       if (mounted) {
