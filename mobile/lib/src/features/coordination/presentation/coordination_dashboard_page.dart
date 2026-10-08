@@ -212,7 +212,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           children: [
-                            const _Kpi(label: 'Produits en rupture', value: '—', note: _later),
+                            _stockoutKpi(),
                             const _Kpi(label: 'Produits en pré-rupture', value: '—', note: _later),
                             const _Kpi(label: 'Lots à risque de péremption', value: '—', note: _later),
                             _Kpi(
@@ -312,6 +312,31 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Produits en rupture : articles retenus sans lot utilisable dans une
+  /// FOSA (calcul serveur). Sans aucune FOSA qui gère son stock : « — ».
+  Widget _stockoutKpi() {
+    final stockouts = _data['stockouts'] is Map
+        ? Map<String, dynamic>.from(_data['stockouts'] as Map)
+        : const <String, dynamic>{};
+    final withStock = (stockouts['facilities_with_stock'] as num?)?.toInt() ?? 0;
+    final products = (stockouts['products'] as num?)?.toInt() ?? 0;
+    final facilities = (stockouts['facilities'] as num?)?.toInt() ?? 0;
+    if (stockouts.isEmpty || withStock == 0) {
+      return const _Kpi(
+        label: 'Produits en rupture',
+        value: '—',
+        note: 'Aucune FOSA n’a encore enregistré de stock',
+      );
+    }
+    return _Kpi(
+      label: 'Produits en rupture',
+      value: '$products',
+      note: products == 0
+          ? 'Aucune rupture'
+          : 'dans $facilities FOSA sur $withStock',
     );
   }
 

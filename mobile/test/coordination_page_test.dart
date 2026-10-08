@@ -54,6 +54,7 @@ class _FakeService implements CoordinationService {
   Future<Map<String, dynamic>> dashboard({String? donorId}) async => {
     'mission': {'id': 'm1', 'name': 'Coordination Yaoundé', 'country': 'Cameroun'},
     'generated_at': '2026-10-05T10:45:00Z',
+    'stockouts': {'products': 2, 'facilities': 1, 'pairs': 2, 'facilities_with_stock': 3},
     'stats': {'validated': 14, 'total': 17, 'pending': 3, 'sync_failed': 1, 'sync_late': 1},
     'todo': [
       {'tone': 'info', 'action': 'validate', 'title': '3 FOSA attendent votre validation', 'detail': 'Projets GFFO5 et FH4'},
@@ -257,7 +258,9 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('14 / 17'), findsOneWidget);
-    expect(find.text('Disponible avec les analyses de base'), findsNWidgets(3));
+    // Ruptures : calculées par le serveur ; pré-rupture et péremption : niveau 9.
+    expect(find.text('dans 1 FOSA sur 3'), findsOneWidget);
+    expect(find.text('Disponible avec les analyses de base'), findsNWidgets(2));
     expect(find.text('3 FOSA attendent votre validation'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Échec de synchro'), 200, scrollable: find.byType(Scrollable).first);
     expect(find.text('Échec de synchro'), findsOneWidget);

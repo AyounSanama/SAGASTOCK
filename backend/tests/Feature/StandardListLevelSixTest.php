@@ -233,6 +233,40 @@ class StandardListLevelSixTest extends TestCase
         $this->assertCount(2, $management->standardList($this->facility));
     }
 
+    public function test_dashboard_counts_stockouts_of_the_effective_standard_list(): void
+    {
+        Sanctum::actingAs($this->coordination);
+        $stockouts = fn () => $this->getJson("/api/v1/coordination/dashboard?mission_id={$this->mission->id}")->assertOk()->json('stockouts');
+
+        // FOSA sans aucun stock enregistré : non comptée.
+        $this->assertSame(['products' => 0, 'facilities' => 0, 'pairs' => 0, 'facilities_with_stock' => 0], $stockouts());
+
+        // Artéméther en stock, diazépam absent : 1 rupture.
+        $site = app(\App\Services\HealthFacilityConfigurationService::class)->ensurePrimarySite($this->facility);
+        $lot = fn (Product $product, string $number, $expires, float $quantity) => \App\Models\StockBalance::create([
+            'organization_id' => $this->organization->id, 'site_id' => $site->id, 'product_id' => $product->id,
+            'batch_id' => \App\Models\Batch::create(['organization_id' => $this->organization->id, 'product_id' => $product->id,
+                'batch_number' => $number, 'expires_on' => $expires, 'status' => 'available'])->id,
+            'theoretical_quantity' => $quantity, 'reserved_quantity' => 0,
+        ]);
+        $lot($this->act, 'ACT-1', now()->addYear(), 20);
+        $this->assertSame(['products' => 1, 'facilities' => 1, 'pairs' => 1, 'facilities_with_stock' => 1], $stockouts());
+        // Même chiffre sur le tableau de bord Web.
+        $this->actingAs($this->coordination)->get('/dashboard')->assertOk()->assertSee('dans 1 FOSA sur 1');
+
+        // Un lot périmé ne compte pas ; un lot valide met fin à la rupture.
+        $lot($this->diazepam, 'DIAZ-OLD', now()->subDay(), 5);
+        $this->assertSame(1, $stockouts()['products']);
+        $lot($this->diazepam, 'DIAZ-1', now()->addYear(), 5);
+        $this->assertSame(0, $stockouts()['products']);
+
+        // Article décoché pour la FOSA : jamais compté en rupture.
+        \App\Models\StockBalance::query()->delete();
+        $lot($this->act, 'ACT-2', now()->addYear(), 20);
+        $this->putJson("/api/v1/coordination/standard-list/{$this->project->id}/facilities/{$this->facility->id}", ['retained' => [$this->act->id]])->assertOk();
+        $this->assertSame(0, $stockouts()['products']);
+    }
+
     public function test_barcode_is_linked_to_a_single_product(): void
     {
         $this->actingAs($this->coordination)->put(route('coordination.standard-list.barcode.update', [$this->project, $this->act]), ['barcode' => '6001 2345 678'])

@@ -382,6 +382,53 @@ class CoordinationService
         return $rows;
     }
 
+    /**
+     * Produits en rupture (avant la CMM du niveau 9) : article de la Liste
+     * Standard effective d'une FOSA validée (articles retenus, moins les
+     * exclusions de la FOSA) sans aucun lot utilisable (disponible, non
+     * périmé, quantité libre > 0) dans ses sites. Une FOSA sans aucun stock
+     * enregistré n'est pas comptée (gestion de stock pas encore démarrée).
+     *
+     * @return array{products: int, facilities: int, pairs: int, facilities_with_stock: int}
+     */
+    private function stockouts(Collection $facilities, Collection $projects): array
+    {
+        $lists = app(CoordinationStandardListService::class);
+        $products = collect();
+        $facilitiesInStockout = collect();
+        $pairs = 0;
+        $withStock = 0;
+        foreach ($facilities->where('validation_status', HealthFacility::STATUS_VALIDATED) as $facility) {
+            $siteIds = Site::where('health_facility_id', $facility->id)->pluck('id');
+            if (! DB::table('stock_balances')->whereIn('site_id', $siteIds)->exists()) {
+                continue;
+            }
+            $withStock++;
+            $retained = $projects->whereIn('id', $facility->projects->pluck('id'))
+                ->flatMap(fn (Project $project) => collect($lists->list($project, $facility)['rows'])
+                    ->where('retained', true)->map(fn (array $row) => $row['product']->id))
+                ->unique();
+            if ($retained->isEmpty()) {
+                continue;
+            }
+            $available = DB::table('stock_balances')
+                ->join('batches', 'batches.id', '=', 'stock_balances.batch_id')
+                ->whereIn('stock_balances.site_id', $siteIds)->whereIn('stock_balances.product_id', $retained)
+                ->where('batches.status', 'available')->whereDate('batches.expires_on', '>=', today())
+                ->whereRaw('(stock_balances.theoretical_quantity - stock_balances.reserved_quantity) > 0')
+                ->distinct()->pluck('stock_balances.product_id');
+            $missing = $retained->diff($available);
+            if ($missing->isNotEmpty()) {
+                $facilitiesInStockout->push($facility->id);
+                $products = $products->merge($missing);
+                $pairs += $missing->count();
+            }
+        }
+
+        return ['products' => $products->unique()->count(), 'facilities' => $facilitiesInStockout->count(),
+            'pairs' => $pairs, 'facilities_with_stock' => $withStock];
+    }
+
     private function dashboardSummary(array $overview, Collection $facilities, Collection $rows, Mission $mission, Collection $allProjects, ?string $donorId, ?string $projectId): array
     {
         $projects = $overview['projects']->map(function (Project $project) use ($facilities, $rows) {
@@ -439,7 +486,8 @@ class CoordinationService
                     ->map(fn ($donor) => ['id' => $donor->id, 'label' => ($mission->organization?->name ?? 'ONG').' / '.$donor->name])->values(),
                 'projects' => $allProjects->sortBy('code')->map(fn (Project $project) => ['id' => $project->id, 'code' => $project->code])->values(),
             ],
-            // Indicateurs prévus au niveau 9 (analyses de base) : jamais de chiffre inventé.
+            'stockouts' => $this->stockouts($facilities, $overview['projects']),
+            // Pré-rupture et risque de péremption : niveau 9 (CMM, formule D2).
             'analyses_available' => false,
         ];
     }

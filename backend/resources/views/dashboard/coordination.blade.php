@@ -46,7 +46,14 @@
     </header>
 
     <section class="cd-kpis">
-        @foreach(['Produits en rupture', 'Produits en pré-rupture', 'Lots à risque de péremption'] as $label)
+        {{-- Ruptures : articles retenus sans lot utilisable (calcul serveur) ; pré-rupture et péremption : niveau 9. --}}
+        @php($stockouts = $board['stockouts'] ?? ['products' => 0, 'facilities' => 0, 'facilities_with_stock' => 0])
+        @if($stockouts['facilities_with_stock'] === 0)
+            <article class="cd-kpi na"><small>Produits en rupture</small><strong>—</strong><span>Aucune FOSA n’a encore enregistré de stock</span></article>
+        @else
+            <article class="cd-kpi"><small>Produits en rupture</small><strong>{{ $stockouts['products'] }}</strong><span>{{ $stockouts['products'] === 0 ? 'Aucune rupture' : 'dans '.$stockouts['facilities'].' FOSA sur '.$stockouts['facilities_with_stock'] }}</span></article>
+        @endif
+        @foreach(['Produits en pré-rupture', 'Lots à risque de péremption'] as $label)
             <article class="cd-kpi na"><small>{{ $label }}</small><strong>—</strong><span>Disponible avec les analyses de base</span></article>
         @endforeach
         <article class="cd-kpi"><small>FOSA validées</small><strong>{{ $stats['validated'] }} / {{ $stats['total'] }}</strong><span>{{ $stats['pending'] }} en attente de validation</span></article>
