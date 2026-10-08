@@ -106,6 +106,38 @@ class StockOriginService
             'origin_key' => 'project:'.$project['project_id']];
     }
 
+    /**
+     * Limite une requête de lots au couple choisi. Les lots sans origine
+     * (stock antérieur au niveau 7) comptent pour le couple seulement si la
+     * FOSA n'a qu'un seul projet : aucun cas ambigu n'est deviné.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<Batch>  $query
+     * @param  array{origin_type: string, origin_project_id: ?string, origin_key: string}  $origin
+     */
+    public function scopeBatches($query, Site $site, array $origin)
+    {
+        if ($origin['origin_type'] === self::TYPE_OTHER) {
+            return $query->where('origin_type', self::TYPE_OTHER);
+        }
+        $legacy = $this->options($site)->count() === 1;
+
+        return $query->where(fn ($batches) => $batches->where('origin_project_id', $origin['origin_project_id'])
+            ->when($legacy, fn ($q) => $q->orWhere('origin_key', '')));
+    }
+
+    /**
+     * Origine choisie pour une sortie (dispensation) : un couple de la FOSA,
+     * ou « Autre » (stock livré par un tiers), sans nom à saisir.
+     */
+    public function resolveForIssue(Site $site, array $data): array
+    {
+        if (($data['origin_type'] ?? null) === self::TYPE_OTHER) {
+            return ['origin_type' => self::TYPE_OTHER, 'origin_project_id' => null, 'origin_label' => null, 'origin_key' => 'other:'];
+        }
+
+        return $this->resolve($site, $data);
+    }
+
     /** Lot de cette origine (un même numéro reçu de deux origines donne deux lots). */
     public function batch(Organization $organization, string $productId, string $batchNumber, array $origin): Batch
     {

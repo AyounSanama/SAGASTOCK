@@ -96,9 +96,18 @@ class ClinicalSupplyService {
     );
   }
 
-  Map<String, List<Map<String, dynamic>>> _optionMap(Map<String, dynamic> d) =>
-      {
-        for (final key in ['sites', 'patients', 'prescriptions', 'products'])
-          key: (d[key] as List? ?? []).cast<Map<String, dynamic>>(),
-      };
+  Map<String, List<Map<String, dynamic>>> _optionMap(
+    Map<String, dynamic> d,
+  ) => {
+    // Niveau 7 : destinations de sortie et lots en stock (choix d'un lot périmé).
+    for (final key in [
+      'sites',
+      'patients',
+      'prescriptions',
+      'products',
+      'destinations',
+      'batches',
+    ])
+      key: (d[key] as List? ?? []).cast<Map<String, dynamic>>(),
+  };
 }

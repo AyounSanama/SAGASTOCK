@@ -33,7 +33,16 @@ class DispensationController extends Controller
         $dispensations = Dispensation::with(['patient', 'prescription', 'site', 'items.product', 'items.batch'])->where('organization_id', $organization->id)->whereIn('site_id', $siteIds)->latest('dispensed_at')->get();
         $sites = Site::with('healthFacility:id,name')->whereIn('id', $siteIds)->orderBy('name')->get();
         $products = Product::where('organization_id', $organization->id)->where('is_active', true)->orderBy('name')->get();
-        return view('dispensations.index', compact('organizations', 'organization', 'patients', 'prescriptions', 'dispensations', 'sites', 'products'));
+        // Niveau 7 : couples ONG/Bailleur par site et lots en stock (sortie de lots périmés ou détériorés).
+        $origins = app(\App\Services\StockOriginService::class);
+        $originsBySite = $sites->mapWithKeys(fn (Site $site) => [$site->id => $origins->options($site)]);
+        $stockBatches = \App\Models\StockBalance::with('batch:id,batch_number,expires_on,origin_type,origin_project_id')->whereIn('site_id', $sites->pluck('id'))
+            ->whereRaw('(theoretical_quantity - reserved_quantity) > 0')->get()
+            ->map(fn ($balance) => ['site_id' => $balance->site_id, 'product_id' => $balance->product_id, 'batch_id' => $balance->batch_id,
+                'batch_number' => $balance->batch?->batch_number, 'expires_on' => $balance->batch?->expires_on?->format('d/m/Y'),
+                'expired' => (bool) $balance->batch?->expires_on?->lt(today()), 'origin_type' => $balance->batch?->origin_type, 'origin_project_id' => $balance->batch?->origin_project_id,
+                'available' => (float) $balance->available_quantity]);
+        return view('dispensations.index', compact('organizations', 'organization', 'patients', 'prescriptions', 'dispensations', 'sites', 'products', 'originsBySite', 'stockBatches'));
     }
 
     public function storePatient(Request $request, Organization $organization): RedirectResponse

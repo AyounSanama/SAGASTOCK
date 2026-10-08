@@ -17,6 +17,7 @@ use App\Models\StandardListVersion;
 use App\Services\AuditService;
 use App\Services\HealthFacilityManagementService;
 use App\Services\StockLedgerService;
+use App\Services\StockOriginService;
 use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -123,7 +124,7 @@ class DispensationController extends Controller
             'client_reference' => ['nullable', 'uuid', 'unique:prescriptions,client_reference'],
             'patient_id' => ['required', 'uuid'], 'site_id' => ['required', 'uuid'],
             'reference' => ['required', 'max:80', Rule::unique('prescriptions')->where('organization_id', $organization->id)],
-            'prescribed_on' => ['required', 'date', 'before_or_equal:today'], 'prescriber_name' => ['required', 'string', 'max:190'],
+            'prescribed_on' => ['required', 'date', 'before_or_equal:today', $request->filled('client_reference') ? 'after_or_equal:'.today()->subDays(7)->toDateString() : 'date_equals:'.today()->toDateString()], 'prescriber_name' => ['required', 'string', 'max:190'],
             'service_origin' => ['nullable', 'string', 'max:190'], 'attachment' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'diagnosis' => ['nullable', 'string', 'max:2000'], 'notes' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'], 'items.*.product_id' => ['required', 'uuid'],
@@ -189,7 +190,18 @@ class DispensationController extends Controller
     {
         $this->access($request, $organization, 'dispensations.manage');
         $sites = Site::with('healthFacility:id,name')->whereIn('id', $this->siteIds($request, $organization))->orderBy('name')->get();
-        return response()->json(['sites' => $sites, 'patients' => $this->patientQuery($request, $organization)->where('is_active', true)->orderBy('last_name')->get(),
+        $origins = app(StockOriginService::class);
+        return response()->json([
+            // Niveau 7 : couples ONG/Bailleur de chaque site, destinations et lots en stock (choix d'un lot périmé ou détérioré).
+            'sites' => $sites->map(fn (Site $site) => [...$site->toArray(), 'origins' => $origins->options($site)->values()]),
+            'destinations' => collect(Dispensation::destinations())->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values(),
+            'batches' => \App\Models\StockBalance::with('batch:id,batch_number,expires_on,status,origin_type,origin_project_id,origin_key')
+                ->whereIn('site_id', $sites->pluck('id'))->whereRaw('(theoretical_quantity - reserved_quantity) > 0')->get()
+                ->map(fn ($balance) => ['site_id' => $balance->site_id, 'product_id' => $balance->product_id, 'batch_id' => $balance->batch_id,
+                    'batch_number' => $balance->batch?->batch_number, 'expires_on' => $balance->batch?->expires_on?->toDateString(),
+                    'expired' => (bool) $balance->batch?->expires_on?->lt(today()), 'origin_type' => $balance->batch?->origin_type,
+                    'origin_project_id' => $balance->batch?->origin_project_id, 'available' => (float) $balance->available_quantity])->values(),
+            'patients' => $this->patientQuery($request, $organization)->where('is_active', true)->orderBy('last_name')->get(),
             'prescriptions' => Prescription::with(['patient', 'items.product'])->where('organization_id', $organization->id)->whereIn('site_id', $sites->pluck('id'))->whereIn('status', Prescription::DISPENSABLE_STATUSES)->latest('prescribed_on')->get(),
             'products' => $this->allowedProducts($request, $organization)->with('codes:id,product_id,code_type,value,is_primary')->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name'])]);
     }
@@ -197,10 +209,13 @@ class DispensationController extends Controller
     public function fefoSuggestion(Request $request, Organization $organization): JsonResponse
     {
         $this->access($request, $organization, 'dispensations.manage');
-        $data = $request->validate(['site_id' => ['required', 'uuid'], 'product_id' => ['required', 'uuid'], 'quantity' => ['required', 'numeric', 'gt:0']]);
+        $data = $request->validate(['site_id' => ['required', 'uuid'], 'product_id' => ['required', 'uuid'], 'quantity' => ['required', 'numeric', 'gt:0'],
+            'origin_type' => ['nullable', Rule::in([StockOriginService::TYPE_PROJECT, StockOriginService::TYPE_OTHER])], 'origin_project_id' => ['nullable', 'uuid']]);
         $site = $this->site($request, $organization, $data['site_id']);
         $product = $this->allowedProducts($request, $organization)->findOrFail($data['product_id']);
-        $allocations = $this->ledger->fefo($organization, $site, $product->id, (float) $data['quantity']);
+        // Niveau 7 : suggestion limitée au couple ONG/Bailleur choisi.
+        $origin = empty($data['origin_type']) ? null : app(StockOriginService::class)->resolveForIssue($site, $data);
+        $allocations = $this->ledger->fefo($organization, $site, $product->id, (float) $data['quantity'], $origin);
         return response()->json(['requested_quantity' => (float) $data['quantity'], 'available_quantity' => $allocations->sum('suggested_quantity'), 'allocations' => $allocations]);
     }
 
@@ -215,40 +230,67 @@ class DispensationController extends Controller
             );
             return response()->json(['dispensation' => $existing->load(['patient', 'prescription', 'site', 'items.product', 'items.batch'])]);
         }
+        // Niveau 7 : une ancienne version mobile n'envoie pas de destination : « Patient ».
+        $request->mergeIfMissing(['destination_type' => 'patient']);
+        $destination = (string) $request->input('destination_type');
         $data = $request->validate([
             'offline_uuid' => ['nullable', 'uuid'], 'reference' => ['required', 'max:80', Rule::unique('dispensations')->where('organization_id', $organization->id)],
-            'patient_id' => ['required', 'uuid'], 'prescription_id' => ['nullable', 'uuid'], 'site_id' => ['required', 'uuid'],
+            'patient_id' => ['nullable', 'uuid', 'required_if:destination_type,patient'], 'prescription_id' => ['nullable', 'uuid'], 'site_id' => ['required', 'uuid'],
             'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
-            'destination_type' => ['nullable', Rule::in(array_values(array_filter(['patient', 'hospital_service', config('pharmacare_v1.features.community_dispensation') ? 'community' : null, 'other'])))], 'destination_name' => ['nullable', 'string', 'max:190'],
+            'destination_type' => ['required', Rule::in(array_keys(Dispensation::destinations()))],
+            'destination_name' => ['nullable', 'string', 'max:190', 'required_if:destination_type,hospital_service'],
             'allow_partial' => ['nullable', 'boolean'], 'dispensed_at' => ['required', 'date', 'before_or_equal:now'], 'notes' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'], 'items.*.prescription_item_id' => ['nullable', 'uuid'],
             'items.*.product_id' => ['required', 'uuid'], 'items.*.quantity' => ['required', 'numeric', 'gt:0'],
-        ]);
-        $patient = $this->patientQuery($request, $organization)->where('is_active', true)->findOrFail($data['patient_id']);
+            // Périmés/détériorés : le lot sortant est choisi (il peut être périmé).
+            'items.*.batch_id' => ['nullable', 'uuid', 'required_if:destination_type,'.Dispensation::DESTINATION_EXPIRED],
+            // Couple obligatoire dès que la FOSA a au moins un projet (contrôlé ci-dessous).
+            'origin_type' => ['nullable', Rule::in([StockOriginService::TYPE_PROJECT, StockOriginService::TYPE_OTHER])],
+            'origin_project_id' => ['nullable', 'uuid', 'required_if:origin_type,'.StockOriginService::TYPE_PROJECT],
+            'origin_label' => ['nullable', 'string', 'max:190'],
+        ], ['origin_project_id.required_if' => 'Choisissez le couple ONG/Bailleur.', 'patient_id.required_if' => 'Choisissez le patient.', 'destination_name.required_if' => 'Indiquez le service hospitalier.',
+            'items.*.batch_id.required_if' => 'Choisissez le lot périmé ou détérioré.'], StockOriginService::attributes());
         $site = $this->site($request, $organization, $data['site_id']);
-        abort_unless($patient->site_id === null || $patient->site_id === $site->id, 422, 'Le patient appartient à une autre formation sanitaire.');
-        $prescription = empty($data['prescription_id']) ? null : Prescription::where('organization_id', $organization->id)->where('patient_id', $patient->id)->whereIn('status', Prescription::DISPENSABLE_STATUSES)->findOrFail($data['prescription_id']);
+        $origins = app(StockOriginService::class);
+        if (empty($data['origin_type']) && $origins->options($site)->isNotEmpty()) {
+            throw ValidationException::withMessages(['origin_type' => 'Choisissez le couple ONG/Bailleur du stock à délivrer.']);
+        }
+        // FOSA sans projet : pas de couple à choisir, tout son stock est proposé.
+        $origin = empty($data['origin_type']) ? null : $origins->resolveForIssue($site, $data);
+        $forPatient = $destination === 'patient';
+        $patient = $forPatient ? $this->patientQuery($request, $organization)->where('is_active', true)->findOrFail($data['patient_id']) : null;
+        abort_unless(! $patient || $patient->site_id === null || $patient->site_id === $site->id, 422, 'Le patient appartient à une autre formation sanitaire.');
+        $prescription = ! $patient || empty($data['prescription_id']) ? null : Prescription::where('organization_id', $organization->id)->where('patient_id', $patient->id)->whereIn('status', Prescription::DISPENSABLE_STATUSES)->findOrFail($data['prescription_id']);
         $allowPartial = (bool) ($data['allow_partial'] ?? false);
         $attachmentFile = $request->file('attachment');
         $attachmentPath = $attachmentFile?->storeAs('private/dispensations', Str::uuid().'.'.$attachmentFile->extension());
-        $dispensation = DB::transaction(function () use ($data, $organization, $patient, $site, $prescription, $request, $allowPartial, $attachmentFile, $attachmentPath) {
-            $model = Dispensation::create([...collect($data)->except(['items', 'allow_partial', 'attachment'])->all(), 'destination_type' => $data['destination_type'] ?? 'patient',
+        $dispensation = DB::transaction(function () use ($data, $organization, $patient, $site, $prescription, $request, $allowPartial, $attachmentFile, $attachmentPath, $origin, $destination) {
+            $model = Dispensation::create([...collect($data)->except(['items', 'allow_partial', 'attachment', 'origin_label'])->all(), 'destination_type' => $destination,
+                'origin_type' => $origin['origin_type'] ?? null, 'origin_project_id' => $origin['origin_project_id'] ?? null,
                 'prescription_attachment_path' => $attachmentPath, 'prescription_attachment_original_name' => null,
                 'prescription_attachment_mime_type' => $attachmentFile?->getMimeType(), 'prescription_attachment_size' => $attachmentFile?->getSize(),
                 'prescription_attachment_captured_at' => $attachmentFile ? now() : null,
-                'organization_id' => $organization->id, 'patient_id' => $patient->id, 'site_id' => $site->id, 'prescription_id' => $prescription?->id, 'status' => 'validated', 'dispensed_by' => $request->user()->id]);
+                'organization_id' => $organization->id, 'patient_id' => $patient?->id, 'site_id' => $site->id, 'prescription_id' => $prescription?->id, 'status' => 'validated', 'dispensed_by' => $request->user()->id]);
             $totalRequested = 0.0; $totalDispensed = 0.0;
+            // Patient et service : produits de la Liste Standard ; retour et périmés : tout produit en stock.
+            $products = in_array($destination, Dispensation::STANDARD_LIST_DESTINATIONS, true)
+                ? $this->allowedProducts($request, $organization) : Product::where('organization_id', $organization->id);
             foreach ($data['items'] as $row) {
-                $product = $this->allowedProducts($request, $organization)->findOrFail($row['product_id']);
+                $product = (clone $products)->findOrFail($row['product_id']);
                 $requested = (float) $row['quantity']; $totalRequested += $requested;
-                $prescriptionItem = empty($row['prescription_item_id']) ? null : PrescriptionItem::where('prescription_id', $prescription?->id)->where('product_id', $product->id)->findOrFail($row['prescription_item_id']);
+                $prescriptionItem = ! $prescription ? null : (empty($row['prescription_item_id'])
+                    // Sans ligne précisée : la ligne de l'ordonnance pour ce produit (reliquat suivi).
+                    ? PrescriptionItem::where('prescription_id', $prescription->id)->where('product_id', $product->id)->first()
+                    : PrescriptionItem::where('prescription_id', $prescription->id)->where('product_id', $product->id)->findOrFail($row['prescription_item_id']));
                 if ($prescriptionItem && (float) $prescriptionItem->quantity_dispensed + $requested > (float) $prescriptionItem->quantity_prescribed) throw ValidationException::withMessages(['items' => 'La quantité dépasse le reliquat prescrit.']);
-                $allocations = $this->ledger->fefo($organization, $site, $product->id, $requested);
+                $allocations = empty($row['batch_id'])
+                    ? $this->ledger->fefo($organization, $site, $product->id, $requested, $origin)
+                    : $this->chosenBatch($organization, $site, $product, $row['batch_id'], $requested, $origin, $destination);
                 $available = (float) $allocations->sum('suggested_quantity');
-                if (! $allowPartial && $available + .0001 < $requested) throw ValidationException::withMessages(['items' => "Stock FEFO insuffisant pour {$product->name}."]);
+                if (! $allowPartial && $available + .0001 < $requested) throw ValidationException::withMessages(['items' => "Stock FEFO insuffisant pour {$product->name} (couple ONG/Bailleur choisi)."]);
                 $first = true;
                 foreach ($allocations as $allocation) {
-                    $movement = $this->ledger->record($organization, $site, $allocation['batch'], 'issue', $allocation['suggested_quantity'], $request->user()->id, ['reference_type' => 'dispensation', 'reference_id' => $model->id, 'reason' => 'Dispensation '.$model->reference]);
+                    $movement = $this->ledger->record($organization, $site, $allocation['batch'], Dispensation::movementType($destination), $allocation['suggested_quantity'], $request->user()->id, ['reference_type' => 'dispensation', 'reference_id' => $model->id, 'reason' => Dispensation::destinations()[$destination].' '.$model->reference]);
                     $model->items()->create(['prescription_item_id' => $prescriptionItem?->id, 'product_id' => $product->id, 'batch_id' => $movement->batch_id,
                         'quantity_requested' => $first ? $requested : 0, 'quantity' => $allocation['suggested_quantity'], 'quantity_shortage' => $first ? max(0, $requested - $available) : 0]);
                     $first = false;
@@ -297,6 +339,28 @@ class DispensationController extends Controller
             'sex' => ['nullable', Rule::in(['female', 'male', 'other', 'unknown'])], 'phone' => ['nullable', 'string', 'max:40'], 'external_identifier' => ['nullable', 'string', 'max:120'],
             'address' => ['nullable', 'string', 'max:1000'], 'allergies' => ['nullable', 'string', 'max:2000'], 'clinical_notes' => ['nullable', 'string', 'max:3000'], 'is_active' => ['sometimes', 'boolean']]);
     }
+    /**
+     * Niveau 7 — Lot choisi par l'utilisateur : du couple choisi, présent sur
+     * le site, jamais plus que son stock ; périmé seulement pour la sortie
+     * « Périmés/détériorés ».
+     */
+    private function chosenBatch(Organization $organization, Site $site, Product $product, string $batchId, float $requested, ?array $origin, string $destination): \Illuminate\Support\Collection
+    {
+        $batches = \App\Models\Batch::where('organization_id', $organization->id)->where('product_id', $product->id);
+        $batch = ($origin ? app(StockOriginService::class)->scopeBatches($batches, $site, $origin) : $batches)->find($batchId);
+        if (! $batch) {
+            throw ValidationException::withMessages(['items' => "Ce lot de {$product->name} n’appartient pas au couple ONG/Bailleur choisi."]);
+        }
+        if ($destination !== Dispensation::DESTINATION_EXPIRED && ($batch->status !== 'available' || $batch->expires_on?->lt(today()))) {
+            throw ValidationException::withMessages(['items' => "Le lot {$batch->batch_number} est périmé ou indisponible : il ne peut sortir que vers « Périmés/détériorés »."]);
+        }
+        $balance = \App\Models\StockBalance::where('site_id', $site->id)->where('batch_id', $batch->id)->first();
+        $available = max(0, (float) ($balance?->available_quantity ?? 0));
+
+        return collect([['batch' => $batch, 'available_quantity' => $available, 'suggested_quantity' => min($available, $requested)]])
+            ->filter(fn ($row) => $row['suggested_quantity'] > 0)->values();
+    }
+
     private function access(Request $request, Organization $organization, string $permission): void { abort_unless($request->user()->hasPermission($permission), 403); abort_unless($this->scopes->organizations($request->user())->whereKey($organization->id)->exists(), 404); }
     private function patientQuery(Request $request, Organization $organization): Builder
     {

@@ -67,6 +67,19 @@ void main() {
     expect(source, contains("?['origins']"));
   });
 
+  test('niveau 7 : sortie avec couple ONG/Bailleur et destination', () {
+    final source = File(
+      'lib/src/features/dispensations/presentation/clinical_supply_page.dart',
+    ).readAsStringSync();
+    expect(source, contains("labelText: 'Couple ONG/Bailleur *'"));
+    expect(source, contains("labelText: 'Destination *'"));
+    expect(source, contains("'destination_type': _destination"));
+    // Patient et photo d'ordonnance seulement pour la destination « Patient ».
+    expect(source, contains("1 => !_forPatient || _attachmentPath != null"));
+    expect(source, contains("labelText: 'Lot périmé ou détérioré *'"));
+    expect(source, contains("labelText: 'Service hospitalier *'"));
+  });
+
   test('inventory uses four validated PageView steps', () {
     final source = File(
       'lib/src/features/inventories/presentation/inventories_page.dart',

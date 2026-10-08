@@ -88,14 +88,21 @@ class StockLedgerService
         ]);
     }
 
-    public function fefo(Organization $organization, Site $site, string $productId, float $requested): Collection
+    /**
+     * Lots à délivrer, premier périmé premier sorti (FEFO).
+     *
+     * Niveau 7 : $origin limite aux lots du couple ONG/Bailleur choisi
+     * (voir StockOriginService::scopeBatches) ; jamais de lot périmé.
+     */
+    public function fefo(Organization $organization, Site $site, string $productId, float $requested, ?array $origin = null): Collection
     {
         $remaining = $requested;
 
         return StockBalance::query()->with('batch')->where('stock_balances.organization_id', $organization->id)
             ->where('stock_balances.site_id', $site->id)->where('stock_balances.product_id', $productId)
             ->whereRaw('(stock_balances.theoretical_quantity - stock_balances.reserved_quantity) > 0')
-            ->whereHas('batch', fn ($q) => $q->where('status', 'available')->whereDate('expires_on', '>=', today()))
+            ->whereHas('batch', fn ($q) => $q->where('status', 'available')->whereDate('expires_on', '>=', today())
+                ->when($origin, fn ($batches) => app(StockOriginService::class)->scopeBatches($batches, $site, $origin)))
             ->join('batches', 'batches.id', '=', 'stock_balances.batch_id')
             ->orderBy('batches.expires_on')->orderBy('batches.batch_number')
             ->select('stock_balances.*')->get()->map(function (StockBalance $balance) use (&$remaining) {

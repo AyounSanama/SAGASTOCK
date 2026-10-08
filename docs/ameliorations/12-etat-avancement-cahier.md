@@ -89,7 +89,7 @@ Limites : vérification dans le code et par les tests automatiques (354 tests ba
 |---|---|---|
 | Lots, dates de péremption, quantités livrées, plusieurs lots par produit | ✅ | |
 | Liste des produits issue de la Liste Standard | ✅ | |
-| Origine « ONG/Bailleur » (ex. MDM/GFFO5) ou « Autre » | ❌ | Champ texte libre / fournisseur ; niveau 7 |
+| Origine « ONG/Bailleur » (ex. MDM/GFFO5) ou « Autre » | ✅ | 07/10 : obligatoire, portée par le lot ; stock existant via `pharmacare:stock-origins` |
 | Quantités commandées et « rapport de réception » | 🟡 | Écarts commandé / reçu existants ; formule à recevoir du client |
 | Risque de péremption par lot, rouge sous 2 mois | 🟡 | Calcul par lot à vérifier à l'écran ; formule corrigée au niveau 9 |
 | Saisie par l'Utilisateur Site | ❌ | Permission `receipts.manage` (matrice en attente) |
@@ -99,12 +99,12 @@ Limites : vérification dans le code et par les tests automatiques (354 tests ba
 | Fonction | État | Détail |
 |---|---|---|
 | Destinations patient, service, autre | ✅ | « Communauté » masquée en V1 |
-| Destinations « Périmés/détériorés » et « Retour pharmacie ONG » | ❌ | Niveau 7 |
+| Destinations « Périmés/détériorés » et « Retour pharmacie ONG » | ✅ | 08/10 : Web et mobile ; lot périmé choisi pour « Périmés/détériorés », patient non demandé |
 | Photo d'ordonnance obligatoire avant l'ordonnance | 🟡 | Obligatoire sur mobile ; facultative sur le Web |
 | Photo jamais depuis la galerie, chiffrée, inaccessible au personnel | ❌ | Le bouton « galerie » existe ; photo non chiffrée ; niveaux 8 et 10 |
-| Date et heure bloquées (date du jour) | ❌ | Saisie libre ≤ maintenant ; niveau 7 |
+| Date et heure bloquées (date du jour) | ✅ | 08/10 : date du jour imposée par le serveur (saisie hors ligne : 7 jours au plus) |
 | En-têtes par type de sortie (patient : nom, âge, sexe, n° d'ordonnance, prescripteur) | 🟡 | Présents, champs obligatoires à aligner (annexe C) |
-| Couple ONG/Bailleur | ❌ | Niveau 7 |
+| Couple ONG/Bailleur | ✅ | 08/10 : couple ou « Autre » obligatoire ; FEFO limité au stock de ce couple |
 | Statut de l'ordonnance : délivrée / en attente / partielle | ✅ | |
 | Pas plus que le stock, pas de lot périmé, FEFO | ✅ | |
 | Statut « R » (rupture) | ✅ | |

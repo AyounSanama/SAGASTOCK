@@ -427,6 +427,42 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
   String? _patientId;
   String? _siteId;
   String? _productId;
+  // Niveau 7 : destination de la sortie, couple ONG/Bailleur, service, lot choisi.
+  String _destination = 'patient';
+  // Projet du couple choisi, ou [_otherOrigin] (stock livré par un tiers).
+  String? _originProjectId;
+  static const _otherOrigin = 'other';
+  String? _batchId;
+  final _serviceName = TextEditingController();
+
+  bool get _forPatient => _destination == 'patient';
+
+  List<Map<String, dynamic>> get _origins => [
+    for (final origin
+        in ((_options['sites'] ?? const [])
+                    .where((site) => '${site['id']}' == _siteId)
+                    .firstOrNull?['origins']
+                as List? ??
+            const []))
+      Map<String, dynamic>.from(origin as Map),
+  ];
+
+  List<Map<String, dynamic>> get _lots => (_options['batches'] ?? const [])
+      .where(
+        (lot) =>
+            '${lot['site_id']}' == _siteId &&
+            '${lot['product_id']}' == _productId,
+      )
+      .where(
+        (lot) =>
+            _origins.isEmpty ||
+            (_originProjectId == _otherOrigin
+                ? lot['origin_type'] == _otherOrigin
+                : lot['origin_type'] != _otherOrigin &&
+                      (lot['origin_project_id'] == null ||
+                          '${lot['origin_project_id']}' == _originProjectId)),
+      )
+      .toList();
   String? _attachmentPath;
   String? _attachmentName;
   Uint8List? _attachmentPreview;
@@ -441,6 +477,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
   void dispose() {
     _pages.dispose();
     _quantity.dispose();
+    _serviceName.dispose();
     super.dispose();
   }
 
@@ -469,8 +506,13 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
   }
 
   bool _stepComplete(int step) => switch (step) {
-    0 => _patientId != null && _siteId != null,
-    1 => _attachmentPath != null,
+    0 =>
+      _siteId != null &&
+          (_origins.isEmpty || _originProjectId != null) &&
+          (!_forPatient || _patientId != null) &&
+          (_destination != 'hospital_service' ||
+              _serviceName.text.trim().isNotEmpty),
+    1 => !_forPatient || _attachmentPath != null,
     2 => _items.isNotEmpty,
     _ => true,
   };
@@ -483,7 +525,8 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
         : null;
     if (firstIncomplete != null) {
       _notice(switch (firstIncomplete) {
-        0 => 'Sélectionnez un patient et une formation sanitaire.',
+        0 =>
+          'Complétez la formation sanitaire, le couple ONG/Bailleur, la destination et le patient ou le service.',
         1 => 'Photographiez ou sélectionnez l’ordonnance.',
         _ => 'Ajoutez au moins un produit à dispenser.',
       });
@@ -564,6 +607,10 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
       _notice('Sélectionnez un produit et une quantité valide.');
       return;
     }
+    if (_destination == 'expired_damaged' && _batchId == null) {
+      _notice('Choisissez le lot périmé ou détérioré.');
+      return;
+    }
     final product = _options['products']!.firstWhere(
       (value) => '${value['id']}' == _productId,
     );
@@ -572,8 +619,10 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
         'product_id': _productId,
         'quantity': quantity,
         'name': product['name'],
+        'batch_id': ?_batchId,
       });
       _productId = null;
+      _batchId = null;
       _quantity.clear();
     });
   }
@@ -613,8 +662,17 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
     try {
       final online = await widget.service.dispense(widget.organizationId, {
         'reference': 'DIS-${DateTime.now().millisecondsSinceEpoch}',
-        'patient_id': _patientId,
+        if (_forPatient) 'patient_id': _patientId,
         'site_id': _siteId,
+        'destination_type': _destination,
+        if (_destination == 'hospital_service')
+          'destination_name': _serviceName.text.trim(),
+        if (_originProjectId == _otherOrigin)
+          'origin_type': _otherOrigin
+        else if (_originProjectId != null) ...{
+          'origin_type': 'project',
+          'origin_project_id': _originProjectId,
+        },
         'dispensed_at': DateTime.now().toUtc().toIso8601String(),
         'allow_partial': false,
         '_attachment_path': _attachmentPath,
@@ -624,6 +682,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
               (item) => {
                 'product_id': item['product_id'],
                 'quantity': item['quantity'],
+                'batch_id': ?item['batch_id'],
               },
             )
             .toList(),
@@ -727,30 +786,92 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
               ),
             )
             .toList(),
-        onChanged: (value) => setState(() => _siteId = value),
+        onChanged: (value) => setState(() {
+          _siteId = value;
+          _originProjectId = _origins.length == 1
+              ? '${_origins.first['project_id']}'
+              : null;
+        }),
       ),
-      const SizedBox(height: 14),
-      DropdownButtonFormField<String>(
-        initialValue: _patientId,
-        decoration: const InputDecoration(labelText: 'Patient'),
-        items: (_options['patients'] ?? const [])
-            .map(
-              (patient) => DropdownMenuItem(
-                value: '${patient['id']}',
+      if (_origins.isNotEmpty) ...[
+        const SizedBox(height: 14),
+        DropdownButtonFormField<String>(
+          key: ValueKey('origin-$_siteId'),
+          initialValue: _originProjectId,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Couple ONG/Bailleur *'),
+          items: [
+            for (final origin in _origins)
+              DropdownMenuItem(
+                value: '${origin['project_id']}',
                 child: Text(
-                  '${patient['code']} · ${patient['last_name']} ${patient['first_name']}',
+                  '${origin['label']}',
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            )
-            .toList(),
-        onChanged: (value) => setState(() => _patientId = value),
-      ),
+            const DropdownMenuItem(
+              value: _otherOrigin,
+              child: Text('Autre (livré par un tiers)'),
+            ),
+          ],
+          onChanged: (value) => setState(() => _originProjectId = value),
+        ),
+      ],
       const SizedBox(height: 14),
-      AppButton.add(
-        label: 'Nouveau patient',
-        expanded: true,
-        onPressed: _siteId == null ? null : _createPatient,
+      DropdownButtonFormField<String>(
+        initialValue: _destination,
+        decoration: const InputDecoration(labelText: 'Destination *'),
+        items: [
+          for (final destination
+              in (_options['destinations'] ??
+                  const <Map<String, dynamic>>[
+                    {'value': 'patient', 'label': 'Patient'},
+                  ]))
+            DropdownMenuItem(
+              value: '${destination['value']}',
+              child: Text('${destination['label']}'),
+            ),
+        ],
+        onChanged: (value) => setState(() {
+          _destination = value ?? 'patient';
+          _batchId = null;
+        }),
       ),
+      if (_destination == 'hospital_service') ...[
+        const SizedBox(height: 14),
+        TextField(
+          controller: _serviceName,
+          decoration: const InputDecoration(
+            labelText: 'Service hospitalier *',
+            hintText: 'Ex. Maternité, Pédiatrie',
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+      ],
+      if (_forPatient) ...[
+        const SizedBox(height: 14),
+        DropdownButtonFormField<String>(
+          initialValue: _patientId,
+          decoration: const InputDecoration(labelText: 'Patient'),
+          items: (_options['patients'] ?? const [])
+              .map(
+                (patient) => DropdownMenuItem(
+                  value: '${patient['id']}',
+                  child: Text(
+                    '${patient['code']} · ${patient['last_name']} ${patient['first_name']}',
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (value) => setState(() => _patientId = value),
+        ),
+        const SizedBox(height: 14),
+        AppButton.add(
+          label: 'Nouveau patient',
+          expanded: true,
+          onPressed: _siteId == null ? null : _createPatient,
+        ),
+      ],
     ],
   );
 
@@ -822,8 +943,33 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
               ),
             )
             .toList(),
-        onChanged: (value) => setState(() => _productId = value),
+        onChanged: (value) => setState(() {
+          _productId = value;
+          _batchId = null;
+        }),
       ),
+      if (_destination == 'expired_damaged') ...[
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: ValueKey('lot-$_productId'),
+          initialValue: _batchId,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Lot périmé ou détérioré *',
+          ),
+          items: [
+            for (final lot in _lots)
+              DropdownMenuItem(
+                value: '${lot['batch_id']}',
+                child: Text(
+                  '${lot['batch_number']} · ${lot['expires_on'] ?? ''}${lot['expired'] == true ? ' (périmé)' : ''} · ${lot['available']} en stock',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: (value) => setState(() => _batchId = value),
+        ),
+      ],
       const SizedBox(height: 12),
       TextField(
         controller: _quantity,
@@ -857,6 +1003,25 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
       (value) => '${value['id']}' == _patientId,
     );
     return _stepBody('Résumé', 'Vérifiez les informations avant validation.', [
+      // Niveau 7 : destination et couple ONG/Bailleur du stock délivré.
+      ListTile(
+        leading: const Icon(Icons.call_split_outlined),
+        title: const Text('Destination'),
+        subtitle: Text(
+          '${(_options['destinations'] ?? const []).where((d) => d['value'] == _destination).firstOrNull?['label'] ?? 'Patient'}'
+          '${_destination == 'hospital_service' ? ' · ${_serviceName.text.trim()}' : ''}',
+        ),
+      ),
+      if (_originProjectId != null)
+        ListTile(
+          leading: const Icon(Icons.handshake_outlined),
+          title: const Text('Couple ONG/Bailleur'),
+          subtitle: Text(
+            _originProjectId == _otherOrigin
+                ? 'Autre (livré par un tiers)'
+                : '${_origins.where((o) => '${o['project_id']}' == _originProjectId).firstOrNull?['label'] ?? ''}',
+          ),
+        ),
       ListTile(
         leading: const Icon(Icons.person_outline),
         title: const Text('Patient'),
@@ -1043,16 +1208,37 @@ class _ProductBarcodeScannerPageState
 class Status extends StatelessWidget {
   const Status(this.value, {super.key});
   final String value;
+
   /// Libellé et couleur d'état ; « validation non requise (V1) » n'est pas
   /// une validation pharmaceutique (statut neutre).
   static (String, Color, Color) describe(String value) => switch (value) {
-    'draft' => ('En attente de validation', AppColors.infoSurface, AppColors.infoText),
-    'validation_not_required' => ('Validation non requise (V1)', AppColors.neutralSurface, AppColors.neutralText),
+    'draft' => (
+      'En attente de validation',
+      AppColors.infoSurface,
+      AppColors.infoText,
+    ),
+    'validation_not_required' => (
+      'Validation non requise (V1)',
+      AppColors.neutralSurface,
+      AppColors.neutralText,
+    ),
     'validated' => ('Validée', AppColors.successSurface, AppColors.successText),
     'rejected' => ('Refusée', AppColors.dangerSurface, AppColors.dangerText),
-    'partially_dispensed' => ('Partiellement dispensée', AppColors.infoSurface, AppColors.infoText),
-    'waiting_stock' => ('En attente de stock', AppColors.infoSurface, AppColors.infoText),
-    'dispensed' => ('Dispensée', AppColors.successSurface, AppColors.successText),
+    'partially_dispensed' => (
+      'Partiellement dispensée',
+      AppColors.infoSurface,
+      AppColors.infoText,
+    ),
+    'waiting_stock' => (
+      'En attente de stock',
+      AppColors.infoSurface,
+      AppColors.infoText,
+    ),
+    'dispensed' => (
+      'Dispensée',
+      AppColors.successSurface,
+      AppColors.successText,
+    ),
     _ => (value, AppColors.neutralSurface, AppColors.neutralText),
   };
 
