@@ -104,7 +104,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            country.isEmpty ? 'Admin Coordination' : 'Admin Coordination, $country',
+                            '${_data['can_act'] == false ? 'Coordination (lecture seule)' : 'Admin Coordination'}${country.isEmpty ? '' : ', $country'}',
                             style: const TextStyle(color: AppColors.sidebarText, fontSize: 13),
                           ),
                           const SizedBox(height: 2),

@@ -348,7 +348,13 @@ class _CoordinationPageState extends State<CoordinationPage>
                   'Modifier le compte',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
-                _Muted(isProjectAdmin ? 'Admin Projet' : 'Coordination (lecture seule)'),
+                _Muted(
+                  isProjectAdmin
+                      ? 'Admin Projet'
+                      : account['read_only'] == true
+                      ? 'Coordination (lecture seule)'
+                      : 'Admin Coordination',
+                ),
                 const SizedBox(height: 12),
                 if (error != null) ...[
                   Text(error!, style: TextStyle(color: AppColors.dangerText)),
@@ -499,9 +505,9 @@ class _CoordinationPageState extends State<CoordinationPage>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          country.isEmpty
-                              ? 'Admin Coordination'
-                              : 'Admin Coordination, $country',
+                          // Compte en lecture seule : indiqué dans l'en-tête.
+                          '${_data.isEmpty || _canAct ? 'Admin Coordination' : 'Coordination (lecture seule)'}'
+                          '${country.isEmpty ? '' : ', $country'}',
                           style: const TextStyle(
                             color: AppColors.sidebarText,
                             fontSize: 13,
@@ -810,8 +816,10 @@ class _CoordinationPageState extends State<CoordinationPage>
   ];
 
   List<Widget> _accountsTab(List<Map<String, dynamic>> accounts) => [
-    const _Muted(
-      'Vous pouvez créer des comptes Admin Projet et Coordination (lecture seule). Les comptes FOSA sont créés par les Admin Projet.',
+    _Muted(
+      _canAct
+          ? 'Vous pouvez créer des comptes Admin Projet et Coordination (lecture seule). Les comptes FOSA sont créés par les Admin Projet.'
+          : 'Comptes de la coordination (consultation seule). Les comptes FOSA sont créés par les Admin Projet.',
     ),
     if (_canAct && widget.organizationId != null && _mission['id'] != null) ...[
       const SizedBox(height: 10),

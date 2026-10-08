@@ -59,7 +59,12 @@ class CoordinationController extends Controller
                 return [
                     ...$user->only(['id', 'name', 'first_name', 'last_name', 'phone', 'username', 'email', 'is_active', 'read_only']),
                     'project_id' => $projectRole?->pivot->scope_id,
-                    'role' => $projectRole ? 'Admin Projet, '.($projectCodes[$projectRole->pivot->scope_id] ?? '—') : 'Coordination (lecture seule)',
+                    // Un Admin Coordination n'est « lecture seule » que s'il porte l'indicateur.
+                    'role' => match (true) {
+                        (bool) $projectRole => 'Admin Projet, '.($projectCodes[$projectRole->pivot->scope_id] ?? '—'),
+                        (bool) $user->read_only => 'Coordination (lecture seule)',
+                        default => 'Admin Coordination',
+                    },
                     'status' => CoordinationService::accountStatus($user)['label'],
                 ];
             })->values(),
@@ -75,6 +80,8 @@ class CoordinationController extends Controller
 
         return response()->json([
             'mission' => $mission->only(['id', 'code', 'name']) + ['country' => $mission->country?->name],
+            // Lecture seule : l'en-tête mobile l'indique.
+            'can_act' => ! $request->user()->read_only,
             ...$this->coordination->dashboard($request->user(), $mission, array_filter([
                 'donor_id' => $request->string('donor_id')->toString() ?: null,
                 'project_id' => $request->string('project_id')->toString() ?: null,

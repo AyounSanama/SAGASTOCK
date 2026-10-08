@@ -217,7 +217,7 @@ details.mc-row>summary{list-style:none;cursor:pointer}details.mc-row>summary::-w
     @if($tab === 'accounts')
         <div class="mc-grid-acc">
             <div>
-                <div class="mc-head" style="margin-bottom:14px;align-items:center"><p style="margin:0">Vous pouvez créer des comptes Admin Projet et Coordination (lecture seule). Les comptes FOSA sont créés par les Admin Projet.</p>
+                <div class="mc-head" style="margin-bottom:14px;align-items:center"><p style="margin:0">@if($c['can_act'])Vous pouvez créer des comptes Admin Projet et Coordination (lecture seule). @else Comptes de la coordination (consultation seule). @endif Les comptes FOSA sont créés par les Admin Projet.</p>
                     @if($c['can_act'] && $canManageProjectAdmins && $accountRoles->isNotEmpty())<button class="mc-btn primary" type="button" data-sheet-open="project-admin-create-sheet"><span class="material-symbols-outlined">add</span> Créer un compte</button>@endif</div>
                 <section class="mc-card mc-scroll"><table class="mc-table" style="min-width:640px">
                     <thead><tr><th>Nom</th><th>Identifiant</th><th>Rôle et projet</th><th>Statut</th><th></th></tr></thead>
@@ -228,7 +228,7 @@ details.mc-row>summary{list-style:none;cursor:pointer}details.mc-row>summary::-w
                         <tr>
                             <td><strong>{{ $account->name }}</strong></td>
                             <td class="mc-muted">{{ $account->email ?: $account->username }}</td>
-                            <td>@if($projectRole)<span class="mc-badge brand">Admin Projet, {{ $c['projects']->firstWhere('id', $projectRole->pivot->scope_id)?->code ?? '—' }}</span>@else<span class="mc-badge neutral">Coordination (lecture seule)</span>@endif</td>
+                            <td>@if($projectRole)<span class="mc-badge brand">Admin Projet, {{ $c['projects']->firstWhere('id', $projectRole->pivot->scope_id)?->code ?? '—' }}</span>@elseif($account->read_only)<span class="mc-badge neutral">Coordination (lecture seule)</span>@else<span class="mc-badge neutral">Admin Coordination</span>@endif</td>
                             <td><span class="mc-badge {{ $status['tone'] }}">{{ $status['label'] }}</span></td>
                             <td class="mc-actions">@if($c['can_act'])<button class="mc-btn sm" type="button" data-sheet-open="account-edit-{{ $account->id }}">Modifier</button>@endif</td>
                         </tr>
