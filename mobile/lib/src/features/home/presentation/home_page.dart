@@ -292,20 +292,32 @@ class _SummaryCards extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = constraints.maxWidth >= 680 ? 4 : 2;
-        final width =
-            (constraints.maxWidth - AppSpacing.md * (columns - 1)) / columns;
-        return Wrap(
-          spacing: AppSpacing.md,
-          runSpacing: AppSpacing.md,
+        // Grille régulière : toutes les cartes d'une ligne ont la même
+        // hauteur et la même largeur, même si un libellé tient sur 2 lignes.
+        return Column(
           children: [
-            for (final item in items)
-              SizedBox(
-                width: width,
-                child: _SummaryCard(
-                  data: item,
-                  value: '${item.value ?? stats[item.key] ?? 0}',
+            for (var start = 0; start < items.length; start += columns) ...[
+              if (start > 0) const SizedBox(height: AppSpacing.md),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var column = 0; column < columns; column++) ...[
+                      if (column > 0) const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: start + column < items.length
+                            ? _SummaryCard(
+                                data: items[start + column],
+                                value:
+                                    '${items[start + column].value ?? stats[items[start + column].key] ?? 0}',
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ],
                 ),
               ),
+            ],
           ],
         );
       },
@@ -335,6 +347,12 @@ class _SummaryCard extends StatelessWidget {
   final _SummaryData data;
   final String value;
 
+  static const _lineHeight = 1.3;
+
+  /// Hauteur de deux lignes, agrandissement du texte du téléphone compris.
+  static double _twoLines(BuildContext context, double fontSize) =>
+      MediaQuery.textScalerOf(context).scale(fontSize) * _lineHeight * 2 + 1;
+
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
@@ -356,13 +374,20 @@ class _SummaryCard extends StatelessWidget {
               child: Icon(data.icon, color: AppTheme.orange, size: 23),
             ),
             const SizedBox(height: 10),
-            Text(
-              data.label,
-              maxLines: 2,
-              style: TextStyle(
-                color: AppTheme.ink,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+            // Deux lignes réservées au libellé et à la légende : toutes les
+            // cartes ont la même taille et les chiffres sont alignés.
+            SizedBox(
+              height: _twoLines(context, 13),
+              child: Text(
+                data.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppTheme.ink,
+                  fontSize: 13,
+                  height: _lineHeight,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(height: 4),
@@ -374,10 +399,18 @@ class _SummaryCard extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            Text(
-              data.caption,
-              maxLines: 2,
-              style: TextStyle(color: AppTheme.muted, fontSize: 11),
+            SizedBox(
+              height: _twoLines(context, 11),
+              child: Text(
+                data.caption,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppTheme.muted,
+                  fontSize: 11,
+                  height: _lineHeight,
+                ),
+              ),
             ),
           ],
         ),

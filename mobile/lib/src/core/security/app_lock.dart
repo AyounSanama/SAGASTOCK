@@ -80,7 +80,7 @@ class AppLock {
       List<int>.generate(16, (_) => Random.secure().nextInt(256)),
     );
     await _storage.write(key: _saltKey, value: salt);
-    await _storage.write(key: _hashKey, value: _hash(pin, salt));
+    await _storage.write(key: _hashKey, value: await _hashInBackground(pin, salt));
     _unlock();
   }
 
@@ -89,7 +89,9 @@ class AppLock {
   Future<bool> unlock(String pin) async {
     final salt = await _storage.read(key: _saltKey);
     final expected = await _storage.read(key: _hashKey);
-    if (salt != null && expected != null && _hash(pin, salt) == expected) {
+    if (salt != null &&
+        expected != null &&
+        await _hashInBackground(pin, salt) == expected) {
       _unlock();
       return true;
     }
@@ -104,6 +106,13 @@ class AppLock {
     _lastActivity = _clock();
     state.value = AppLockState.unlocked;
   }
+
+  /// Calcul hors du fil de l'interface : les 20 000 passes figeaient l'écran
+  /// plusieurs secondes (message Android « l'application ne répond pas »).
+  static Future<String> _hashInBackground(String pin, String salt) =>
+      compute(_hashEntry, [pin, salt]);
+
+  static String _hashEntry(List<String> args) => _hash(args[0], args[1]);
 
   /// Empreinte salée et étirée (20 000 passes) : un PIN court ne doit pas
   /// pouvoir être retrouvé rapidement même si l'empreinte était extraite.
