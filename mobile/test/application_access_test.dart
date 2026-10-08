@@ -141,8 +141,9 @@ void main() {
     final navigation = ApplicationAccess.navigation(user);
     final keys = navigation.map((item) => item.key).toList(growable: false);
 
-    expect(keys, <String>['dashboard', 'missions']);
-    expect(navigation.last.label, 'Ma Coordination');
+    // « Utilisateurs » hors menu Coordination ; « Mon profil » toujours présent (niveau 2).
+    expect(keys, <String>['dashboard', 'missions', 'profile']);
+    expect(navigation[1].label, 'Ma Coordination');
   });
 
   test('la V1 filtre aussi un ancien manifeste conservé hors connexion', () {
@@ -179,13 +180,27 @@ void main() {
     };
 
     final items = ApplicationAccess.navigation(coordination);
+    // Niveau 2 : « Configuration des projets » quitte le menu (projets
+    // ouverts depuis Ma Coordination) ; Liste Standard de la Coordination.
     expect(items.map((item) => item.label), <String>[
       'Tableau de bord',
       'Ma Coordination',
-      'Configuration des projets',
-      'Liste standard du projet',
+      'Liste Standard',
+      'Mon profil',
     ]);
-    expect(items[2].path, '/projects');
+    expect(items[2].path, '/coordination/standard-list');
+    // Avec le droit de voir les bailleurs : « Référentiels ».
+    final withFunding = ApplicationAccess.navigation({
+      ...coordination,
+      'permissions': [...coordination['permissions'] as List, 'funding.view'],
+    });
+    expect(withFunding.map((item) => item.label), <String>[
+      'Tableau de bord',
+      'Ma Coordination',
+      'Référentiels',
+      'Liste Standard',
+      'Mon profil',
+    ]);
     expect(ApplicationAccess.moduleAvailable(coordination, '/stocks'), isFalse);
     expect(
       ApplicationAccess.moduleAvailable(coordination, '/projects/42'),

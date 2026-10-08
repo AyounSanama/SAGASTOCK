@@ -17,9 +17,13 @@ class ScopedProjectsPage extends StatefulWidget {
     super.key,
     this.openCreate = false,
     this.embedded = false,
+    this.openProjectId,
   });
 
   final bool openCreate;
+
+  /// Projet dont le détail s'ouvre à l'arrivée (carte de « Ma Coordination »).
+  final String? openProjectId;
   final bool embedded;
   @override
   State<ScopedProjectsPage> createState() => _ScopedProjectsPageState();
@@ -36,6 +40,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
   bool _projectMode = false;
   bool _canManage = false;
   bool _createOpened = false;
+  bool _projectOpened = false;
   String _status = '', _missionId = '';
   String? _error;
 
@@ -117,6 +122,15 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
         _createOpened = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _openForm();
+        });
+      }
+      final opened = _projects
+          .where((project) => '${project['id']}' == widget.openProjectId)
+          .firstOrNull;
+      if (mounted && opened != null && !_projectOpened) {
+        _projectOpened = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showProject(opened);
         });
       }
     }
@@ -895,6 +909,14 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
           label: 'Fermer',
           onPressed: () => Navigator.pop(dialogContext),
         ),
+        if (!_archived && _canManage)
+          AppButton.edit(
+            label: 'Modifier',
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _openForm(project);
+            },
+          ),
       ],
     ),
   );

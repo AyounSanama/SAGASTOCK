@@ -100,11 +100,6 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
         facilityId: state.pathParameters['facilityId'],
       ),
     ),
-    // Niveau 6 — Liste Standard de la Coordination (décochage par FOSA, code-barres).
-    GoRoute(
-      path: '/coordination/standard-list',
-      builder: (context, state) => const CoordinationStandardListPage(),
-    ),
     // Niveau 2 — Assistant « Créer un projet / programme », plein écran.
     GoRoute(
       path: '/projects/new',
@@ -121,6 +116,12 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
       builder: (context, state, child) =>
           MainLayout(location: state.uri.path, child: child),
       routes: [
+        // Niveau 6 — Liste Standard de la Coordination (décochage par FOSA,
+        // code-barres), avec la barre de navigation comme les autres écrans.
+        GoRoute(
+          path: '/coordination/standard-list',
+          builder: (context, state) => const CoordinationStandardListPage(),
+        ),
         GoRoute(
           path: '/configuration',
           builder: (context, state) => const ConfigurationPage(),
@@ -206,11 +207,15 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
           path: '/projects',
           builder: (context, state) => ProjectConfigurationPage(
             openCreate: state.uri.queryParameters['create'] == '1',
+            openProjectId: state.uri.queryParameters['open'],
           ),
         ),
         GoRoute(
           path: '/funding',
-          builder: (context, state) => const ScopedFundingPage(),
+          // Niveau 2 : « Référentiels » de la Coordination (bailleurs ;
+          // l'onglet Programmes est masqué).
+          builder: (context, state) =>
+              const ScopedFundingPage(section: FundingSection.donors),
         ),
         // Niveau 5 : écrans de l'Admin Projet (maquettes mobiles 06 et 08).
         GoRoute(

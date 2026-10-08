@@ -167,7 +167,9 @@ class ProjectWizardTest extends TestCase
     {
         $project = Project::create(['organization_id' => $this->organization->id, 'mission_id' => $this->mission->id, 'code' => 'P1', 'name' => 'Projet', 'status' => 'draft']);
         $this->actingAs($this->coordination)->get(route('projects.wizard.show', [$project, 'standard-list']))->assertOk()
-            ->assertSee('data-open-dialog="service-dialog"', false)->assertDontSee('#ajouter-un-service', false);
+            ->assertSee('data-open-dialog="service-dialog"', false)->assertDontSee('#ajouter-un-service', false)
+            // Rattachement : chemin complet (deux catégories du même nom restent distinctes).
+            ->assertSee('Soins de santé primaire › ', false);
 
         // Web : programme rattaché à « Soins de santé primaire », propre à l'organisation.
         $this->actingAs($this->coordination)->postJson(route('projects.wizard.services.store', $project), [

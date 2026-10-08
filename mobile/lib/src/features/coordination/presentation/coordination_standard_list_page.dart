@@ -280,7 +280,6 @@ class _CoordinationStandardListPageState extends State<CoordinationStandardListP
               if (_editable)
                 Switch(
                   value: retained,
-                  activeThumbColor: AppColors.primaryStrong,
                   onChanged: (value) => setState(() => value ? _retained.add(id) : _retained.remove(id)),
                 )
               else

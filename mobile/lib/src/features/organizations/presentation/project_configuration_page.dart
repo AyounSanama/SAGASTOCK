@@ -1,31 +1,38 @@
 import 'package:flutter/material.dart';
 
 import '../../auth/data/auth_service.dart';
-import 'scoped_funding_page.dart';
 import 'scoped_projects_page.dart';
 import 'my_project_page.dart';
 
-/// Conteneur V1 de l'Admin Coordination : les trois sections sœurs utilisent
-/// les écrans, repositories et formulaires existants.
+/// Projets de l'Admin Coordination, ouverts depuis « Ma Coordination »
+/// (détail, modification, configuration médicale).
+///
+/// Niveau 2 : l'entrée « Configuration des projets » a quitté le menu ; les
+/// bailleurs sont dans « Référentiels » et l'onglet « Programmes » est masqué
+/// (aucun doublon).
 class ProjectConfigurationPage extends StatefulWidget {
-  const ProjectConfigurationPage({super.key, this.openCreate = false});
+  const ProjectConfigurationPage({
+    super.key,
+    this.openCreate = false,
+    this.openProjectId,
+  });
 
   final bool openCreate;
+
+  /// Projet dont le détail s'ouvre à l'arrivée.
+  final String? openProjectId;
 
   @override
   State<ProjectConfigurationPage> createState() =>
       _ProjectConfigurationPageState();
 }
 
-class _ProjectConfigurationPageState extends State<ProjectConfigurationPage>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
+class _ProjectConfigurationPageState extends State<ProjectConfigurationPage> {
   String? _role;
 
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
     _loadRole();
   }
 
@@ -37,12 +44,6 @@ class _ProjectConfigurationPageState extends State<ProjectConfigurationPage>
   }
 
   @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     if (_role == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -51,30 +52,11 @@ class _ProjectConfigurationPageState extends State<ProjectConfigurationPage>
       return const MyProjectPage();
     }
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Configuration des projets'),
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: const [
-            Tab(text: 'Projets'),
-            Tab(text: 'Bailleurs'),
-            Tab(text: 'Programmes'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabs,
-        children: [
-          ScopedProjectsPage(openCreate: widget.openCreate, embedded: true),
-          const ScopedFundingPage(
-            embedded: true,
-            section: FundingSection.donors,
-          ),
-          const ScopedFundingPage(
-            embedded: true,
-            section: FundingSection.programs,
-          ),
-        ],
+      appBar: AppBar(title: const Text('Projets')),
+      body: ScopedProjectsPage(
+        openCreate: widget.openCreate,
+        openProjectId: widget.openProjectId,
+        embedded: true,
       ),
     );
   }

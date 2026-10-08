@@ -318,7 +318,6 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
                   ProjectAdminCard(
                     child: SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      activeThumbColor: AppColors.primaryStrong,
                       title: const Text('FOSA active', style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: const Text('Une FOSA inactive ne peut plus se connecter ; ses données restent conservées.'),
                       value: _active,

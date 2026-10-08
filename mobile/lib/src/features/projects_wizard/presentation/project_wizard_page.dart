@@ -722,13 +722,41 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
     });
   }
 
+  /// Un champ corrigé perd son message d'erreur (« Champ obligatoire »).
+  void _clearError(String field) {
+    if (_fieldErrors.containsKey(field)) {
+      _fieldErrors = {..._fieldErrors}..remove(field);
+    }
+  }
+
+  /// Chemin complet de chaque niveau (« Soins de santé primaire ›
+  /// Programmes de prise en charge ») : deux catégories du même nom sous des
+  /// niveaux différents restent distinctes. L'arbre arrive aplati, parent
+  /// avant ses enfants.
+  static List<Map<String, dynamic>> _withPaths(List<Map<String, dynamic>> levels) {
+    final ancestors = <int, String>{};
+    return [
+      for (final level in levels)
+        () {
+          final depth = ((level['depth'] as num?) ?? 1).toInt();
+          ancestors
+            ..removeWhere((key, _) => key >= depth)
+            ..[depth] = '${level['name']}';
+          return {
+            ...level,
+            'path': [for (var d = 1; d <= depth; d++) ?ancestors[d]].join(' › '),
+          };
+        }(),
+    ];
+  }
+
   /// « + Ajouter un service » : ajouté au référentiel, coché, puis la liste se
   /// régénère, sans quitter l'assistant.
   Future<void> _addService() async {
     final service = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (_) => _ServiceDialog(
-        parents: _maps(_map(_list['options'])['care_levels'])
+        parents: _withPaths(_maps(_map(_list['options'])['care_levels']))
             .where((level) => ((level['depth'] as num?) ?? 1) < 3)
             .toList(),
         create: (name, code, parentId) => _service.addService(
@@ -1090,7 +1118,10 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
               for (var month = 1; month <= 12; month++)
                 DropdownMenuItem(value: month, child: Text('$month mois')),
             ],
-            onChanged: (value) => setState(() => _period = value),
+            onChanged: (value) => setState(() {
+              _period = value;
+              _clearError('order_period_months');
+            }),
           ),
           const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<int>(
@@ -1104,7 +1135,10 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
               for (var month = 1; month <= 12; month++)
                 DropdownMenuItem(value: month, child: Text('$month mois')),
             ],
-            onChanged: (value) => setState(() => _lead = value),
+            onChanged: (value) => setState(() {
+              _lead = value;
+              _clearError('delivery_lead_time_months');
+            }),
           ),
           const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<num>(
@@ -1118,7 +1152,10 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
               for (final months in safetyOptions)
                 DropdownMenuItem(value: months, child: Text('${_decimal(months)} mois')),
             ],
-            onChanged: (value) => setState(() => _safety = value),
+            onChanged: (value) => setState(() {
+              _safety = value;
+              _clearError('safety_stock_months');
+            }),
           ),
           const SizedBox(height: AppSpacing.md),
           _DateTile(
@@ -1415,7 +1452,7 @@ class _ServiceDialogState extends State<_ServiceDialog> {
                 DropdownMenuItem<String?>(
                   value: '${level['id']}',
                   child: Text(
-                    '${'— ' * (((level['depth'] as num?) ?? 1).toInt() - 1)}${level['name']}',
+                    '${level['path'] ?? level['name']}',
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),

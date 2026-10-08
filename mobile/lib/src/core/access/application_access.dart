@@ -274,9 +274,26 @@ abstract final class ApplicationAccess {
   ) {
     final remote = user?['navigation'] as List<dynamic>?;
     final role = '${user?['role'] ?? ''}'.toLowerCase();
-    final source = role == 'sago_admin' || remote == null || remote.isEmpty
+    final baseSource = role == 'sago_admin' || remote == null || remote.isEmpty
         ? _fallbackManifest
         : remote.cast<Map<String, dynamic>>();
+    // Coordination : menu du niveau 2 (Tableau de bord, Ma Coordination,
+    // Référentiels, Liste Standard, Profil). « Référentiels » est réservé au
+    // Web dans le manifeste serveur : l'entrée mobile (bailleurs) le complète.
+    final source = role == 'coordination_admin'
+        ? [
+            for (final key in const [
+              'dashboard',
+              'missions',
+              'funding',
+              'standard-lists',
+              'profile',
+            ])
+              ...[...baseSource, ..._fallbackManifest]
+                  .where((raw) => raw['key'] == key)
+                  .take(1),
+          ]
+        : baseSource;
     final allowedKeys = switch (role) {
       // Admin Sago : l'ancien Centre de contrôle (parcours en 12 étapes) est
       // remplacé par Organisations, Standards, Assistance et Historique ;
@@ -292,7 +309,7 @@ abstract final class ApplicationAccess {
       'coordination_admin' => const {
         'dashboard',
         'missions',
-        'projects',
+        'funding',
         'standard-lists',
         'profile',
       },
@@ -318,8 +335,8 @@ abstract final class ApplicationAccess {
             label: role == 'coordination_admin'
                 ? switch (raw['key']) {
                     'missions' => 'Ma Coordination',
-                    'projects' => 'Configuration des projets',
-                    'standard-lists' => 'Liste standard du projet',
+                    'funding' => 'Référentiels',
+                    'standard-lists' => 'Liste Standard',
                     _ => raw['label']?.toString() ?? '',
                   }
                 : role == 'project_admin'

@@ -5,6 +5,7 @@ import '../../../core/connectivity/connectivity_service.dart';
 import '../../../core/localization/language_catalog.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_badge.dart';
+import '../../../core/widgets/app_navigation_drawer.dart';
 import '../../../core/widgets/language_picker.dart';
 import '../../users/presentation/coordination_account_sheet.dart';
 import '../data/coordination_service.dart';
@@ -240,6 +241,38 @@ class _CoordinationPageState extends State<CoordinationPage>
     );
   }
 
+  /// Validation d'une FOSA : confirmée, comme la suspension et le refus
+  /// (elle ouvre la création des comptes de la FOSA).
+  Future<void> _validate(Map<String, dynamic> facility) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Valider ${facility['name']} ?'),
+        content: const Text(
+          'L’Admin Projet pourra ensuite créer les comptes de cette FOSA.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primaryStrong,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Valider'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _run(
+      () => _service.validateFacility('${facility['id']}'),
+      'FOSA validée. L’Admin Projet peut créer ses comptes.',
+    );
+  }
+
   Future<void> _suspend(Map<String, dynamic> facility) async {
     final reason = await _askReason(
       title: 'Suspendre ${facility['name']}',
@@ -436,6 +469,8 @@ class _CoordinationPageState extends State<CoordinationPage>
     final facilities = _list('facilities');
     final accounts = _list('accounts');
     return Scaffold(
+      // Menu principal (Référentiels…) : accessible depuis l'en-tête.
+      drawer: const AppNavigationDrawer(),
       backgroundColor: AppColors.background,
       floatingActionButton: _canAct && _tabs.index == 0
           ? FloatingActionButton(
@@ -475,6 +510,16 @@ class _CoordinationPageState extends State<CoordinationPage>
                         const SizedBox(height: 2),
                         Row(
                           children: [
+                            // Menu principal (Référentiels, Profil…).
+                            Builder(
+                              builder: (context) => IconButton(
+                                tooltip: 'Menu principal',
+                                style: _onDarkHeader,
+                                icon: const Icon(Icons.menu, color: Colors.white),
+                                onPressed: () => Scaffold.of(context).openDrawer(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 '${_mission['name'] ?? 'Ma Coordination'}',
@@ -591,6 +636,10 @@ class _CoordinationPageState extends State<CoordinationPage>
         const _Message(text: 'Aucun projet ni programme dans cette coordination.'),
       for (final project in projects)
         _Card(
+          // Projet enregistré : détail (et « Modifier ») ; brouillon : « Reprendre ».
+          onTap: project['status'] == 'draft'
+              ? null
+              : () => context.push('/projects?open=${project['id']}'),
           children: [
             _TitleRow(
               title: '${project['code']}',
@@ -684,12 +733,7 @@ class _CoordinationPageState extends State<CoordinationPage>
                       backgroundColor: AppColors.primaryStrong,
                       minimumSize: const Size.fromHeight(46),
                     ),
-                    onPressed: _busy
-                        ? null
-                        : () => _run(
-                            () => _service.validateFacility('${facility['id']}'),
-                            'FOSA validée. L’Admin Projet peut créer ses comptes.',
-                          ),
+                    onPressed: _busy ? null : () => _validate(facility),
                     icon: const Icon(Icons.check, size: 18),
                     label: const Text('Valider'),
                   ),
@@ -982,19 +1026,30 @@ class _ReasonDialogState extends State<_ReasonDialog> {
 }
 
 class _Card extends StatelessWidget {
-  const _Card({required this.children});
+  const _Card({required this.children, this.onTap});
   final List<Widget> children;
 
+  /// Ouverture du détail (ex. projet actif : détail et « Modifier »).
+  final VoidCallback? onTap;
+
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Material(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
-      border: Border.all(color: AppColors.border),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        side: BorderSide(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+        ),
+      ),
     ),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
   );
 }
 

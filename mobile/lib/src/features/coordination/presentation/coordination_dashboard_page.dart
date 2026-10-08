@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/connectivity/connectivity_service.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_badge.dart';
+import '../../../core/widgets/app_navigation_drawer.dart';
 import '../data/coordination_service.dart';
 
 /// AM-172 — Tableau de bord mobile de la Coordination (maquette 08) : chiffres
@@ -72,6 +73,8 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
     final filters = Map<String, dynamic>.from(_data['filters'] as Map? ?? const {});
     final donors = (filters['donors'] as List? ?? const []).whereType<Map>().toList();
     return Scaffold(
+      // Menu principal (Référentiels…) : accessible depuis l'en-tête.
+      drawer: const AppNavigationDrawer(),
       backgroundColor: AppColors.background,
       body: Column(
         children: [
@@ -83,6 +86,19 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                 child: Row(
                   children: [
+                    // Menu principal (Référentiels, Profil…).
+                    Builder(
+                      builder: (context) => IconButton(
+                        tooltip: 'Menu principal',
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0x26FFFFFF),
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.menu, color: Colors.white),
+                        onPressed: () => Scaffold.of(context).openDrawer(),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,7 +119,7 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                                   ? 'Hors ligne, données au ${_stamp(_data['generated_at'])}'
                                   : syncedAgo == null
                                   ? 'Données au ${_stamp(_data['generated_at'])}'
-                                  : 'Synchronisé $syncedAgo, données au ${_stamp(_data['generated_at'])}',
+                                  : 'Dernière synchro d’une FOSA : $syncedAgo · données au ${_stamp(_data['generated_at'])}',
                               style: TextStyle(
                                 color: _online ? const Color(0xFF8FD3A5) : AppColors.sidebarText,
                                 fontSize: 13,

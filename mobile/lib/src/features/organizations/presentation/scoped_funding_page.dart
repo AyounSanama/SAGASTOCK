@@ -122,7 +122,7 @@ class _ScopedFundingPageState extends State<ScopedFundingPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: AppButton.add(
-                        label: 'Ajouter',
+                        label: editing ? 'Enregistrer' : 'Ajouter',
                         loading: saving,
                         onPressed: saving
                             ? null
@@ -390,7 +390,13 @@ class _ScopedFundingPageState extends State<ScopedFundingPage> {
     );
     if (widget.embedded) return content;
     return Scaffold(
-      appBar: AppBar(title: const Text('Bailleurs & Programmes')),
+      appBar: AppBar(
+        title: Text(
+          widget.section == FundingSection.donors
+              ? 'Référentiels'
+              : 'Bailleurs & Programmes',
+        ),
+      ),
       body: content,
     );
   }

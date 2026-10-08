@@ -155,7 +155,16 @@ void main() {
     await tester.tap(find.text('À valider'));
     await tester.pumpAndSettle();
     expect(find.text('Liste Standard générée : 186 produits'), findsOneWidget);
+    // Confirmation demandée : « Annuler » ne valide rien.
     await tester.tap(find.text('Valider'));
+    await tester.pumpAndSettle();
+    expect(find.text('Valider CSI d’Ekoumdoum ?'), findsOneWidget);
+    await tester.tap(find.text('Annuler'));
+    await tester.pumpAndSettle();
+    expect(service.validated, isEmpty);
+    await tester.tap(find.text('Valider'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Valider').last);
     await tester.pumpAndSettle();
     expect(service.validated, ['f1']);
     expect(find.text('Aucune FOSA n’attend votre validation.'), findsOneWidget);
@@ -167,6 +176,8 @@ void main() {
     await tester.tap(find.text('À valider'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Valider'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Valider').last);
     await tester.pump();
     expect(find.text(CoordinationService.offlineMessage), findsWidgets);
   });

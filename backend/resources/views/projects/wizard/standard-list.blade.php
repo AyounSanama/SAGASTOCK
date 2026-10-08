@@ -104,7 +104,9 @@
         <label class="wz-field">Rattacher à
             <select name="parent_id" data-service-parent>
                 <option value="">Nouveau niveau de soins</option>
-                @foreach($careLevels as $level)@if(($level['depth'] ?? 1) < \App\Services\CareLevelHierarchyService::MAX_DEPTH)<option value="{{ $level['id'] }}">{{ str_repeat('— ', ($level['depth'] ?? 1) - 1) }}{{ $level['name'] }}</option>@endif @endforeach
+                {{-- Chemin complet : deux catégories du même nom restent distinctes. --}}
+                @php($ancestors = [])
+                @foreach($careLevels as $level)@php($depth = $level['depth'] ?? 1)@php($ancestors = array_slice($ancestors, 0, $depth - 1))@php($ancestors[] = $level['name'])@if($depth < \App\Services\CareLevelHierarchyService::MAX_DEPTH)<option value="{{ $level['id'] }}">{{ implode(' › ', $ancestors) }}</option>@endif @endforeach
             </select>
         </label>
         <label class="wz-field">Nom du service *<input name="service_name" required maxlength="180" autocomplete="off" placeholder="ex. Programme PEC Diabète"></label>
