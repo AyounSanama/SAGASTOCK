@@ -1,3 +1,4 @@
+import '../../../core/catalog/care_level_paths.dart';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -1091,12 +1092,10 @@ class _FacilityFormState extends State<_FacilityForm> {
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Niveau de soins *'),
           items: [
-            for (final level in _option('care_levels'))
+            for (final (index, path) in careLevelPaths(_option('care_levels')).indexed)
               DropdownMenuItem(
-                value: '${level['id']}',
-                child: Text(
-                  '${'— ' * ((int.tryParse('${level['depth']}') ?? 1) - 1)}${level['name']}',
-                ),
+                value: '${_option('care_levels')[index]['id']}',
+                child: Text(path, overflow: TextOverflow.ellipsis),
               ),
           ],
           onChanged: (value) => setState(() => _careLevelId = value),

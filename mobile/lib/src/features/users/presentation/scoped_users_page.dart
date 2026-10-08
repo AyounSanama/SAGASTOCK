@@ -192,6 +192,17 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
         obscure = true,
         saving = false,
         synchronizing = false;
+    // Erreur affichée dans la fenêtre (une SnackBar resterait cachée dessous).
+    String? sheetError;
+    // Comptes FOSA : seulement pour une FOSA validée par la Coordination et
+    // active (le serveur refuse les autres).
+    final creatableFacilities = _facilities
+        .where(
+          (facility) =>
+              (facility['validation_status'] ?? 'validated') == 'validated' &&
+              facility['is_active'] != false,
+        )
+        .toList(growable: false);
     String draft() => jsonEncode([
       firstName.text,
       lastName.text,
@@ -217,10 +228,10 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
             scopeId = scopes.isEmpty ? '' : '${scopes.first['id']}';
           }
           if (roleCode != 'project_admin') {
-            if (!_facilities.any((item) => '${item['id']}' == facilityId)) {
-              facilityId = _facilities.isEmpty
+            if (!creatableFacilities.any((item) => '${item['id']}' == facilityId)) {
+              facilityId = creatableFacilities.isEmpty
                   ? ''
-                  : '${_facilities.first['id']}';
+                  : '${creatableFacilities.first['id']}';
             }
             final filteredSites = persistedSitesForFacility(_sites, facilityId);
             if (!filteredSites.any((item) => '${item['id']}' == scopeId)) {
@@ -314,6 +325,7 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                             )
                           else
                             DropdownButtonFormField<int>(
+                              isExpanded: true,
                               initialValue: roleId,
                               decoration: const InputDecoration(
                                 labelText: 'Rôle *',
@@ -346,6 +358,7 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                             )
                           else if (roleCode == 'project_admin')
                             DropdownButtonFormField<String>(
+                              isExpanded: true,
                               initialValue: scopeId.isEmpty ? null : scopeId,
                               decoration: InputDecoration(
                                 labelText: 'Projet *',
@@ -370,14 +383,20 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                               initialValue: facilityId.isEmpty
                                   ? null
                                   : facilityId,
+                              isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Formation sanitaire *',
+                                helperText:
+                                    'FOSA validées par la Coordination et actives',
                               ),
-                              items: _facilities
+                              items: creatableFacilities
                                   .map(
                                     (facility) => DropdownMenuItem(
                                       value: '${facility['id']}',
-                                      child: Text('${facility['name']}'),
+                                      child: Text(
+                                        '${facility['name']}',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
                                   )
                                   .toList(),
@@ -392,6 +411,7 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                             ),
                             const SizedBox(height: 14),
                             DropdownButtonFormField<String>(
+                              isExpanded: true,
                               key: ValueKey('site-$facilityId-$scopeId'),
                               initialValue: scopeId.isEmpty ? null : scopeId,
                               decoration: const InputDecoration(
@@ -607,6 +627,17 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                     ),
                   ),
                   const Divider(height: 1),
+                  if (sheetError != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Text(
+                        sheetError!,
+                        style: TextStyle(
+                          color: Theme.of(sheetContext).colorScheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
@@ -635,18 +666,16 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                                     if (!editing &&
                                         roleCode != 'project_admin' &&
                                         !isPersistedScopeId(scopeId)) {
-                                      ScaffoldMessenger.of(
-                                        sheetContext,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
+                                      setSheetState(
+                                        () => sheetError =
                                             'Synchronisez d’abord le point de dispensation avant de créer son utilisateur.',
-                                          ),
-                                        ),
                                       );
                                       return;
                                     }
-                                    setSheetState(() => saving = true);
+                                    setSheetState(() {
+                                      saving = true;
+                                      sheetError = null;
+                                    });
                                     final payload = <String, dynamic>{
                                       'name':
                                           '${firstName.text.trim()} ${lastName.text.trim()}'
@@ -684,18 +713,13 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
                                       }
                                     } on DioException catch (error) {
                                       if (!sheetContext.mounted) return;
-                                      setSheetState(() => saving = false);
-                                      ScaffoldMessenger.of(
-                                        sheetContext,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
+                                      setSheetState(() {
+                                        saving = false;
+                                        sheetError =
                                             error.response?.statusCode == 403
-                                                ? 'Rôle ou périmètre non autorisé.'
-                                                : _userCreationError(error),
-                                          ),
-                                        ),
-                                      );
+                                            ? 'Rôle ou périmètre non autorisé.'
+                                            : _userCreationError(error);
+                                      });
                                     }
                                   },
                           ),
@@ -710,13 +734,8 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
         },
       ),
     );
-    firstName.dispose();
-    lastName.dispose();
-    username.dispose();
-    email.dispose();
-    phone.dispose();
-    password.dispose();
-    confirmation.dispose();
+    // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
+    // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
     if (result == null || !mounted) return;
     await _load();
     if (!mounted) return;

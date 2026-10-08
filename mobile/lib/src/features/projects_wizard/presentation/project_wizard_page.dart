@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/catalog/care_level_paths.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../data/project_wizard_service.dart';
 
@@ -733,22 +734,10 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
   /// Programmes de prise en charge ») : deux catégories du même nom sous des
   /// niveaux différents restent distinctes. L'arbre arrive aplati, parent
   /// avant ses enfants.
-  static List<Map<String, dynamic>> _withPaths(List<Map<String, dynamic>> levels) {
-    final ancestors = <int, String>{};
-    return [
-      for (final level in levels)
-        () {
-          final depth = ((level['depth'] as num?) ?? 1).toInt();
-          ancestors
-            ..removeWhere((key, _) => key >= depth)
-            ..[depth] = '${level['name']}';
-          return {
-            ...level,
-            'path': [for (var d = 1; d <= depth; d++) ?ancestors[d]].join(' › '),
-          };
-        }(),
-    ];
-  }
+  static List<Map<String, dynamic>> _withPaths(List<Map<String, dynamic>> levels) => [
+    for (final (index, path) in careLevelPaths(levels).indexed)
+      {...levels[index], 'path': path},
+  ];
 
   /// « + Ajouter un service » : ajouté au référentiel, coché, puis la liste se
   /// régénère, sans quitter l'assistant.

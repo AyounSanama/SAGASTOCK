@@ -13,7 +13,16 @@ class MyProjectPage extends StatefulWidget {
   State<MyProjectPage> createState() => _MyProjectPageState();
 }
 
+/// Date lisible « 01/01/2026 » (le serveur envoie un horodatage ISO).
+String _projectDate(Object? value) {
+  final date = DateTime.tryParse('${value ?? ''}');
+  if (date == null) return '—';
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(date.day)}/${two(date.month)}/${date.year}';
+}
+
 class _MyProjectPageState extends State<MyProjectPage> {
+
   final _service = OrganizationService();
   bool _loading = true;
   String? _error;
@@ -181,8 +190,8 @@ class _InfoSection extends StatelessWidget {
         _Line('Mise en œuvre', _orDash(project['implementing_partner'])),
         _Line('Coordination / Mission', '${mission?['name'] ?? '—'}'),
         _Line('Pays', '${country?['name'] ?? '—'}'),
-        _Line('Date de début', '${project['starts_on'] ?? '—'}'),
-        _Line('Date de fin', '${project['ends_on'] ?? '—'}'),
+        _Line('Date de début', _projectDate(project['starts_on'])),
+        _Line('Date de fin', _projectDate(project['ends_on'])),
         _Line('Responsable', _orDash(project['responsible_name'])),
         _Line('Contact', _orDash(project['responsible_contact'])),
         _Line('Code bailleur', _orDash(project['donor_reference_code'])),

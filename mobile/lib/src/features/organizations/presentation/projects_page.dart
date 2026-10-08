@@ -130,9 +130,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
         ],
       ),
     );
-    code.dispose();
-    name.dispose();
-    description.dispose();
+    // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
+    // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
     if (created == true) await _load();
   }
 

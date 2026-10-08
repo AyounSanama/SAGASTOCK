@@ -96,15 +96,17 @@ class UserPolicy
     }
 
     /**
-     * Sans « users.manage », la permission déléguée ne vaut que pour un Admin
-     * Site dont tous les sites sont dans le périmètre de l'acteur.
+     * Sans « users.manage », la permission déléguée ne vaut que pour un compte
+     * FOSA (Admin Site ou Utilisateur Site, cahier §3) dont tous les sites sont
+     * dans le périmètre de l'acteur.
      */
     private function siteAccountDelegation(User $actor, User $target, string $permission): Response
     {
         if ($actor->hasPermission('users.manage')) {
             return Response::allow();
         }
-        if (! $actor->hasPermission($permission) || $this->governance->roleCode($target) !== GovernanceService::SITE_ADMIN) {
+        $facilityRoles = [GovernanceService::SITE_ADMIN, GovernanceService::SITE_USER];
+        if (! $actor->hasPermission($permission) || ! in_array($this->governance->roleCode($target), $facilityRoles, true)) {
             return Response::deny();
         }
         $targetSiteIds = $target->roles()->wherePivot('scope_type', 'site')->pluck('role_user.scope_id');

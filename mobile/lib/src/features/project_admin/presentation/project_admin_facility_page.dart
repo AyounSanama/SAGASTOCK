@@ -1,3 +1,4 @@
+import '../../../core/catalog/care_level_paths.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -238,10 +239,10 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
                       isExpanded: true,
                       decoration: InputDecoration(labelText: 'Niveau de soins *', errorText: _fieldErrors['care_level_id']),
                       items: [
-                        for (final level in asMaps(_options['care_levels']))
+                        for (final (index, path) in careLevelPaths(asMaps(_options['care_levels'])).indexed)
                           DropdownMenuItem(
-                            value: '${level['id']}',
-                            child: Text('${'— ' * (((level['depth'] as num?)?.toInt() ?? 1) - 1)}${level['name']}'),
+                            value: '${asMaps(_options['care_levels'])[index]['id']}',
+                            child: Text(path, overflow: TextOverflow.ellipsis),
                           ),
                       ],
                       onChanged: (value) {

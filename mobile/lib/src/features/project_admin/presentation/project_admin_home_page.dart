@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_badge.dart';
+import '../../../core/widgets/app_navigation_drawer.dart';
 import '../data/project_admin_service.dart';
 import 'project_admin_widgets.dart';
 
@@ -50,9 +51,22 @@ class _ProjectAdminHomePageState extends State<ProjectAdminHomePage> {
     final failed = (stats['sync_failed'] as num?)?.toInt() ?? 0;
     return Scaffold(
       backgroundColor: AppColors.background,
+      // Menu principal (Mon projet, Équipe FOSA…) : bouton de l'en-tête.
+      drawer: const AppNavigationDrawer(),
       body: Column(
         children: [
           ProjectAdminHeader(
+            trailing: Builder(
+              builder: (context) => IconButton(
+                tooltip: 'Menu principal',
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0x26FFFFFF),
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.menu, color: Colors.white),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ),
             overline: [
               'Admin Projet',
               project['mission'],
@@ -88,22 +102,26 @@ class _ProjectAdminHomePageState extends State<ProjectAdminHomePage> {
                           [
                             ProjectAdminKpi(
                               label: 'FOSA actives',
+                              onTap: () => context.go('/health-facilities'),
                               value:
                                   '${stats['active_facilities'] ?? 0} / ${stats['facilities'] ?? 0}',
                             ),
                             ProjectAdminKpi(
                               label: 'Comptes FOSA',
+                              onTap: () => context.go('/users'),
                               value: '${stats['accounts'] ?? 0}',
                             ),
                           ],
                           [
                             ProjectAdminKpi(
                               label: 'Échecs de synchro',
+                              onTap: () => context.go('/health-facilities'),
                               value: '$failed',
                               color: failed > 0 ? AppColors.dangerText : null,
                             ),
                             ProjectAdminKpi(
                               label: 'Liste Standard',
+                              onTap: () => context.go('/standard-lists'),
                               value: '${stats['standard_list_products'] ?? 0}',
                               color: AppColors.primaryStrong,
                             ),

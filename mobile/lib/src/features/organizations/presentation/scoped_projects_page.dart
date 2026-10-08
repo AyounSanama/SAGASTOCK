@@ -708,20 +708,8 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
     // Le pop termine la Future avant la fin visuelle de l'animation inverse.
     // Garder les dependances du formulaire vivantes jusqu'au retrait complet.
     await Future<void>.delayed(const Duration(milliseconds: 350));
-    code.dispose();
-    name.dispose();
-    description.dispose();
-    partner.dispose();
-    donorCode.dispose();
-    mohCode.dispose();
-    responsibleName.dispose();
-    responsibleContact.dispose();
-    adminFirstName.dispose();
-    adminLastName.dispose();
-    adminEmail.dispose();
-    adminPhone.dispose();
-    adminUsername.dispose();
-    adminPassword.dispose();
+    // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
+    // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
     if (result == null || !mounted) return;
     await _load();
     if (!mounted) return;

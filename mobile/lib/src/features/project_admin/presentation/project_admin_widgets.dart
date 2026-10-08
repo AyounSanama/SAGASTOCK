@@ -118,28 +118,37 @@ class ProjectAdminCard extends StatelessWidget {
 }
 
 class ProjectAdminKpi extends StatelessWidget {
-  const ProjectAdminKpi({required this.label, required this.value, this.color, super.key});
+  const ProjectAdminKpi({required this.label, required this.value, this.color, this.onTap, super.key});
 
   final String label;
   final String value;
   final Color? color;
 
+  /// Ouvre l'écran du détail (FOSA, Équipe FOSA, Liste Standard).
+  final VoidCallback? onTap;
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(AppSpacing.md),
-    decoration: BoxDecoration(
-      color: AppColors.surface,
+  Widget build(BuildContext context) => Material(
+    color: AppColors.surface,
+    shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AppRadius.lg),
-      border: Border.all(color: AppColors.border),
+      side: BorderSide(color: AppColors.border),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-        const SizedBox(height: 6),
-        Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: color ?? AppColors.text)),
-      ],
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+            const SizedBox(height: 6),
+            Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: color ?? AppColors.text)),
+          ],
+        ),
+      ),
     ),
   );
 }

@@ -880,7 +880,8 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                   IconButton(
                     onPressed: () => setState(() {
                       final removed = _lines.removeAt(index);
-                      removed.dispose();
+                      // Libérée après le retrait de ses champs de l’écran.
+                      WidgetsBinding.instance.addPostFrameCallback((_) => removed.dispose());
                     }),
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -1164,7 +1165,8 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                     ? null
                     : () => setState(() {
                         final removed = _lines.removeAt(index);
-                        removed.dispose();
+                        // Libérée après le retrait de ses champs de l’écran.
+                        WidgetsBinding.instance.addPostFrameCallback((_) => removed.dispose());
                       }),
               ),
             TextFormField(

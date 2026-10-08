@@ -356,9 +356,8 @@ class _ScopedSitesPageState extends State<ScopedSitesPage> {
         },
       ),
     );
-    code.dispose();
-    name.dispose();
-    location.dispose();
+    // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
+    // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
     if (result == null || !mounted) return;
     await _load();
     if (!mounted) return;

@@ -129,8 +129,8 @@ class _FundingPageState extends State<FundingPage> {
         ],
       ),
     );
-    code.dispose();
-    name.dispose();
+    // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
+    // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
     if (saved == true) await _load();
   }
 

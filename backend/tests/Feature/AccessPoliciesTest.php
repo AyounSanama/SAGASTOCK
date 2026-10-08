@@ -173,4 +173,20 @@ class AccessPoliciesTest extends TestCase
         $this->postJson("/api/v1/organizations/{$this->organization->id}/projects/archived/{$otherProject->id}/restore")->assertNotFound();
         $this->assertSoftDeleted($otherProject);
     }
+
+    public function test_project_admin_manages_site_users_of_its_facilities(): void
+    {
+        ['projectAdmin' => $projectAdmin, 'siteUser' => $siteUser, 'siteAdmin' => $siteAdmin] = $this->zones['yde'];
+
+        // Cahier §3 : l'Admin Projet gère l'Admin Site ET l'Utilisateur Site de ses FOSA.
+        foreach (['update', 'resetPassword', 'delete'] as $ability) {
+            $this->assertNull($this->decision($projectAdmin, $ability, $siteUser), $ability);
+            $this->assertNull($this->decision($projectAdmin, $ability, $siteAdmin), $ability);
+        }
+        $this->assertSame(404, $this->decision($projectAdmin, 'update', $this->zones['dla']['siteUser']));
+
+        Sanctum::actingAs($projectAdmin);
+        $this->putJson("/api/v1/users/{$siteUser->id}", ['name' => $siteUser->name, 'email' => $siteUser->email, 'phone' => '+237600000055'])->assertOk();
+        $this->assertSame('+237600000055', $siteUser->fresh()->phone);
+    }
 }

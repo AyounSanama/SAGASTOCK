@@ -1,3 +1,4 @@
+import '../../../core/catalog/care_level_paths.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -484,15 +485,11 @@ Future<bool?> _promptReference(
                       value: '',
                       child: Text('Nouveau niveau (racine)'),
                     ),
-                    ...parents.map(
-                      (node) => DropdownMenuItem(
-                        value: '${node['id']}',
-                        child: Text(
-                          '${'— ' * ((node['depth'] as int? ?? 1) - 1)}${node['name']}',
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                    for (final (index, path) in careLevelPaths(parents).indexed)
+                      DropdownMenuItem(
+                        value: '${parents[index]['id']}',
+                        child: Text(path, overflow: TextOverflow.ellipsis),
                       ),
-                    ),
                   ],
                   onChanged: (value) => parentId = value,
                 ),
