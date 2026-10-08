@@ -40,6 +40,7 @@ class _FakeWizard implements ProjectWizardService {
     'national_program_default_donor': 'Ministère de la Santé',
     'safety_stock_options': [0.25, 0.5, 0.75, 1, 1.5, 2],
     'can_add_donor': false,
+    'can_add_service': true,
   };
 
   @override
@@ -113,6 +114,19 @@ class _FakeWizard implements ProjectWizardService {
     required String code,
   }) async => const {};
 
+  Map<String, String?>? addedService;
+
+  @override
+  Future<Map<String, dynamic>> addService(
+    String id, {
+    required String name,
+    required String code,
+    String? parentId,
+  }) async {
+    addedService = {'name': name, 'code': code, 'parent_id': parentId};
+    return {'id': 's1', 'name': name, 'depth': 1};
+  }
+
   Map<String, dynamic>? createdProduct;
 
   @override
@@ -178,12 +192,25 @@ void main() {
     expect(fake.identity?['type'], 'national_program');
     expect(fake.identity?['code'], 'PNLT');
 
+    // Étape 3 : « + Ajouter un service » coche le service sans quitter l'assistant.
+    expect(find.text('Étape 3 sur 4'), findsOneWidget);
+    await tester.tap(find.text('+ Ajouter un service'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Nom du service *'), 'Soins tertiaires');
+    await tester.enterText(find.widgetWithText(TextField, 'Code *'), 'STER');
+    await tester.tap(find.widgetWithText(FilledButton, 'Ajouter'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(fake.addedService, {'name': 'Soins tertiaires', 'code': 'STER', 'parent_id': null});
+
     // Étape 3 : produit décoché conservé.
     expect(find.text('Étape 3 sur 4'), findsOneWidget);
     expect(find.text('Liste Standard : 1 / 2'), findsOneWidget);
     await tester.tap(find.text('Suivant'));
     await tester.pumpAndSettle();
     expect(fake.list?['retained'], ['x']);
+    expect(fake.list?['care_level_ids'], containsAll(['l1', 's1']));
 
     // Étape 4 : valeurs reprises du projet, projet créé.
     expect(find.text('Étape 4 sur 4'), findsOneWidget);

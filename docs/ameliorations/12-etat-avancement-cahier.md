@@ -43,9 +43,9 @@ Limites : vérification dans le code et par les tests automatiques (354 tests ba
 
 | Fonction | État | Détail |
 |---|---|---|
-| Pays, ONG/MoH, bailleurs (un bailleur peut soutenir plusieurs projets), codes projet / programme MoH, intitulé | ✅ | |
+| Pays, ONG/MoH, bailleurs (un bailleur peut soutenir plusieurs projets), codes projet / programme MoH, intitulé | ✅ | 08/10 : « Mission » = pays de la coordination de l’admin, pas les 249 pays (DÉCISION NÉCESSAIRE : le document Configuration Mission demande tous les pays ; recommandation : garder, pour le cloisonnement) |
 | Assistant « Créer un projet / programme » en 4 étapes, brouillon | ✅ Web · 🟡 mobile | 06/10 ; mobile écrit, à compiler sur Codemagic |
-| Niveaux de soins + « Ajouter un service » | ✅ | |
+| Niveaux de soins + « Ajouter un service » | ✅ | 08/10 : « + Ajouter un service » dans l’assistant, Web et mobile, sans quitter l’étape. Cases à cocher (plusieurs niveaux) au lieu d’une liste déroulante : DÉCISION NÉCESSAIRE, recommandation : garder |
 | Niveau « Programme Laboratoire » | ✅ | 07/10 (niveau 6) : niveau global, ses examens proposés comme activités |
 | Populations par défaut (Adultes, Femmes enceintes, Enfants < 5 ans) | ✅ | Ajout d'une population : possible, à confirmer (annexe C) |
 | Pathologies selon le couple niveau de soins × population | ✅ | 07/10 : proposées d’après les correspondances du catalogue, les autres derrière « + N autres » |

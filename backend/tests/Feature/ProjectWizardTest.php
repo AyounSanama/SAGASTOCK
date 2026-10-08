@@ -163,6 +163,32 @@ class ProjectWizardTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors('code');
     }
 
+    public function test_add_service_from_step_three_without_leaving_the_wizard(): void
+    {
+        $project = Project::create(['organization_id' => $this->organization->id, 'mission_id' => $this->mission->id, 'code' => 'P1', 'name' => 'Projet', 'status' => 'draft']);
+        $this->actingAs($this->coordination)->get(route('projects.wizard.show', [$project, 'standard-list']))->assertOk()
+            ->assertSee('data-open-dialog="service-dialog"', false)->assertDontSee('#ajouter-un-service', false);
+
+        // Web : programme rattaché à « Soins de santé primaire », propre à l'organisation.
+        $this->actingAs($this->coordination)->postJson(route('projects.wizard.services.store', $project), [
+            'parent_id' => $this->node('SSP'), 'name' => 'Programme PEC Diabète', 'code' => 'DIAB',
+        ])->assertCreated()->assertJsonPath('name', 'Programme PEC Diabète')->assertJsonPath('depth', 2);
+        $this->assertDatabaseHas('catalog_references', ['organization_id' => $this->organization->id, 'reference_type' => 'care_level', 'code' => 'DIAB']);
+        $this->actingAs($this->coordination)->postJson(route('projects.wizard.services.store', $project), ['name' => 'Doublon', 'code' => 'DIAB'])
+            ->assertUnprocessable()->assertJsonValidationErrors('code');
+
+        // Mobile : nouveau niveau de soins, proposé ensuite dans les choix de l'étape 3.
+        \Laravel\Sanctum\Sanctum::actingAs($this->coordination);
+        $id = $this->postJson("/api/v1/projects/{$project->id}/wizard/services", ['name' => 'Soins tertiaires', 'code' => 'STER'])
+            ->assertCreated()->assertJsonPath('service.depth', 1)->json('service.id');
+        $this->assertContains($id, collect($this->getJson("/api/v1/projects/{$project->id}/wizard/standard-list")->assertOk()->json('options.care_levels'))->pluck('id'));
+
+        // Coordination d'une autre mission : projet introuvable.
+        $otherMission = Mission::create(['organization_id' => $this->organization->id, 'country_id' => $this->mission->country_id, 'code' => 'DLA', 'name' => 'Coordination Douala']);
+        \Laravel\Sanctum\Sanctum::actingAs($this->user('coordination_admin', 'mission', $otherMission->id));
+        $this->postJson("/api/v1/projects/{$project->id}/wizard/services", ['name' => 'Intrus', 'code' => 'INTRUS'])->assertNotFound();
+    }
+
     public function test_mobile_api_runs_the_same_four_steps(): void
     {
         $adults = $this->ref('target_population', 'ADULT', 'Adultes');
@@ -173,7 +199,7 @@ class ProjectWizardTest extends TestCase
         $this->getJson('/api/v1/projects/wizard/options')->assertOk()
             ->assertJsonPath('missions.0.name', 'Coordination Yaoundé')
             ->assertJsonPath('missions.0.country', 'Cameroun')
-            ->assertJsonPath('types.national_program', 'Programme national');
+            ->assertJsonPath('types.national_program', 'Programme national')->assertJsonPath('can_add_service', true);
         $donor = $this->postJson('/api/v1/projects/wizard/donors', ['mission_id' => $this->mission->id, 'name' => 'Bailleur A', 'code' => 'BA'])
             ->assertCreated()->json('id');
 

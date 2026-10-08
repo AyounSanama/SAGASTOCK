@@ -261,6 +261,28 @@ class ProjectWizardService
     }
 
     /**
+     * « + Ajouter un service » (étape 3) : niveau, catégorie ou programme ajouté
+     * au référentiel de l'organisation du projet, mêmes règles que Référentiels.
+     */
+    public function createService(Project $project, array $input): CatalogReference
+    {
+        $hierarchy = app(CareLevelHierarchyService::class);
+        $data = \Illuminate\Support\Facades\Validator::make($input, $hierarchy->rules($project->organization), [
+            'code.unique' => 'Ce code est déjà utilisé par un autre service.',
+            'code.alpha_dash' => 'Le code ne contient que des lettres, chiffres, tirets et tirets bas.',
+        ], ['code' => 'code', 'name' => 'nom du service', 'parent_id' => 'rattachement'])->validate();
+
+        return $hierarchy->createNode($project->organization, $data);
+    }
+
+    /** Service tel qu'il apparaît dans les choix de l'étape 3. */
+    public function serviceOption(CatalogReference $node): array
+    {
+        return ['id' => $node->id, 'name' => $node->name, 'depth' => $node->depth ?? 1,
+            'level_label' => CareLevelHierarchyService::DEPTH_LABELS[$node->depth ?? 1] ?? ''];
+    }
+
+    /**
      * Étape 3 — Valeurs sélectionnables : niveaux de soins (arbre à plat),
      * populations cibles et pathologies (référentiel global + organisation).
      *

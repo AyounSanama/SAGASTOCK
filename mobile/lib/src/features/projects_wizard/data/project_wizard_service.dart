@@ -96,6 +96,22 @@ class ProjectWizardService {
     if (draft) 'intent': 'draft',
   });
 
+  /// « + Ajouter un service » (étape 3) : niveau de soins, catégorie ou
+  /// programme (sous [parentId]) ajouté au référentiel de l'organisation.
+  Future<Map<String, dynamic>> addService(
+    String id, {
+    required String name,
+    required String code,
+    String? parentId,
+  }) async {
+    final response = await _send('POST', '/projects/$id/wizard/services', {
+      'name': name,
+      'code': code,
+      'parent_id': parentId,
+    });
+    return Map<String, dynamic>.from(response['service'] as Map);
+  }
+
   /// « + Ajouter un bailleur » : ajouté au référentiel de l'organisation.
   Future<Map<String, dynamic>> addDonor({
     required String missionId,

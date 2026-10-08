@@ -70,6 +70,7 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/projects/{project}/wizard/standard-list', 'updateStandardList')->middleware('permission:standard_lists.manage');
             // Niveau 6 : nouveau produit retenu à l'étape 3.
             Route::post('/projects/{project}/wizard/standard-list/products', 'storeProduct')->middleware('permission:standard_lists.manage');
+            Route::post('/projects/{project}/wizard/services', 'storeService')->middleware('permission:standard_lists.manage');
             Route::put('/projects/{project}/wizard/supply', 'updateSupply');
         });
         Route::get('/projects/medical-references', [\App\Http\Controllers\Api\V1\MedicalReferenceController::class, 'show'])->middleware('permission:standard_lists.view');

@@ -96,6 +96,8 @@ Route::middleware('auth')->group(function () {
         // Niveau 6 : « + Ajouter un produit » et « Importer depuis Excel » à l'étape 3.
         Route::put('/projects/{project}/wizard/standard-list/products', 'storeProduct')->middleware('permission:standard_lists.manage')->name('projects.wizard.standard-list.products.store');
         Route::put('/projects/{project}/wizard/standard-list/import', 'importProducts')->middleware('permission:standard_lists.manage')->name('projects.wizard.standard-list.import');
+        // « + Ajouter un service » sans quitter l'assistant.
+        Route::post('/projects/{project}/wizard/services', 'storeService')->middleware('permission:standard_lists.manage')->name('projects.wizard.services.store');
         Route::put('/projects/{project}/wizard/supply', 'updateSupply')->name('projects.wizard.supply.update');
         Route::post('/projects/{project}/supply/apply-to-facilities', 'applySupplyToFacilities')->name('projects.supply.apply');
     });

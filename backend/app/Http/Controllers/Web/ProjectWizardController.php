@@ -144,6 +144,16 @@ class ProjectWizardController extends Controller
         return response()->json($donor->only(['id', 'organization_id', 'code', 'name']), 201);
     }
 
+    /** « + Ajouter un service » : niveau de soins ajouté au référentiel de l'organisation et coché dans l'étape 3. */
+    public function storeService(Request $request, Project $project): JsonResponse
+    {
+        Gate::authorize('configure', $project);
+        $node = $this->wizard->createService($project, $request->all());
+        $this->audit->record($request, 'reference.created', $node, [], $node->only(['code', 'name', 'parent_id', 'depth']));
+
+        return response()->json($this->wizard->serviceOption($node), 201);
+    }
+
     /** Règles communes Web / API de « + Ajouter un bailleur ». */
     public static function donorRules(Mission $mission): array
     {

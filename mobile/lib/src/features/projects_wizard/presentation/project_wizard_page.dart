@@ -722,6 +722,28 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
     });
   }
 
+  /// « + Ajouter un service » : ajouté au référentiel, coché, puis la liste se
+  /// régénère, sans quitter l'assistant.
+  Future<void> _addService() async {
+    final service = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _ServiceDialog(
+        parents: _maps(_map(_list['options'])['care_levels'])
+            .where((level) => ((level['depth'] as num?) ?? 1) < 3)
+            .toList(),
+        create: (name, code, parentId) => _service.addService(
+          _projectId!,
+          name: name,
+          code: code,
+          parentId: parentId,
+        ),
+      ),
+    );
+    if (service == null || !mounted) return;
+    setState(() => _levels.add('${service['id']}'));
+    _scheduleRefresh();
+  }
+
   // Étape 3 ---------------------------------------------------------------
 
   List<Widget> _standardListStep() {
@@ -740,6 +762,15 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
         selected: _levels,
         errorText: _fieldErrors['care_level_ids'],
         onToggle: (id) => toggle(_levels, id),
+        action: _options['can_add_service'] == true
+            ? ActionChip(
+                label: const Text('+ Ajouter un service'),
+                shape: StadiumBorder(side: BorderSide(color: AppColors.border)),
+                backgroundColor: AppColors.surface,
+                labelStyle: TextStyle(color: AppColors.primaryStrong),
+                onPressed: _busy ? null : _addService,
+              )
+            : null,
       ),
       _ChoiceGroup(
         title: 'Population cible *',
@@ -1227,6 +1258,7 @@ class _ChoiceGroup extends StatefulWidget {
     required this.selected,
     required this.onToggle,
     this.errorText,
+    this.action,
   });
 
   final String title;
@@ -1234,6 +1266,9 @@ class _ChoiceGroup extends StatefulWidget {
   final Set<String> selected;
   final ValueChanged<String> onToggle;
   final String? errorText;
+
+  /// Action affichée après les choix (ex. « + Ajouter un service »).
+  final Widget? action;
 
   @override
   State<_ChoiceGroup> createState() => _ChoiceGroupState();
@@ -1284,6 +1319,7 @@ class _ChoiceGroupState extends State<_ChoiceGroup> {
                   backgroundColor: AppColors.surface,
                   onPressed: () => setState(() => _expanded = true),
                 ),
+              ?widget.action,
             ],
           ),
           if (widget.errorText != null) ...[
@@ -1311,6 +1347,107 @@ class _ChoiceGroupState extends State<_ChoiceGroup> {
     shape: StadiumBorder(
       side: BorderSide(color: selected ? AppColors.primary : AppColors.border),
     ),
+  );
+}
+
+/// Fenêtre « Ajouter un service » : elle possède ses champs, libérés une fois
+/// la fenêtre fermée (jamais pendant l'animation de fermeture).
+class _ServiceDialog extends StatefulWidget {
+  const _ServiceDialog({required this.parents, required this.create});
+
+  final List<Map<String, dynamic>> parents;
+  final Future<Map<String, dynamic>> Function(String name, String code, String? parentId) create;
+
+  @override
+  State<_ServiceDialog> createState() => _ServiceDialogState();
+}
+
+class _ServiceDialogState extends State<_ServiceDialog> {
+  final _name = TextEditingController();
+  final _code = TextEditingController();
+  String? _parentId;
+  String? _error;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _code.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final created = await widget.create(_name.text.trim(), _code.text.trim(), _parentId);
+      if (mounted) Navigator.pop(context, created);
+    } on ProjectWizardException catch (exception) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = exception.message;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Ajouter un service'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Le service est ajouté au référentiel de votre organisation et coché pour ce projet.',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          DropdownButtonFormField<String?>(
+            initialValue: _parentId,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Rattacher à'),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('Nouveau niveau de soins')),
+              for (final level in widget.parents)
+                DropdownMenuItem<String?>(
+                  value: '${level['id']}',
+                  child: Text(
+                    '${'— ' * (((level['depth'] as num?) ?? 1).toInt() - 1)}${level['name']}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (value) => _parentId = value,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Nom du service *'),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _code,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(labelText: 'Code *', errorText: _error),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: _saving ? null : () => Navigator.pop(context),
+        child: const Text('Annuler'),
+      ),
+      FilledButton(
+        style: FilledButton.styleFrom(backgroundColor: AppColors.primaryStrong),
+        onPressed: _saving ? null : _submit,
+        child: const Text('Ajouter'),
+      ),
+    ],
   );
 }
 

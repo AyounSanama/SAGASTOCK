@@ -50,6 +50,7 @@ class ProjectWizardController extends Controller
             'national_program_default_donor' => Project::NATIONAL_PROGRAM_DEFAULT_DONOR,
             'safety_stock_options' => HealthFacility::SAFETY_STOCK_OPTIONS,
             'can_add_donor' => $request->user()->hasPermission('funding.manage'),
+            'can_add_service' => $request->user()->hasPermission('standard_lists.manage'),
         ]);
     }
 
@@ -138,6 +139,16 @@ class ProjectWizardController extends Controller
         $this->audit->record($request, $request->isDraft() ? 'project.updated' : 'project.activated', $project, $old, $project->only(array_keys($old)));
 
         return response()->json($this->payload($project));
+    }
+
+    /** « + Ajouter un service » (étape 3, mobile) : mêmes règles que le Web. */
+    public function storeService(Request $request, Project $project): JsonResponse
+    {
+        Gate::forUser($request->user())->authorize('configure', $project);
+        $node = $this->wizard->createService($project, $request->all());
+        $this->audit->record($request, 'reference.created', $node, [], $node->only(['code', 'name', 'parent_id', 'depth']));
+
+        return response()->json(['service' => $this->wizard->serviceOption($node)], 201);
     }
 
     public function storeDonor(Request $request): JsonResponse

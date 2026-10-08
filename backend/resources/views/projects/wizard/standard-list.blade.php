@@ -15,7 +15,7 @@
             @foreach($careLevels as $level)
                 <label class="wz-chip"><input type="checkbox" name="care_level_ids[]" value="{{ $level['id'] }}" @checked($selected('care_level_ids', $level['id']))>{{ $level['name'] }}@if(($level['depth'] ?? 1) > 1)<small>{{ $depthLabels[$level['depth']] ?? '' }}</small>@endif</label>
             @endforeach
-            @if($canAddService)<a class="wz-link" style="align-self:center;margin-left:4px" href="{{ route('projects.medical-references') }}#ajouter-un-service">+ Ajouter un service</a>@endif
+            @if($canAddService)<button class="wz-link" type="button" style="align-self:center;margin-left:4px;border:0;background:none;cursor:pointer;font:inherit" data-open-dialog="service-dialog" data-add-service>+ Ajouter un service</button>@endif
         </div>
         @error('care_level_ids')<span class="wz-error">{{ $message }}</span>@enderror
 
@@ -96,6 +96,23 @@
 </form>
 
 @if($canAddService)
+{{-- « + Ajouter un service » : ajouté au référentiel de l'organisation et coché, sans quitter l'assistant. --}}
+<dialog class="wz-dialog" id="service-dialog" aria-labelledby="service-dialog-title" style="width:min(520px,calc(100% - 32px))">
+    <form method="dialog" data-service-form data-url="{{ route('projects.wizard.services.store', $project) }}">
+        <h2 id="service-dialog-title">Ajouter un service</h2>
+        <p>Le service est ajouté au référentiel de votre organisation (Référentiels &gt; Référentiel médical) et coché pour ce projet.</p>
+        <label class="wz-field">Rattacher à
+            <select name="parent_id" data-service-parent>
+                <option value="">Nouveau niveau de soins</option>
+                @foreach($careLevels as $level)@if(($level['depth'] ?? 1) < \App\Services\CareLevelHierarchyService::MAX_DEPTH)<option value="{{ $level['id'] }}">{{ str_repeat('— ', ($level['depth'] ?? 1) - 1) }}{{ $level['name'] }}</option>@endif @endforeach
+            </select>
+        </label>
+        <label class="wz-field">Nom du service *<input name="service_name" required maxlength="180" autocomplete="off" placeholder="ex. Programme PEC Diabète"></label>
+        <label class="wz-field">Code *<input name="service_code" required maxlength="60" autocomplete="off" placeholder="ex. DIAB"></label>
+        <span class="wz-error" data-service-error role="alert"></span>
+        <footer><button class="wz-btn" type="button" data-close-dialog>Annuler</button><button class="wz-btn primary" type="submit">Ajouter</button></footer>
+    </form>
+</dialog>
 {{-- Niveau 6 : les champs « Nouveau produit » et le fichier sont envoyés avec le formulaire de l'étape (choix en cours conservés). --}}
 <dialog class="wz-dialog" id="product-dialog" aria-labelledby="product-dialog-title" style="width:min(560px,calc(100% - 32px))">
     <h2 id="product-dialog-title">Ajouter un produit</h2>
@@ -210,6 +227,32 @@
         if (closer) closer.closest('dialog')?.close();
     });
     document.addEventListener('close', (event) => { if (event.target.matches?.('dialog')) toggleInputs(event.target, false); }, true);
+
+    // « + Ajouter un service » : le service créé est coché, puis la liste se régénère.
+    const serviceForm = document.querySelector('[data-service-form]');
+    serviceForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const error = serviceForm.querySelector('[data-service-error]');
+        error.textContent = '';
+        const response = await fetch(serviceForm.dataset.url, {
+            method: 'POST',
+            headers: {'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': form.querySelector('input[name="_token"]').value},
+            body: JSON.stringify({parent_id: serviceForm.parent_id.value || null, name: serviceForm.service_name.value.trim(), code: serviceForm.service_code.value.trim()}),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) { error.textContent = Object.values(payload.errors || {})[0]?.[0] || payload.message || 'Le service n’a pas pu être ajouté.'; return; }
+        const chip = document.createElement('label');
+        chip.className = 'wz-chip';
+        const input = Object.assign(document.createElement('input'), {type: 'checkbox', name: 'care_level_ids[]', value: payload.id, checked: true});
+        chip.append(input, payload.name);
+        if (payload.depth > 1) chip.append(Object.assign(document.createElement('small'), {textContent: payload.level_label}));
+        const button = document.querySelector('[data-add-service]');
+        button.before(chip);
+        if (payload.depth < {{ \App\Services\CareLevelHierarchyService::MAX_DEPTH }}) serviceForm.parent_id.add(new Option('— '.repeat(payload.depth - 1) + payload.name, payload.id));
+        serviceForm.reset();
+        serviceForm.closest('dialog').close();
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+    });
 
     const bindList = () => {
         const list = document.getElementById('wizard-list');
