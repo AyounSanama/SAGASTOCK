@@ -218,14 +218,20 @@ class AppButton extends StatelessWidget {
     final callback = loading ? null : onPressed;
     final color = _color;
     final height = AppSizes.buttonHeight;
-    final foreground = _filled ? Colors.white : color;
+    // Bouton plein : texte lisible sur son fond (mode sombre : fonds clairs,
+    // texte foncé ; contraste minimum 4,5:1 de la charte).
+    final onFilled =
+        ThemeData.estimateBrightnessForColor(color) == Brightness.light
+        ? const Color(0xFF1E2329)
+        : Colors.white;
+    final foreground = _filled ? onFilled : color;
     final disabledForeground = AppColors.disabledText;
     final content = loading
         ? SizedBox.square(
             dimension: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2.2,
-              color: _filled ? Colors.white : color,
+              color: _filled ? onFilled : color,
             ),
           )
         : Row(

@@ -87,7 +87,15 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
         valueListenable: _lock.state,
         builder: (context, state, _) => Stack(
           children: [
-            widget.child,
+            // Verrouillé : l'écran caché n'est ni lu (TalkBack, services
+            // d'accessibilité) ni actionnable sous l'écran du PIN.
+            ExcludeSemantics(
+              excluding: state != AppLockState.unlocked,
+              child: IgnorePointer(
+                ignoring: state != AppLockState.unlocked,
+                child: widget.child,
+              ),
+            ),
             if (state != AppLockState.unlocked)
               // Overlay propre : l'écran est au-dessus du Navigator.
               Positioned.fill(

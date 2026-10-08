@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
+use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -52,19 +53,29 @@ class ProfileController extends Controller
 
     public function update(Request $request): RedirectResponse
     {
+        self::applyUpdate($request, $this->audit);
+        return back()->with('status', 'Profil mis à jour.');
+    }
+
+    /** Mise à jour de son propre profil : mêmes règles pour le Web et l'API mobile. */
+    public static function applyUpdate(Request $request, AuditService $audit): User
+    {
         $user = $request->user();
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:80'],
             'last_name' => ['required', 'string', 'max:80'],
-            'username' => ['required', 'alpha_dash', 'max:80', Rule::unique('users')->ignore($user->id)],
+            // Format vérifié seulement si l'identifiant change (anciens identifiants avec un point conservés).
+            'username' => ['required', 'max:80', Rule::unique('users')->ignore($user->id),
+                ...(strtolower((string) $request->input('username')) === strtolower((string) $user->username) ? [] : ['alpha_dash'])],
             'email' => ['required', 'email', 'max:190', Rule::unique('users')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:40'],
             'preferred_locale' => ['sometimes', 'required', Rule::in(config('pharmacare_languages.translated_locales', ['fr']))],
         ]);
         $old = $user->only(['first_name', 'last_name', 'username', 'email', 'phone', 'preferred_locale']);
         $user->update([...$data, 'username' => strtolower($data['username']), 'name' => trim($data['first_name'].' '.$data['last_name'])]);
-        $this->audit->record($request, 'profile.updated', $user, $old, $user->only(array_keys($old)));
-        return back()->with('status', 'Profil mis à jour.');
+        $audit->record($request, 'profile.updated', $user, $old, $user->only(array_keys($old)));
+
+        return $user;
     }
 
     public function password(Request $request): RedirectResponse

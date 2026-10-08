@@ -231,4 +231,27 @@ void main() {
       '/change-password',
     );
   });
+
+  test('Admin Sago : pas d’ancien Centre de contrôle dans le menu', () {
+    final keys = ApplicationAccess.navigation(<String, dynamic>{
+      'role': 'sago_admin',
+      'permissions': <String>[
+        'configuration.view',
+        'organizations.view',
+        'platform_standards.view',
+      ],
+    }).map((item) => item.key);
+
+    expect(keys, isNot(contains('configuration')));
+    expect(keys, containsAll(<String>['organizations', 'standards', 'history']));
+  });
+
+  test('le rôle est affiché par son libellé, jamais par son code', () {
+    expect(ApplicationAccess.roleLabel({'role': 'sago_admin'}), 'Admin Sago');
+    expect(ApplicationAccess.roleLabel({'role': 'site_user'}), 'Utilisateur du Site');
+    expect(
+      ApplicationAccess.roleLabel({'role': 'coordination_admin', 'read_only': true}),
+      'Coordination (lecture seule)',
+    );
+  });
 }

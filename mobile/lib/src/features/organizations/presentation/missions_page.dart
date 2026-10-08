@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_tokens.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/access/application_access.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../auth/data/auth_service.dart';
 import '../data/organization_service.dart';
 import 'mission_form_sheet.dart';
 import '../../users/presentation/coordination_account_sheet.dart';
@@ -60,8 +62,20 @@ class _MissionsPageState extends State<MissionsPage> {
   @override
   void initState() {
     super.initState();
+    AuthService().cachedUser().then((user) {
+      if (mounted) {
+        setState(
+          () => _mayManage = ApplicationAccess.allows(user, 'missions.manage'),
+        );
+      }
+    });
     _load();
   }
+
+  /// Ajout, modification et archivage : seulement avec le droit de gérer les
+  /// missions (jamais de bouton sans effet, ex. Admin Sago).
+  bool _mayManage = false;
+  bool get _canManage => !widget.readOnly && _mayManage;
 
   @override
   void dispose() {
@@ -241,7 +255,7 @@ class _MissionsPageState extends State<MissionsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.organizationName)),
-      floatingActionButton: widget.readOnly || _archived
+      floatingActionButton: !_canManage || _archived
           ? null
           : AppFab(
               onPressed: _loading ? null : _openForm,
@@ -426,7 +440,7 @@ class _MissionsPageState extends State<MissionsPage> {
                             : 'Aucune mission enregistrée.',
                       ),
                       const SizedBox(height: 14),
-                      if (!widget.readOnly && !_archived)
+                      if (_canManage && !_archived)
                         AppButton.add(
                           label: 'Ajouter une mission',
                           onPressed: _openForm,
@@ -466,7 +480,7 @@ class _MissionsPageState extends State<MissionsPage> {
                         : Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (!widget.readOnly && !_archived)
+                              if (_canManage && !_archived)
                                 AppIconAction(
                                   icon: Icons.edit_outlined,
                                   tooltip: 'Modifier la mission',
@@ -474,7 +488,7 @@ class _MissionsPageState extends State<MissionsPage> {
                                   onPressed: () => _openForm(mission),
                                 ),
                               const SizedBox(width: 4),
-                              if (!widget.readOnly)
+                              if (_canManage)
                                 AppIconAction(
                                   icon: _archived
                                       ? Icons.restore_rounded

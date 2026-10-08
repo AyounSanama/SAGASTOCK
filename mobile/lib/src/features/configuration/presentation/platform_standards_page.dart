@@ -337,7 +337,10 @@ class _History extends StatelessWidget {
         ...items.map(
           (item) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: AppCard(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              onTap: () => _showDetail(context, item),
+              child: AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -359,16 +362,85 @@ class _History extends StatelessWidget {
                   ),
                   const SizedBox(height: 7),
                   Text(
-                    '${item['author']} · ${item['created_at'] ?? ''}',
+                    '${item['author']} · ${_date(item['created_at'])}',
                     style: const TextStyle(fontSize: 11),
                   ),
                 ],
               ),
             ),
+            ),
           ),
         ),
     ],
   );
+
+  /// Date lisible (heure locale du téléphone) : « 08/10/2026 à 09:48 ».
+  static String _date(Object? value) {
+    final date = DateTime.tryParse('${value ?? ''}')?.toLocal();
+    if (date == null) return '';
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${two(date.day)}/${two(date.month)}/${date.year} à ${two(date.hour)}:${two(date.minute)}';
+  }
+
+  /// Détail d'une intervention : paramètres modifiés, avant / après.
+  static void _showDetail(BuildContext context, Map<String, dynamic> item) {
+    final changes = (item['changes'] as List? ?? const [])
+        .whereType<Map>()
+        .toList(growable: false);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${item['organization'] ?? 'Organisation'}',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${item['category_label']} · ${item['version']} · ${item['author']} · ${_date(item['created_at'])}',
+                style: TextStyle(color: AppTheme.muted),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _SyncStatus(status: '${item['status']}'),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      item['status'] == 'synced'
+                          ? 'Reçue par les appareils de l’organisation.'
+                          : 'Les appareils de l’organisation la recevront à leur prochaine synchronisation.',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (changes.isEmpty)
+                const Text('Aucun paramètre modifié.')
+              else
+                for (final change in changes) ...[
+                  Text(
+                    '${change['label'] ?? change['key']}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text('Avant : ${change['old'] ?? 'Non défini'}'),
+                  Text('Après : ${change['new'] ?? 'Non défini'}'),
+                  const SizedBox(height: 12),
+                ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _Status extends StatelessWidget {

@@ -2,8 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/access/application_access.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
+import '../../auth/data/auth_service.dart';
 import '../data/organization_service.dart';
 import 'organization_creation_page.dart';
 
@@ -20,10 +22,15 @@ class _OrganizationsPageState extends State<OrganizationsPage> {
   List<Map<String, dynamic>> _organizations = [];
   bool _loading = true;
   String? _error;
+  // Actions de la carte selon les droits du compte (rien d'interdit n'est proposé).
+  Map<String, dynamic>? _user;
 
   @override
   void initState() {
     super.initState();
+    AuthService().cachedUser().then((user) {
+      if (mounted) setState(() => _user = user);
+    });
     _load();
   }
 
@@ -256,14 +263,26 @@ class _OrganizationsPageState extends State<OrganizationsPage> {
               for (final organization in _organizations) ...[
                 _OrganizationCard(
                   organization: organization,
-                  onTap: () => context.push(
-                    '/organizations/${organization['id']}/missions',
-                    extra: organization['name'] as String,
-                  ),
-                  onFacilities: () => context.push(
-                    '/organizations/${organization['id']}/facilities',
-                    extra: organization['name'] as String,
-                  ),
+                  onTap: ApplicationAccess.allows(_user, 'missions.view')
+                      ? () => context.push(
+                          '/organizations/${organization['id']}/missions',
+                          extra: organization['name'] as String,
+                        )
+                      : null,
+                  onFacilities:
+                      ApplicationAccess.allows(_user, 'health_facilities.view')
+                      ? () => context.push(
+                          '/organizations/${organization['id']}/facilities',
+                          extra: organization['name'] as String,
+                        )
+                      : null,
+                  // Admin Sago : détail et paramètres de plateforme de l'organisation.
+                  onSettings:
+                      ApplicationAccess.allows(_user, 'platform_standards.view')
+                      ? () => context.push(
+                          '/standards/assistance/${organization['id']}',
+                        )
+                      : null,
                 ),
                 const SizedBox(height: 12),
               ],
@@ -277,20 +296,47 @@ class _OrganizationsPageState extends State<OrganizationsPage> {
 class _OrganizationCard extends StatelessWidget {
   const _OrganizationCard({
     required this.organization,
-    required this.onTap,
-    required this.onFacilities,
+    this.onTap,
+    this.onFacilities,
+    this.onSettings,
   });
   final Map<String, dynamic> organization;
-  final VoidCallback onTap;
-  final VoidCallback onFacilities;
+  final VoidCallback? onTap;
+  final VoidCallback? onFacilities;
+  final VoidCallback? onSettings;
 
   @override
   Widget build(BuildContext context) {
     final active = organization['is_active'] == true;
     final name = organization['name'] as String? ?? 'Organisation';
+    final actions = <Widget>[
+      if (onTap != null)
+        AppButton.text(
+          compact: true,
+          label: 'Missions et projets',
+          icon: Icons.account_tree_outlined,
+          onPressed: onTap,
+        ),
+      if (onFacilities != null)
+        AppButton.view(
+          compact: true,
+          label: 'Formations sanitaires',
+          icon: Icons.local_hospital_outlined,
+          onPressed: onFacilities,
+        ),
+      if (onSettings != null)
+        AppButton.view(
+          compact: true,
+          label: 'Détail et paramètres',
+          icon: Icons.tune_rounded,
+          onPressed: onSettings,
+        ),
+    ];
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Padding(
+      child: InkWell(
+        onTap: onSettings ?? onTap,
+        child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
@@ -330,29 +376,19 @@ class _OrganizationCard extends StatelessWidget {
                 ),
               ],
             ),
-            const Divider(height: 22),
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton.text(
-                    compact: true,
-                    label: 'Missions et projets',
-                    icon: Icons.account_tree_outlined,
-                    onPressed: onTap,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: AppButton.view(
-                    compact: true,
-                    label: 'Formations sanitaires',
-                    icon: Icons.local_hospital_outlined,
-                    onPressed: onFacilities,
-                  ),
-                ),
-              ],
-            ),
+            if (actions.isNotEmpty) ...[
+              const Divider(height: 22),
+              Row(
+                children: [
+                  for (var i = 0; i < actions.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 8),
+                    Expanded(child: actions[i]),
+                  ],
+                ],
+              ),
+            ],
           ],
+        ),
         ),
       ),
     );

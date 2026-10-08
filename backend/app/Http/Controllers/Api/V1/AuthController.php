@@ -114,6 +114,14 @@ class AuthController extends Controller
         return response()->json(['user' => $this->userPayload($request->user()->refresh())]);
     }
 
+    /** Mon profil (mobile) : prénom, nom, identifiant, e-mail, téléphone ; règles du Web. */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = \App\Http\Controllers\Web\ProfileController::applyUpdate($request, app(\App\Services\AuditService::class));
+
+        return response()->json(['user' => $this->userPayload($user->refresh())]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()?->delete();

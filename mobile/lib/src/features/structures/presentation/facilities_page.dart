@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/access/application_access.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
+import '../../auth/data/auth_service.dart';
 import '../../organizations/data/organization_service.dart';
 import '../data/structure_service.dart';
 
@@ -76,8 +78,21 @@ class _FacilitiesPageState extends State<FacilitiesPage>
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
+    AuthService().cachedUser().then((user) {
+      if (mounted) {
+        setState(
+          () => _canManage = ApplicationAccess.allows(
+            user,
+            'health_facilities.manage',
+          ),
+        );
+      }
+    });
     _load();
   }
+
+  /// Ajout réservé aux comptes qui gèrent les formations sanitaires.
+  bool _canManage = false;
 
   @override
   void dispose() {
@@ -289,10 +304,12 @@ class _FacilitiesPageState extends State<FacilitiesPage>
           ],
         ),
       ),
-      floatingActionButton: AppFab(
-        tooltip: 'Ajouter une formation sanitaire',
-        onPressed: _openFacilityForm,
-      ),
+      floatingActionButton: _canManage
+          ? AppFab(
+              tooltip: 'Ajouter une formation sanitaire',
+              onPressed: _openFacilityForm,
+            )
+          : null,
       body: Column(
         children: [
           if (_offline)

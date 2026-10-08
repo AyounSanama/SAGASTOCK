@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/access/application_access.dart';
 import '../../../core/widgets/app_button.dart';
 import '../data/auth_service.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
@@ -45,6 +47,20 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _editProfile() async {
+    final user = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _ProfileForm(user: _user ?? const {}, auth: _auth),
+    );
+    if (user == null || !mounted) return;
+    setState(() => _user = user);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profil mis à jour.')),
+    );
+  }
+
   Future<void> _saveLocale() async {
     setState(() => _savingLocale = true);
     await _auth.updatePreferredLocale(_preferredLocale);
@@ -88,7 +104,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                   style: Theme.of(context).textTheme.titleLarge
                                       ?.copyWith(fontWeight: FontWeight.w800),
                                 ),
-                                Text('${_user?['role'] ?? ''}'),
+                                Text(ApplicationAccess.roleLabel(_user)),
                               ],
                             ),
                           ),
@@ -132,6 +148,13 @@ class _ProfilePageState extends State<ProfilePage> {
                           (_user!['coordination'] as Map)['name'],
                           Icons.public_outlined,
                         ),
+                      const SizedBox(height: 8),
+                      AppButton.edit(
+                        label: 'Modifier mes informations',
+                        icon: Icons.edit_outlined,
+                        expanded: true,
+                        onPressed: _editProfile,
+                      ),
                     ],
                   ),
                 ),
@@ -185,7 +208,16 @@ class _ProfilePageState extends State<ProfilePage> {
                             ButtonSegment(
                               value: value,
                               icon: Icon(icon),
-                              label: Text(AppThemeMode.labels[value]!),
+                              // Jamais coupé sur deux lignes (« Systèm / e ») :
+                              // réduit si l'écran est étroit.
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  AppThemeMode.labels[value]!,
+                                  maxLines: 1,
+                                  softWrap: false,
+                                ),
+                              ),
                             ),
                         ],
                         selected: {AppThemeMode.preference.value},
@@ -224,5 +256,120 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ],
           ),
+  );
+}
+
+/// « Modifier mes informations » : mêmes règles que le Web (serveur).
+class _ProfileForm extends StatefulWidget {
+  const _ProfileForm({required this.user, required this.auth});
+
+  final Map<String, dynamic> user;
+  final AuthService auth;
+
+  @override
+  State<_ProfileForm> createState() => _ProfileFormState();
+}
+
+class _ProfileFormState extends State<_ProfileForm> {
+  late final _fields = {
+    for (final key in ['first_name', 'last_name', 'username', 'email', 'phone'])
+      key: TextEditingController(text: '${widget.user[key] ?? ''}'),
+  };
+  Map<String, String> _errors = {};
+  bool _saving = false;
+
+  static const _labels = {
+    'first_name': 'Prénom *',
+    'last_name': 'Nom *',
+    'username': 'Identifiant *',
+    'email': 'Adresse e-mail *',
+    'phone': 'Téléphone',
+  };
+
+  @override
+  void dispose() {
+    for (final controller in _fields.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _saving = true;
+      _errors = {};
+    });
+    try {
+      final user = await widget.auth.updateProfile({
+        for (final entry in _fields.entries) entry.key: entry.value.text.trim(),
+      });
+      if (mounted) Navigator.pop(context, user);
+    } on DioException catch (error) {
+      final errors = error.response?.data is Map
+          ? (error.response!.data as Map)['errors']
+          : null;
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _errors = errors is Map
+            ? {
+                for (final entry in errors.entries)
+                  '${entry.key}': '${(entry.value as List).first}',
+              }
+            : {'_': 'Enregistrement impossible. Vérifiez la connexion.'};
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(
+      20,
+      0,
+      20,
+      20 + MediaQuery.viewInsetsOf(context).bottom,
+    ),
+    child: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Modifier mes informations',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 16),
+          for (final entry in _fields.entries) ...[
+            TextField(
+              controller: entry.value,
+              keyboardType: switch (entry.key) {
+                'email' => TextInputType.emailAddress,
+                'phone' => TextInputType.phone,
+                _ => TextInputType.text,
+              },
+              decoration: InputDecoration(
+                labelText: _labels[entry.key],
+                errorText: _errors[entry.key],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (_errors['_'] != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                _errors['_']!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          AppButton.save(
+            label: 'Enregistrer',
+            expanded: true,
+            loading: _saving,
+            onPressed: _saving ? null : _save,
+          ),
+        ],
+      ),
+    ),
   );
 }

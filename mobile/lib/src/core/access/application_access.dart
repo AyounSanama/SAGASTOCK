@@ -247,6 +247,19 @@ abstract final class ApplicationAccess {
     return roots.any((root) => path == root || path.startsWith('$root/'));
   }
 
+  /// Libellé du rôle affiché à l'utilisateur (jamais le code technique).
+  static String roleLabel(Map<String, dynamic>? user) {
+    if (isReadOnly(user)) return 'Coordination (lecture seule)';
+    return switch ('${user?['role'] ?? ''}'.toLowerCase()) {
+      'sago_admin' => 'Admin Sago',
+      'coordination_admin' => 'Admin Coordination',
+      'project_admin' => 'Admin Projet',
+      'site_admin' => 'Admin Site de Dispensation',
+      'site_user' => 'Utilisateur du Site',
+      final other => other,
+    };
+  }
+
   /// Route d'accueil unique, calculée depuis l'identité authentifiée.
   static String landingPath(Map<String, dynamic>? user) {
     if (user?['must_change_password'] == true) return '/change-password';
@@ -263,9 +276,11 @@ abstract final class ApplicationAccess {
         ? _fallbackManifest
         : remote.cast<Map<String, dynamic>>();
     final allowedKeys = switch (role) {
+      // Admin Sago : l'ancien Centre de contrôle (parcours en 12 étapes) est
+      // remplacé par Organisations, Standards, Assistance et Historique ;
+      // masqué du menu, la route reste en place.
       'sago_admin' => const {
         'dashboard',
-        'configuration',
         'organizations',
         'standards',
         'assistance',

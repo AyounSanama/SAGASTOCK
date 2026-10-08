@@ -17,6 +17,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       _confirmation = TextEditingController();
   bool _loading = false;
   String? _error;
+  // Mot de passe temporaire imposé, ou changement volontaire depuis Mon profil.
+  bool _mustChange = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AuthService().cachedUser().then((user) {
+      if (mounted) {
+        setState(() => _mustChange = user?['must_change_password'] == true);
+      }
+    });
+  }
+
   @override
   void dispose() {
     _current.dispose();
@@ -43,7 +56,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         currentPassword: _current.text,
         password: _password.text,
       );
-      if (mounted) {
+      if (!mounted) return;
+      if (!_mustChange && context.canPop()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Mot de passe modifié.')),
+        );
+        context.pop();
+      } else {
         context.go('/home');
       }
     } catch (_) {
@@ -72,8 +91,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Pour prot\u00e9ger votre compte, remplacez le mot de passe temporaire avant de continuer.',
+                Text(
+                  _mustChange
+                      ? 'Pour prot\u00e9ger votre compte, remplacez le mot de passe temporaire avant de continuer.'
+                      : 'Saisissez votre mot de passe actuel, puis le nouveau.',
                 ),
                 const SizedBox(height: 20),
                 AppPasswordField(

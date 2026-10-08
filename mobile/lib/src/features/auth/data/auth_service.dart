@@ -268,6 +268,22 @@ class AuthService {
     }
   }
 
+  /// Mon profil : prénom, nom, identifiant, e-mail, téléphone (en ligne).
+  /// Les erreurs de validation du serveur sont renvoyées par champ.
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    final response = await _client.dio.put<Map<String, dynamic>>(
+      '/auth/profile',
+      data: data,
+      options: await _authorized(),
+    );
+    final user = Map<String, dynamic>.from(response.data!['user'] as Map);
+    final cached = await cachedUser() ?? {};
+    // Le menu et les droits du compte sont conservés tels quels.
+    final merged = {...cached, ...user};
+    await _storage.write(key: _userKey, value: jsonEncode(merged));
+    return merged;
+  }
+
   /// Niveau 4 — Mode d'affichage (Clair / Sombre / Système) : appliqué tout de
   /// suite sur le téléphone, envoyé au serveur dès que possible.
   Future<void> updateThemePreference(String preference) async {

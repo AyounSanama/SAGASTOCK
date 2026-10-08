@@ -430,6 +430,14 @@ class _QuickActions extends StatelessWidget {
                 '/standard-lists',
               ),
           ]
+        : role == 'sago_admin'
+        // Admin Sago : mêmes entrées que son menu mobile (sans l'ancien
+        // Centre de contrôle, remplacé).
+        ? [
+            for (final item in ApplicationAccess.navigation(user))
+              if (!{'dashboard', 'profile'}.contains(item.key))
+                _ActionData(item.label, item.icon, item.path),
+          ].take(4).toList(growable: false)
         : navigation
               .where(
                 (item) => !{'dashboard', 'profile'}.contains('${item['key']}'),
