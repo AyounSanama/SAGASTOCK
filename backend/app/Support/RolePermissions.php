@@ -132,10 +132,11 @@ final class RolePermissions
             'orders.view', 'orders.manage', 'orders.prepare', 'reports.view', 'reports.export_local',
             'synchronization.view', 'synchronization.manage', 'site_settings.view', 'activity_logs.view_local',
         ]],
+        // Niveau 7 (cahier §3) : l'Utilisateur Site saisit les entrées en stock et les inventaires.
         'site_user' => ['Utilisateur du Site', 'site', [
             'dashboard.view', 'standard_lists.view', 'catalog.view', 'products.view', 'stocks.view',
-            'receipts.view', 'dispensing.view', 'patients.view', 'prescriptions.view', 'prescriptions.manage',
-            'dispensations.view', 'dispensations.manage', 'inventories.view', 'orders.view', 'reports.view',
+            'receipts.view', 'receipts.manage', 'dispensing.view', 'patients.view', 'prescriptions.view', 'prescriptions.manage',
+            'dispensations.view', 'dispensations.manage', 'inventories.view', 'inventories.manage', 'orders.view', 'reports.view',
             'synchronization.view', 'activity_logs.view_local',
         ]],
     ];

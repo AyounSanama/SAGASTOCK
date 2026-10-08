@@ -92,7 +92,7 @@ Limites : vérification dans le code et par les tests automatiques (354 tests ba
 | Origine « ONG/Bailleur » (ex. MDM/GFFO5) ou « Autre » | ✅ | 07/10 : obligatoire, portée par le lot ; stock existant via `pharmacare:stock-origins` |
 | Quantités commandées et « rapport de réception » | 🟡 | Écarts commandé / reçu existants ; formule à recevoir du client |
 | Risque de péremption par lot, rouge sous 2 mois | 🟡 | Calcul par lot à vérifier à l'écran ; formule corrigée au niveau 9 |
-| Saisie par l'Utilisateur Site | ❌ | Permission `receipts.manage` (matrice en attente) |
+| Saisie par l’Utilisateur Site | ✅ | 08/10 : `receipts.manage` accordé (migration, sans toucher aux autres rôles) |
 
 ## 6. Dispensation (cahier 4-iii)
 
@@ -127,7 +127,7 @@ Limites : vérification dans le code et par les tests automatiques (354 tests ba
 | Bon de commande **proposé automatiquement** après l'inventaire | ❌ | Quantités saisies à la main ; dépend de la CMM (niveau 9) |
 | Analyse de l'inventaire (% d'écart, écarts positifs / négatifs, rapport signé) | ❌ | Niveau 9 / V3 (signature) |
 | Signe de l'écart | ⚠️ | Code : inventorié − théorique ; cahier : théorique − inventorié. À aligner |
-| Saisie par l'Utilisateur Site | ❌ | Permission `inventories.manage` (matrice en attente) |
+| Saisie par l’Utilisateur Site | ✅ | 08/10 : `inventories.manage` accordé ; la validation reste hors de son rôle |
 | Présentation simple pour des utilisateurs peu scolarisés | 🟡 | À revoir avec les maquettes du niveau 7 |
 
 ## 8. Analyses et rapports (cahier 4-v)

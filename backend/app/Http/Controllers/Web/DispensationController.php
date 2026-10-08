@@ -53,7 +53,7 @@ class DispensationController extends Controller
     public function storePrescription(Request $request, Organization $organization): RedirectResponse
     {
         $this->clinical->storePrescription($request, $organization);
-        return back()->with('status', 'Ordonnance enregistrée et transmise pour validation clinique.');
+        return back()->with('status', config('pharmacare_v1.features.clinical_validation') ? 'Ordonnance enregistrée et transmise pour validation clinique.' : 'Ordonnance enregistrée ; elle peut être dispensée.');
     }
     public function validatePrescription(Request $request, Organization $organization, Prescription $prescription): RedirectResponse
     {
@@ -65,7 +65,7 @@ class DispensationController extends Controller
     {
         $response = $this->clinical->storeDispensation($request, $organization);
         $status = data_get($response->getData(true), 'dispensation.status');
-        return back()->with('status', match ($status) { 'partial' => 'Dispensation partielle enregistrée ; reliquat en attente.', 'stockout' => 'Rupture enregistrée ; ordonnance mise en attente.', default => 'Dispensation FEFO validée et stock mis à jour.' });
+        return back()->with('status', match ($status) { 'partial' => 'Dispensation partielle enregistrée ; reliquat en attente.', 'stockout' => 'Rupture enregistrée ; ordonnance mise en attente.', default => 'Sortie enregistrée (FEFO) et stock mis à jour.' });
     }
     public function returnDispensation(Request $request, Organization $organization, Dispensation $dispensation): RedirectResponse
     {

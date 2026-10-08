@@ -120,7 +120,7 @@ Sources, par ordre de priorité (règle permanente n° 1) : décisions validées
 - Stock de sécurité du projet en 0,25 / 0,5 / 0,75 / 1 / 1,5 / 2 mois et dates d'inventaire, de soumission et de réception au niveau du projet (II.2) : correspond à la migration du niveau 2.
 - Préremplissage des FOSA depuis le projet, sans écrasement, action « Appliquer à toutes les FOSA » (II.3) : déjà en place (DEC-08).
 - Seule la Coordination modifie la Liste Standard ; codification propre à l'ONG, ajout, import Excel, décochage par FOSA : `standard_lists.manage` et `catalog.manage` pour la Coordination seulement (niveau 6).
-- Utilisateur Site : entrées, dispensation, inventaire (§3) : `receipts.manage`, `inventories.manage`.
+- Utilisateur Site : entrées, dispensation, inventaire (§3) : `receipts.manage`, `inventories.manage`. **Appliqué le 08/10 (niveau 7).**
 - Validation clinique des ordonnances en V4 (annexe A) : `prescriptions.validate` retiré à la Coordination et au Projet.
 
 **Écarts relevés sur l'assistant « Créer un projet / programme »** (niveau 2, à reprendre au niveau 6) :

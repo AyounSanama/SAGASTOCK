@@ -63,8 +63,8 @@ class RolePermissionsSeederTest extends TestCase
             ]],
             'site_user' => ['site_user', [
                 'activity_logs.view_local', 'catalog.view', 'dashboard.view', 'dispensations.manage',
-                'dispensations.view', 'dispensing.view', 'inventories.view', 'orders.view', 'patients.view',
-                'prescriptions.manage', 'prescriptions.view', 'products.view', 'receipts.view', 'reports.view',
+                'dispensations.view', 'dispensing.view', 'inventories.manage', 'inventories.view', 'orders.view', 'patients.view',
+                'prescriptions.manage', 'prescriptions.view', 'products.view', 'receipts.manage', 'receipts.view', 'reports.view',
                 'standard_lists.view', 'stocks.view', 'synchronization.view',
             ]],
         ];
