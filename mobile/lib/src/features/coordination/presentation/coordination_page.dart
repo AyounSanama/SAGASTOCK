@@ -16,10 +16,14 @@ class CoordinationPage extends StatefulWidget {
     this.organizationId,
     this.service,
     this.connectivity,
+    this.initialTab,
     super.key,
   });
 
   final String? organizationId;
+
+  /// Onglet ouvert à l'arrivée : projects, pending, facilities ou accounts.
+  final String? initialTab;
   final CoordinationService? service;
   final ConnectivityService? connectivity;
 
@@ -29,11 +33,27 @@ class CoordinationPage extends StatefulWidget {
 
 class _CoordinationPageState extends State<CoordinationPage>
     with SingleTickerProviderStateMixin {
+  /// Boutons de l'en-tête sombre : fond translucide (le thème leur donnait
+  /// un fond clair, icône blanche invisible).
+  static final _onDarkHeader = IconButton.styleFrom(
+    backgroundColor: const Color(0x26FFFFFF),
+    foregroundColor: Colors.white,
+  );
+
   late final CoordinationService _service =
       widget.service ?? CoordinationService();
   late final ConnectivityService _connectivity =
       widget.connectivity ?? ConnectivityService();
-  late final TabController _tabs = TabController(length: 4, vsync: this);
+  late final TabController _tabs = TabController(
+    length: 4,
+    vsync: this,
+    initialIndex: switch (widget.initialTab) {
+      'pending' => 1,
+      'facilities' => 2,
+      'accounts' => 3,
+      _ => 0,
+    },
+  );
   Map<String, dynamic> _data = const {};
   bool _loading = true;
   bool _online = true;
@@ -390,10 +410,8 @@ class _CoordinationPageState extends State<CoordinationPage>
         ),
       ),
     );
-    firstName.dispose();
-    lastName.dispose();
-    email.dispose();
-    phone.dispose();
+    // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
+    // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
     if (!mounted) return;
     if (result == 'saved') {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -470,12 +488,14 @@ class _CoordinationPageState extends State<CoordinationPage>
                             if (_canAct)
                               IconButton(
                                 tooltip: 'Langues de la coordination',
+                                style: _onDarkHeader,
                                 icon: const Icon(Icons.translate, color: Colors.white),
                                 onPressed: _busy ? null : _editLanguages,
                               ),
                             // Niveau 6 : Liste Standard (décochage par FOSA, code-barres).
                             IconButton(
                               tooltip: 'Liste Standard',
+                              style: _onDarkHeader,
                               icon: const Icon(Icons.format_list_bulleted, color: Colors.white),
                               onPressed: () => context.push('/coordination/standard-list'),
                             ),

@@ -214,7 +214,11 @@ class _CoordinationDashboardPageState extends State<CoordinationDashboardPage> {
                               Text('Rien à traiter pour le moment.', style: TextStyle(color: AppColors.textMuted)),
                             for (final item in _list('todo'))
                               InkWell(
-                                onTap: () => context.go('/missions'),
+                                onTap: () => context.go(
+                                  item['action'] == 'validate'
+                                      ? '/missions?tab=pending'
+                                      : '/missions?tab=facilities',
+                                ),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 10),
                                   child: Row(

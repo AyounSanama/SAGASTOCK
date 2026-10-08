@@ -710,8 +710,8 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
         ),
       ),
     );
-    name.dispose();
-    code.dispose();
+    // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
+    // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
     if (donor == null || !mounted) return;
     setState(() {
       _options = {
@@ -1060,9 +1060,8 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
         ),
       ),
     );
-    for (final controller in [code, name, packaging, barcode]) {
-      controller.dispose();
-    }
+    // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
+    // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
     if (created != true || !mounted) return false;
     await _loadList();
     return true;

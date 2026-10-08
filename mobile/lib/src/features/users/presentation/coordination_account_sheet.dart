@@ -99,7 +99,10 @@ Future<bool> openCoordinationAccountSheet(
           }
         }
 
-        return Form(
+        // Marges et défilement : rien ne touche les bords ni ne déborde.
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Form(
           key: formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -124,6 +127,7 @@ Future<bool> openCoordinationAccountSheet(
               const SizedBox(height: AppSpacing.sm),
               DropdownButtonFormField<Object?>(
                 initialValue: roleId,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Rôle *'),
                 items: [
                   for (final role in roles)
@@ -155,12 +159,16 @@ Future<bool> openCoordinationAccountSheet(
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
                   initialValue: projectId,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Projet *'),
                   items: [
                     for (final project in projects)
                       DropdownMenuItem(
                         value: '${project['id']}',
-                        child: Text('${project['name']} (${project['code']})'),
+                        child: Text(
+                          '${project['name']} (${project['code']})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                   ],
                   validator: (value) => value == null
@@ -187,13 +195,13 @@ Future<bool> openCoordinationAccountSheet(
               ),
             ],
           ),
+        )
         );
       },
     ),
   );
-  for (final controller in [firstName, lastName, email, phone, username]) {
-    controller.dispose();
-  }
+  // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
+  // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
   return created ?? false;
 }
 

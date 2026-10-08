@@ -6,7 +6,10 @@ import '../../coordination/presentation/coordination_page.dart';
 import 'missions_page.dart';
 
 class ScopedMissionsPage extends StatelessWidget {
-  const ScopedMissionsPage({super.key});
+  const ScopedMissionsPage({this.initialTab, super.key});
+
+  /// Onglet ouvert depuis « À traiter » (pending, facilities…).
+  final String? initialTab;
 
   @override
   Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>?>(
@@ -33,6 +36,7 @@ class ScopedMissionsPage extends StatelessWidget {
       if (role == 'coordination_admin') {
         return CoordinationPage(
           organizationId: organizationId.isEmpty ? null : organizationId,
+          initialTab: initialTab,
         );
       }
       if (organizationId.isEmpty) {

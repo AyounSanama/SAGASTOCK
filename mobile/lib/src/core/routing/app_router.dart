@@ -198,7 +198,9 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
         ),
         GoRoute(
           path: '/missions',
-          builder: (context, state) => const ScopedMissionsPage(),
+          builder: (context, state) => ScopedMissionsPage(
+            initialTab: state.uri.queryParameters['tab'],
+          ),
         ),
         GoRoute(
           path: '/projects',

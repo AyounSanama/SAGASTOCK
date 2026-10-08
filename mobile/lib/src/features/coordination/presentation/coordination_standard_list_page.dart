@@ -104,7 +104,8 @@ class _CoordinationStandardListPageState extends State<CoordinationStandardListP
         ],
       ),
     );
-    controller.dispose();
+    // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
+    // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
     if (value == null || !mounted) return;
     try {
       await _service.saveBarcode(_projectId!, '${product['id']}', value);

@@ -229,6 +229,8 @@ abstract final class ApplicationAccess {
         '/projects',
         '/funding',
         '/standard-lists',
+        // Niveau 6 : sa Liste Standard (sans cette entrée, renvoi à l'accueil).
+        '/coordination/standard-list',
         '/notifications',
         '/profile',
       },
@@ -331,6 +333,10 @@ abstract final class ApplicationAccess {
                 : raw['label']?.toString() ?? '',
             path: role == 'sago_admin' && raw['key'] == 'dashboard'
                 ? '/sago/dashboard'
+                // Coordination : sa Liste Standard (niveau 6), pas l'ancien
+                // catalogue qui attendait un choix d'organisation.
+                : role == 'coordination_admin' && raw['key'] == 'standard-lists'
+                ? '/coordination/standard-list'
                 : raw['path']?.toString() ?? '/home',
             icon: ModuleIconRegistry.resolve(raw['icon']?.toString()),
             permission: raw['permission']?.toString(),
@@ -351,6 +357,7 @@ abstract final class ApplicationAccess {
       '/dispensing-sites': 'dispensing_sites.view',
       '/users': 'users.view',
       '/standard-lists': 'standard_lists.view',
+      '/coordination/standard-list': 'standard_lists.view',
       '/products': 'products.view',
       '/stocks': 'stocks.view',
       '/receipts': 'receipts.view',
