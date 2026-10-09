@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Site;
 use App\Models\SupplyOrder;
 use App\Notifications\OperationalNotification;
+use App\Services\AllowedProductsService;
 use App\Services\AuditService;
 use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
@@ -41,7 +42,9 @@ class SupplyOrderController extends Controller
                 $site->setAttribute('order_proposal_ready', $inventory !== null);
                 return $site;
             }),
-            'products' => Product::where('organization_id', $organization->id)->where('is_active', true)->orderBy('name')->get(['id','code','name','strength']),
+            // Niveau 7 : produits de la Liste Standard des sites du compte.
+            'products' => app(AllowedProductsService::class)->query($organization, $this->siteIds($request, $organization))
+                ->where('is_active', true)->orderBy('name')->get(['id','code','name','strength']),
         ]);
     }
 
@@ -74,6 +77,9 @@ class SupplyOrderController extends Controller
         if ($data['supplying_site_id'] ?? null) $this->site($request,$organization,$data['supplying_site_id']);
         $productIds = collect($data['lines'])->pluck('product_id');
         abort_unless(Product::where('organization_id',$organization->id)->whereIn('id',$productIds)->count()===$productIds->unique()->count(),422,'Un produit est invalide pour cette organisation.');
+        // Niveau 7 : seulement des produits de la Liste Standard du site demandeur.
+        abort_unless(app(AllowedProductsService::class)->query($organization, collect([$site->id]))->whereIn('id', $productIds)->count() === $productIds->unique()->count(),
+            422, 'Un produit ne fait pas partie de la liste standard de ce site.');
         $order = DB::transaction(function () use ($data,$organization,$request) {
             $lines=$data['lines']; unset($data['lines']);
             $order=SupplyOrder::create([...$data,'organization_id'=>$organization->id,'created_by'=>$request->user()->id]);

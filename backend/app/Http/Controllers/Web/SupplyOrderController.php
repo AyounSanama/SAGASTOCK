@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Api\V1\SupplyOrderController as ApiController;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
-use App\Models\Product;
 use App\Models\Site;
 use App\Models\SupplyOrder;
 use App\Services\UserScopeService;
@@ -25,7 +24,8 @@ class SupplyOrderController extends Controller
         abort_if(!$organization,$request->filled('organization_id')?404:403);
         $siteIds=$this->scopes->sites($request->user())->where('organization_id',$organization->id)->pluck('id');
         $sites=Site::with('healthFacility:id,name')->whereIn('id',$siteIds)->orderBy('name')->get();
-        $products=Product::where('organization_id',$organization->id)->where('is_active',true)->orderBy('name')->get();
+        // Niveau 7 : produits de la Liste Standard des sites du compte (même règle que l'API).
+        $products=app(\App\Services\AllowedProductsService::class)->query($organization,$siteIds)->where('is_active',true)->orderBy('name')->get();
         $orders=SupplyOrder::with(['requestingSite.healthFacility','supplyingSite','lines.product','approvals.decisionMaker'])->where('organization_id',$organization->id)->whereIn('requesting_site_id',$siteIds)->latest()->get();
         return view('orders.index',compact('organizations','organization','sites','products','orders'));
     }

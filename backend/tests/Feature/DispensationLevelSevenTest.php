@@ -52,7 +52,7 @@ class DispensationLevelSevenTest extends TestCase
         $this->product = Product::create(['organization_id' => $this->organization->id, 'code' => 'PARA', 'name' => 'Paracétamol', 'product_type' => 'medicine', 'is_active' => true]);
 
         $role = Role::create(['code' => 'care_test', 'name' => 'Soins']);
-        $role->permissions()->attach(collect(['patients.view', 'patients.manage', 'prescriptions.view', 'prescriptions.manage', 'dispensations.view', 'dispensations.manage', 'dispensing.view'])
+        $role->permissions()->attach(collect(['patients.view', 'patients.manage', 'prescriptions.view', 'prescriptions.manage', 'dispensations.view', 'dispensations.manage', 'dispensing.view', 'inventories.view', 'inventories.manage'])
             ->map(fn ($code) => Permission::firstOrCreate(['code' => $code], ['name' => $code])->id));
         $user = User::factory()->create(['is_active' => true, 'organization_id' => $this->organization->id]);
         $user->roles()->attach($role, ['scope_type' => 'organization', 'scope_id' => $this->organization->id]);
@@ -98,6 +98,23 @@ class DispensationLevelSevenTest extends TestCase
         $this->postJson($this->url('dispensations'), $this->dispensation(['reference' => 'DIS-H2', 'quantity' => 1]))->assertCreated()
             ->assertJsonPath('dispensation.patient_sex', 'female')
             ->assertJsonPath('dispensation.patient_age_years', \Illuminate\Support\Carbon::parse('1990-05-01')->age);
+    }
+
+    public function test_inventory_counts_only_the_lots_of_its_couple(): void
+    {
+        $this->lot('LOT-A', $this->gffo5, 6, 10);
+        $this->lot('LOT-B', $this->fh4, 2, 7);
+        $payload = ['site_id' => $this->site->id, 'reference' => 'INV-C1', 'inventory_type' => 'monthly', 'period_date' => now()->toDateString()];
+
+        $this->postJson($this->url('inventories'), $payload)->assertUnprocessable()->assertJsonValidationErrors('origin_type');
+        $id = $this->postJson($this->url('inventories'), [...$payload, 'origin_type' => 'project', 'origin_project_id' => $this->gffo5->id])
+            ->assertCreated()->json('inventory.id');
+
+        $lines = $this->postJson($this->url("inventories/$id/start"))->assertOk()->json('inventory.lines');
+        $this->assertSame(['LOT-A'], collect($lines)->pluck('batch.batch_number')->all());
+        // Écart = théorique − inventorié : 10 − 9 = 1 manquant.
+        $this->putJson($this->url("inventories/$id/count"), ['lines' => [['id' => $lines[0]['id'], 'physical_quantity' => 9, 'justification' => 'Une boîte cassée']]])
+            ->assertOk()->assertJsonPath('inventory.lines.0.variance_quantity', '1.0000');
     }
 
     public function test_other_origin_uses_only_third_party_stock(): void

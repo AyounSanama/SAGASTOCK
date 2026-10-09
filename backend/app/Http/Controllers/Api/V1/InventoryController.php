@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\StockBalance;
 use App\Services\AuditService;
 use App\Services\StockLedgerService;
+use App\Services\StockOriginService;
 use App\Services\UserScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,14 +26,19 @@ class InventoryController extends Controller
     public function index(Request $request, Organization $organization): JsonResponse
     {
         $this->access($request, $organization, 'inventories.view');
-        return response()->json(Inventory::with(['site.healthFacility', 'lines.product', 'lines.batch'])->where('organization_id', $organization->id)
-            ->whereIn('site_id', $this->siteIds($request, $organization))->when($request->input('status'), fn ($q,$v)=>$q->where('status',$v))->latest('period_date')->paginate(30));
+        $origins = app(StockOriginService::class);
+        return response()->json(Inventory::with(['site.healthFacility', 'lines.product', 'lines.batch', 'originProject'])->where('organization_id', $organization->id)
+            ->whereIn('site_id', $this->siteIds($request, $organization))->when($request->input('status'), fn ($q,$v)=>$q->where('status',$v))->latest('period_date')->paginate(30)
+            ->through(fn (Inventory $inventory) => [...$inventory->toArray(), 'origin_display' => $inventory->origin_type ? $origins->label($inventory->originProject) : null]));
     }
 
     public function options(Request $request, Organization $organization): JsonResponse
     {
         $this->access($request, $organization, 'inventories.manage');
-        return response()->json(['sites' => Site::with('healthFacility:id,name')->whereIn('id', $this->siteIds($request, $organization))->orderBy('name')->get()]);
+        // Niveau 7 : couples ONG/Bailleur proposés pour chaque site.
+        $origins = app(StockOriginService::class);
+        return response()->json(['sites' => Site::with('healthFacility:id,name')->whereIn('id', $this->siteIds($request, $organization))->orderBy('name')->get()
+            ->map(fn (Site $site) => [...$site->toArray(), 'origins' => $origins->options($site)->values()])]);
     }
 
     public function store(Request $request, Organization $organization): JsonResponse
@@ -48,10 +54,20 @@ class InventoryController extends Controller
         }
         $data = $request->validate(['offline_uuid'=>['nullable','uuid','unique:inventories,offline_uuid'],'site_id'=>['required','uuid'],
             'reference'=>['required','max:80',Rule::unique('inventories')->where('organization_id',$organization->id)],
-            'inventory_type'=>['required',Rule::in(['monthly','exceptional'])],'period_date'=>['required','date','before_or_equal:today'],'notes'=>['nullable','string','max:2000']]);
+            'inventory_type'=>['required',Rule::in(['monthly','exceptional'])],'period_date'=>['required','date','before_or_equal:today'],'notes'=>['nullable','string','max:2000'],
+            'origin_type'=>['nullable',Rule::in([StockOriginService::TYPE_PROJECT, StockOriginService::TYPE_OTHER])],
+            'origin_project_id'=>['nullable','uuid','required_if:origin_type,'.StockOriginService::TYPE_PROJECT]],
+            ['origin_project_id.required_if'=>'Choisissez le couple ONG/Bailleur.'], StockOriginService::attributes());
         $site = $this->site($request, $organization, $data['site_id']);
         abort_if(Inventory::where('site_id',$site->id)->whereIn('status',['draft','counting','submitted'])->exists(), 422, 'Un inventaire est déjà ouvert sur ce site.');
-        $inventory = Inventory::create([...$data,'organization_id'=>$organization->id,'site_id'=>$site->id,'created_by'=>$request->user()->id]);
+        // Niveau 7 : un inventaire par couple ONG/Bailleur dès que la FOSA en a un.
+        $origins = app(StockOriginService::class);
+        if (empty($data['origin_type']) && $origins->options($site)->isNotEmpty()) {
+            throw ValidationException::withMessages(['origin_type' => 'Choisissez le couple ONG/Bailleur à inventorier.']);
+        }
+        $origin = empty($data['origin_type']) ? ['origin_type' => null, 'origin_project_id' => null] : $origins->resolveForIssue($site, $data);
+        $inventory = Inventory::create([...$data,'origin_type'=>$origin['origin_type'],'origin_project_id'=>$origin['origin_project_id'],
+            'organization_id'=>$organization->id,'site_id'=>$site->id,'created_by'=>$request->user()->id]);
         $this->audit->record($request,'inventory.created',$inventory);
         return response()->json(['inventory'=>$inventory->load('site')],201);
     }
@@ -60,8 +76,12 @@ class InventoryController extends Controller
     {
         $this->manage($request,$organization,$inventory); abort_unless($inventory->status==='draft',422,'Cet inventaire ne peut plus être démarré.');
         DB::transaction(function() use($inventory,$request){
-            $balances=StockBalance::with('batch')->where('organization_id',$inventory->organization_id)->where('site_id',$inventory->site_id)->get();
-            abort_if($balances->isEmpty(),422,'Aucune ligne de stock à inventorier sur ce site.');
+            $balances=StockBalance::with('batch')->where('organization_id',$inventory->organization_id)->where('site_id',$inventory->site_id)
+                // Niveau 7 : seulement les lots du couple inventorié.
+                ->when($inventory->origin_type, fn ($query) => $query->whereIn('batch_id', app(StockOriginService::class)->scopeBatches(
+                    \App\Models\Batch::query(), $inventory->site, ['origin_type' => $inventory->origin_type, 'origin_project_id' => $inventory->origin_project_id],
+                )->select('id')))->get();
+            abort_if($balances->isEmpty(),422,$inventory->origin_type ? 'Aucune ligne de stock de ce couple ONG/Bailleur à inventorier sur ce site.' : 'Aucune ligne de stock à inventorier sur ce site.');
             foreach($balances as $balance) $inventory->lines()->create(['product_id'=>$balance->product_id,'batch_id'=>$balance->batch_id,
                 'theoretical_quantity'=>$balance->theoretical_quantity,'unit_cost'=>$balance->batch?->unit_cost]);
             $inventory->update(['status'=>'counting','frozen_at'=>now()]);
@@ -75,7 +95,8 @@ class InventoryController extends Controller
         $this->manage($request,$organization,$inventory); abort_unless($inventory->status==='counting',422,'Le comptage n’est pas ouvert.');
         $data=$request->validate(['lines'=>['required','array','min:1'],'lines.*.id'=>['required','uuid'],'lines.*.physical_quantity'=>['required','numeric','gte:0'],'lines.*.justification'=>['nullable','string','max:2000']]);
         DB::transaction(function() use($data,$inventory,$request){foreach($data['lines'] as $row){
-            $line=$inventory->lines()->findOrFail($row['id']); $physical=(float)$row['physical_quantity']; $variance=$physical-(float)$line->theoretical_quantity;
+            // Niveau 7 : écart = théorique − inventorié (positif = manquant), comme le cahier.
+            $line=$inventory->lines()->findOrFail($row['id']); $physical=(float)$row['physical_quantity']; $variance=(float)$line->theoretical_quantity-$physical;
             if(abs($variance)>.0001 && mb_strlen(trim((string)($row['justification']??'')))<5) throw ValidationException::withMessages(['lines'=>'Une justification précise est obligatoire pour chaque écart.']);
             $line->update(['physical_quantity'=>$physical,'variance_quantity'=>$variance,'variance_value'=>$variance*(float)($line->unit_cost??0),
                 'justification'=>$row['justification']??null,'counted_by'=>$request->user()->id,'counted_at'=>now()]);
@@ -100,7 +121,8 @@ class InventoryController extends Controller
         $data=$request->validate(['decision'=>['required',Rule::in(['approve','reject'])],'rejection_reason'=>[Rule::requiredIf($request->input('decision')==='reject'),'nullable','string','min:5','max:2000']]);
         if($data['decision']==='reject'){$inventory->update(['status'=>'rejected','rejection_reason'=>$data['rejection_reason'],'validated_by'=>$request->user()->id,'validated_at'=>now()]);$this->audit->record($request,'inventory.rejected',$inventory,[],$data);return response()->json(['inventory'=>$inventory]);}
         DB::transaction(function() use($inventory,$request){foreach($inventory->lines()->with('batch')->get() as $line){$variance=(float)$line->variance_quantity;
-            if(abs($variance)>.0001)$this->ledger->record($inventory->organization,$inventory->site,$line->batch,$variance>0?'adjustment_in':'adjustment_out',abs($variance),$request->user()->id,
+            // Écart positif = manquant : sortie d'ajustement ; négatif = surplus : entrée.
+            if(abs($variance)>.0001)$this->ledger->record($inventory->organization,$inventory->site,$line->batch,$variance>0?'adjustment_out':'adjustment_in',abs($variance),$request->user()->id,
                 ['reference_type'=>'inventory','reference_id'=>$inventory->id,'reason'=>$line->justification,'bypass_inventory_freeze'=>true]);
             StockBalance::where('site_id',$inventory->site_id)->where('batch_id',$line->batch_id)->update(['physical_quantity'=>$line->physical_quantity]);
         }$inventory->update(['status'=>'validated','validated_by'=>$request->user()->id,'validated_at'=>now()]);});

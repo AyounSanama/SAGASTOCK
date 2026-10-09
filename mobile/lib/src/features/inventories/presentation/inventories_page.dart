@@ -595,7 +595,8 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
   );
   Widget _differenceCard(Map<String, dynamic> line) {
     final physical = _physical(line);
-    final gap = physical == null ? null : physical - _theoretical(line);
+    // Écart = théorique − compté (positif = manquant), comme le cahier et le serveur.
+    final gap = physical == null ? null : _theoretical(line) - physical;
     return Card(
       child: ListTile(
         title: Text(
@@ -619,7 +620,7 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
     var positive = 0, negative = 0, equal = 0;
     double theoretical = 0, physical = 0;
     for (final line in _lines) {
-      final t = _theoretical(line), p = _physical(line) ?? 0, gap = p - t;
+      final t = _theoretical(line), p = _physical(line) ?? 0, gap = t - p;
       theoretical += t;
       physical += p;
       if (gap > 0) {
@@ -639,8 +640,8 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
           formatQuantity(theoretical),
         ),
         _InventorySummaryLine('Stock compté', formatQuantity(physical)),
-        _InventorySummaryLine('Écarts positifs', '$positive'),
-        _InventorySummaryLine('Écarts négatifs', '$negative'),
+        _InventorySummaryLine('Manquants (écart positif)', '$positive'),
+        _InventorySummaryLine('Surplus (écart négatif)', '$negative'),
         _InventorySummaryLine('Sans écart', '$equal'),
       ],
     );
@@ -681,6 +682,20 @@ class _InventoryCreateFormState extends State<InventoryCreateForm> {
       );
   String? site;
   String type = 'monthly';
+  // Niveau 7 : couple ONG/Bailleur inventorié (projet), ou [_other].
+  String? origin;
+  static const _other = 'other';
+
+  List<Map<String, dynamic>> get _origins => [
+    for (final value
+        in (widget.sites
+                    .where((s) => '${s['id']}' == site)
+                    .firstOrNull?['origins']
+                as List? ??
+            const []))
+      Map<String, dynamic>.from(value as Map),
+  ];
+
   @override
   Widget build(BuildContext c) => _Body(
     keyForm: key,
@@ -691,6 +706,12 @@ class _InventoryCreateFormState extends State<InventoryCreateForm> {
           'reference': reference.text,
           'inventory_type': type,
           'period_date': period.text,
+          if (origin == _other)
+            'origin_type': _other
+          else if (origin != null) ...{
+            'origin_type': 'project',
+            'origin_project_id': origin,
+          },
         });
       }
     },
@@ -706,9 +727,37 @@ class _InventoryCreateFormState extends State<InventoryCreateForm> {
               ),
             )
             .toList(),
-        onChanged: (v) => site = v,
+        onChanged: (v) => setState(() {
+          site = v;
+          origin = _origins.length == 1 ? '${_origins.first['project_id']}' : null;
+        }),
         validator: (v) => v == null ? 'Sélection obligatoire.' : null,
       ),
+      if (_origins.isNotEmpty)
+        DropdownButtonFormField<String>(
+          key: ValueKey('origine-$site'),
+          isExpanded: true,
+          initialValue: origin,
+          decoration: const InputDecoration(
+            labelText: 'Couple ONG/Bailleur *',
+          ),
+          items: [
+            for (final value in _origins)
+              DropdownMenuItem(
+                value: '${value['project_id']}',
+                child: Text(
+                  '${value['label']}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            const DropdownMenuItem(
+              value: _other,
+              child: Text('Autre (livré par un tiers)'),
+            ),
+          ],
+          onChanged: (v) => setState(() => origin = v),
+          validator: (v) => v == null ? 'Choisissez le couple.' : null,
+        ),
       TextFormField(
         controller: reference,
         decoration: const InputDecoration(labelText: 'Référence'),

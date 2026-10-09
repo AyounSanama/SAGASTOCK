@@ -44,7 +44,7 @@ class SiteUserStockEntryTest extends TestCase
         $this->postJson("$api/receipts/$id/validate")->assertOk();
         $this->assertSame(404, $receipt($otherSite, 'REC-2')->status(), 'Site hors de son périmètre');
 
-        $inventory = $this->postJson("$api/inventories", ['site_id' => $site->id, 'reference' => 'INV-1', 'inventory_type' => 'monthly', 'period_date' => now()->toDateString()])
+        $inventory = $this->postJson("$api/inventories", ['site_id' => $site->id, 'reference' => 'INV-1', 'inventory_type' => 'monthly', 'period_date' => now()->toDateString(), 'origin_type' => 'project', 'origin_project_id' => $project->id])
             ->assertCreated()->json('inventory.id');
         $this->postJson("$api/inventories/$inventory/validate")->assertForbidden();
     }

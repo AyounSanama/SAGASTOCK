@@ -5,17 +5,13 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Dispensation;
 use App\Models\DispensationItem;
-use App\Models\HealthFacility;
 use App\Models\Organization;
 use App\Models\Patient;
 use App\Models\Prescription;
 use App\Models\PrescriptionItem;
 use App\Models\Product;
 use App\Models\Site;
-use App\Models\StandardList;
-use App\Models\StandardListVersion;
 use App\Services\AuditService;
-use App\Services\HealthFacilityManagementService;
 use App\Services\StockLedgerService;
 use App\Services\StockOriginService;
 use App\Services\UserScopeService;
@@ -432,29 +428,7 @@ class DispensationController extends Controller
     }
     private function allowedProducts(Request $request, Organization $organization): Builder
     {
-        $siteIds = $this->siteIds($request, $organization);
-        $projectIds = DB::table('health_facility_project')
-            ->join('sites', 'sites.health_facility_id', '=', 'health_facility_project.health_facility_id')
-            ->whereIn('sites.id', $siteIds)
-            ->pluck('health_facility_project.project_id')->unique();
-        $lists = StandardList::where('organization_id', $organization->id)
-            ->where('scope_type', 'project')->whereIn('scope_id', $projectIds)
-            ->where('is_active', true)->get(['id', 'allow_outside_list']);
-        $query = Product::where('organization_id', $organization->id);
-        if ($lists->isEmpty() || $lists->contains('allow_outside_list', true)) return $query;
-
-        $versionIds = StandardListVersion::whereIn('standard_list_id', $lists->pluck('id'))
-            ->where('status', 'published')->pluck('id');
-        $productIds = DB::table('standard_list_items')
-            ->whereIn('standard_list_version_id', $versionIds)->pluck('product_id');
-        // Niveau 6 : une FOSA configurée suit sa propre Liste Standard (critères
-        // de la FOSA, articles décochés par la Coordination retirés).
-        $facilities = HealthFacility::whereIn('id', Site::whereIn('id', $siteIds)->pluck('health_facility_id'))->get();
-        if ($facilities->isNotEmpty() && $facilities->every(fn ($facility) => $facility->care_level_id)) {
-            $management = app(HealthFacilityManagementService::class);
-            $productIds = $facilities->flatMap(fn ($facility) => $management->standardList($facility)->pluck('id'))->unique()->values();
-        }
-        return $query->whereIn('id', $productIds);
+        return app(\App\Services\AllowedProductsService::class)->query($organization, $this->siteIds($request, $organization));
     }
     private function siteIds(Request $request, Organization $organization) { return $this->scopes->sites($request->user())->whereHas('healthFacility', fn ($q) => $q->where('organization_id', $organization->id))->pluck('id'); }
     private function site(Request $request, Organization $organization, string $id): Site { return $this->scopes->sites($request->user())->whereKey($id)->whereHas('healthFacility', fn ($q) => $q->where('organization_id', $organization->id))->firstOrFail(); }

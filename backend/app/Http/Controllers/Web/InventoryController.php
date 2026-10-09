@@ -32,11 +32,14 @@ class InventoryController extends Controller
         $siteIds = $this->scopes->sites($request->user())
             ->where('organization_id', $organization->id)->pluck('id');
         $sites = Site::with('healthFacility:id,name')->whereIn('id', $siteIds)->orderBy('name')->get();
-        $inventories = Inventory::with(['site.healthFacility', 'lines.product', 'lines.batch'])
+        $inventories = Inventory::with(['site.healthFacility', 'lines.product', 'lines.batch', 'originProject'])
             ->where('organization_id', $organization->id)->whereIn('site_id', $siteIds)
             ->latest('period_date')->get();
+        // Niveau 7 : couples ONG/Bailleur proposés pour chaque site.
+        $origins = app(\App\Services\StockOriginService::class);
+        $originsBySite = $sites->mapWithKeys(fn (Site $site) => [$site->id => $origins->options($site)]);
 
-        return view('inventories.index', compact('organizations', 'organization', 'sites', 'inventories'));
+        return view('inventories.index', compact('organizations', 'organization', 'sites', 'inventories', 'originsBySite', 'origins'));
     }
 
     public function store(Request $request, Organization $organization): RedirectResponse
