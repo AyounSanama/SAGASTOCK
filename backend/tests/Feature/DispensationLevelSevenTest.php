@@ -57,7 +57,7 @@ class DispensationLevelSevenTest extends TestCase
         $user = User::factory()->create(['is_active' => true, 'organization_id' => $this->organization->id]);
         $user->roles()->attach($role, ['scope_type' => 'organization', 'scope_id' => $this->organization->id]);
         Sanctum::actingAs($user);
-        $this->patient = $this->postJson($this->url('patients'), ['code' => 'P001', 'first_name' => 'Marie', 'last_name' => 'Test', 'sex' => 'female'])->assertCreated()->json('patient');
+        $this->patient = $this->postJson($this->url('patients'), ['code' => 'P001', 'first_name' => 'Marie', 'last_name' => 'Test', 'sex' => 'female', 'date_of_birth' => '1990-05-01'])->assertCreated()->json('patient');
     }
 
     public function test_dispensation_uses_only_the_stock_of_the_chosen_couple(): void
@@ -77,6 +77,27 @@ class DispensationLevelSevenTest extends TestCase
         // Plus que le stock du couple : refusé, même si l'autre couple en a.
         $this->postJson($this->url('dispensations'), $this->dispensation(['reference' => 'DIS-2', 'quantity' => 12]))
             ->assertUnprocessable()->assertJsonValidationErrors('items');
+    }
+
+    public function test_patient_header_requires_the_five_fields(): void
+    {
+        $this->lot('LOT-A', $this->gffo5, 6, 10);
+        // Patient sans date de naissance ni sexe : âge et sexe à saisir sur la sortie.
+        $patient = $this->postJson($this->url('patients'), ['code' => 'P002', 'first_name' => 'Jean', 'last_name' => 'Essomba'])->assertCreated()->json('patient');
+        $payload = [...$this->dispensation(['reference' => 'DIS-H1', 'patient_id' => $patient['id']]), 'prescription_number' => '', 'prescriber_name' => ''];
+
+        $this->postJson($this->url('dispensations'), $payload)->assertUnprocessable()
+            ->assertJsonValidationErrors(['patient_age_years', 'patient_sex', 'prescription_number', 'prescriber_name']);
+
+        $this->postJson($this->url('dispensations'), [...$payload, 'patient_age_years' => 34, 'patient_sex' => 'male', 'prescription_number' => 'ORD-7', 'prescriber_name' => 'Dr Mbarga'])
+            ->assertCreated()
+            ->assertJsonPath('dispensation.patient_age_years', 34)
+            ->assertJsonPath('dispensation.prescription_number', 'ORD-7');
+
+        // Patient avec date de naissance et sexe : repris du dossier.
+        $this->postJson($this->url('dispensations'), $this->dispensation(['reference' => 'DIS-H2', 'quantity' => 1]))->assertCreated()
+            ->assertJsonPath('dispensation.patient_sex', 'female')
+            ->assertJsonPath('dispensation.patient_age_years', \Illuminate\Support\Carbon::parse('1990-05-01')->age);
     }
 
     public function test_other_origin_uses_only_third_party_stock(): void
@@ -166,6 +187,9 @@ class DispensationLevelSevenTest extends TestCase
             'reference' => $overrides['reference'] ?? 'DIS-1', 'site_id' => $this->site->id, 'dispensed_at' => now()->toISOString(),
             'patient_id' => array_key_exists('patient_id', $overrides) ? $overrides['patient_id'] : $this->patient['id'],
             'destination_type' => $overrides['destination_type'] ?? 'patient', 'destination_name' => $overrides['destination_name'] ?? null,
+            // Entête Patient (âge et sexe repris du dossier).
+            'prescription_number' => ($overrides['destination_type'] ?? 'patient') === 'patient' ? 'ORD-42' : null,
+            'prescriber_name' => ($overrides['destination_type'] ?? 'patient') === 'patient' ? 'Dr Ndongo' : null,
             'origin_type' => array_key_exists('origin_type', $overrides) ? $overrides['origin_type'] : 'project',
             'origin_project_id' => array_key_exists('origin_project_id', $overrides) ? $overrides['origin_project_id'] : $this->gffo5->id,
             'items' => [$item],

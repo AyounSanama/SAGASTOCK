@@ -28,6 +28,8 @@ class AuditService {
             // Identité et santé du patient : jamais en clair dans le journal.
             'first_name', 'last_name', 'date_of_birth', 'sex', 'phone', 'address', 'external_identifier',
             'notes', 'prescriber_name', 'clinical_validation_notes', 'rejection_reason',
+            // Entête Patient de la dispensation (niveau 7).
+            'patient_age_years', 'patient_sex', 'prescription_number',
         ];
 
         foreach ($values as $key => $value) {

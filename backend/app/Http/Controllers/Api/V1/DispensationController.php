@@ -248,6 +248,11 @@ class DispensationController extends Controller
             'origin_type' => ['nullable', Rule::in([StockOriginService::TYPE_PROJECT, StockOriginService::TYPE_OTHER])],
             'origin_project_id' => ['nullable', 'uuid', 'required_if:origin_type,'.StockOriginService::TYPE_PROJECT],
             'origin_label' => ['nullable', 'string', 'max:190'],
+            // Entête Patient : complété ci-dessous depuis l'ordonnance et le dossier.
+            'prescription_number' => ['nullable', 'string', 'max:80'],
+            'prescriber_name' => ['nullable', 'string', 'max:190'],
+            'patient_age_years' => ['nullable', 'integer', 'min:0', 'max:130'],
+            'patient_sex' => ['nullable', Rule::in(['female', 'male', 'other'])],
         ], ['origin_project_id.required_if' => 'Choisissez le couple ONG/Bailleur.', 'patient_id.required_if' => 'Choisissez le patient.', 'destination_name.required_if' => 'Indiquez le service hospitalier.',
             'items.*.batch_id.required_if' => 'Choisissez le lot périmé ou détérioré.'], StockOriginService::attributes());
         $site = $this->site($request, $organization, $data['site_id']);
@@ -261,6 +266,7 @@ class DispensationController extends Controller
         $patient = $forPatient ? $this->patientQuery($request, $organization)->where('is_active', true)->findOrFail($data['patient_id']) : null;
         abort_unless(! $patient || $patient->site_id === null || $patient->site_id === $site->id, 422, 'Le patient appartient à une autre formation sanitaire.');
         $prescription = ! $patient || empty($data['prescription_id']) ? null : Prescription::where('organization_id', $organization->id)->where('patient_id', $patient->id)->whereIn('status', Prescription::DISPENSABLE_STATUSES)->findOrFail($data['prescription_id']);
+        $data = [...$data, ...$this->patientHeader($data, $patient, $prescription)];
         $allowPartial = (bool) ($data['allow_partial'] ?? false);
         $attachmentFile = $request->file('attachment');
         $attachmentPath = $attachmentFile?->storeAs('private/dispensations', Str::uuid().'.'.$attachmentFile->extension());
@@ -330,6 +336,36 @@ class DispensationController extends Controller
         });
         $this->audit->record($request, 'dispensation.returned', $dispensation, [], ['reason' => $data['reason'], 'items' => $data['items']]);
         return response()->json(['dispensation' => $dispensation->fresh(['items.product', 'items.batch'])]);
+    }
+
+    /**
+     * Niveau 7 (décision du 09/10) — entête « Patient » d'une sortie : nom et
+     * prénom, âge, sexe, n° d'ordonnance, prescripteur, tous obligatoires.
+     * Saisis sur la sortie, sinon repris de l'ordonnance et du dossier patient.
+     */
+    private function patientHeader(array $data, ?Patient $patient, ?Prescription $prescription): array
+    {
+        if (! $patient) {
+            return ['prescription_number' => null, 'prescriber_name' => null, 'patient_age_years' => null, 'patient_sex' => null];
+        }
+        $header = [
+            'prescription_number' => trim((string) ($data['prescription_number'] ?? '')) ?: $prescription?->reference,
+            'prescriber_name' => trim((string) ($data['prescriber_name'] ?? '')) ?: $prescription?->prescriber_name,
+            'patient_age_years' => $data['patient_age_years'] ?? $patient->date_of_birth?->age,
+            'patient_sex' => $data['patient_sex'] ?? (in_array($patient->sex, ['female', 'male', 'other'], true) ? $patient->sex : null),
+        ];
+        $missing = array_filter([
+            'patient_id' => trim($patient->last_name.' '.$patient->first_name) === '' ? 'Indiquez le nom et le prénom du patient.' : null,
+            'patient_age_years' => $header['patient_age_years'] === null ? 'Indiquez l’âge du patient.' : null,
+            'patient_sex' => $header['patient_sex'] === null ? 'Indiquez le sexe du patient.' : null,
+            'prescription_number' => $header['prescription_number'] ? null : 'Indiquez le numéro de l’ordonnance.',
+            'prescriber_name' => $header['prescriber_name'] ? null : 'Indiquez le prescripteur.',
+        ]);
+        if ($missing) {
+            throw ValidationException::withMessages($missing);
+        }
+
+        return $header;
     }
 
     private function patientData(Request $request, Organization $organization, ?Patient $patient = null): array

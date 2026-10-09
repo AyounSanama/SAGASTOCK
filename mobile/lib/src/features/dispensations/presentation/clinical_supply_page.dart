@@ -453,8 +453,39 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
   static const _otherOrigin = 'other';
   String? _batchId;
   final _serviceName = TextEditingController();
+  // Entête Patient (décision du 09/10) : nom et prénom (dossier), âge, sexe,
+  // n° d'ordonnance et prescripteur, tous obligatoires.
+  final _age = TextEditingController();
+  String? _sex;
+  final _prescriptionNumber = TextEditingController();
+  final _prescriber = TextEditingController();
 
   bool get _forPatient => _destination == 'patient';
+
+  int? get _ageYears {
+    final value = int.tryParse(_age.text.trim());
+    return value == null || value < 0 || value > 130 ? null : value;
+  }
+
+  /// Âge et sexe repris du dossier du patient choisi (modifiables).
+  void _prefillFromPatient(String? patientId) {
+    final patient = (_options['patients'] ?? const [])
+        .where((value) => '${value['id']}' == patientId)
+        .firstOrNull;
+    if (patient == null) return;
+    final birth = DateTime.tryParse('${patient['date_of_birth'] ?? ''}');
+    if (birth != null) {
+      final now = DateTime.now();
+      var years = now.year - birth.year;
+      if (now.month < birth.month ||
+          (now.month == birth.month && now.day < birth.day)) {
+        years--;
+      }
+      _age.text = '$years';
+    }
+    final sex = '${patient['sex'] ?? ''}';
+    _sex = const {'female', 'male', 'other'}.contains(sex) ? sex : _sex;
+  }
 
   List<Map<String, dynamic>> get _origins => [
     for (final origin
@@ -497,6 +528,9 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
     _pages.dispose();
     _quantity.dispose();
     _serviceName.dispose();
+    _age.dispose();
+    _prescriptionNumber.dispose();
+    _prescriber.dispose();
     super.dispose();
   }
 
@@ -528,10 +562,15 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
     0 =>
       _siteId != null &&
           (_origins.isEmpty || _originProjectId != null) &&
-          (!_forPatient || _patientId != null) &&
+          (!_forPatient ||
+              (_patientId != null && _ageYears != null && _sex != null)) &&
           (_destination != 'hospital_service' ||
               _serviceName.text.trim().isNotEmpty),
-    1 => !_forPatient || _attachmentPath != null,
+    1 =>
+      !_forPatient ||
+          (_attachmentPath != null &&
+              _prescriptionNumber.text.trim().isNotEmpty &&
+              _prescriber.text.trim().isNotEmpty),
     2 => _items.isNotEmpty,
     _ => true,
   };
@@ -545,8 +584,9 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
     if (firstIncomplete != null) {
       _notice(switch (firstIncomplete) {
         0 =>
-          'Complétez la formation sanitaire, le couple ONG/Bailleur, la destination et le patient ou le service.',
-        1 => 'Photographiez ou sélectionnez l’ordonnance.',
+          'Complétez la formation sanitaire, le couple ONG/Bailleur, la destination et le patient (âge et sexe) ou le service.',
+        1 =>
+          'Photographiez l’ordonnance et indiquez son numéro et le prescripteur.',
         _ => 'Ajoutez au moins un produit à dispenser.',
       });
       await _pages.animateToPage(
@@ -605,6 +645,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
           'patients': [...?_options['patients'], localPatient],
         };
         _patientId = '${data['id']}';
+        _prefillFromPatient(_patientId);
       });
       _notice(
         'Patient conservé hors connexion. Vous pouvez poursuivre la dispensation.',
@@ -616,7 +657,10 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
       (patient) => patient['client_reference'] == data['client_reference'],
     );
     if (match != null && match.isNotEmpty && mounted) {
-      setState(() => _patientId = '${match.first['id']}');
+      setState(() {
+        _patientId = '${match.first['id']}';
+        _prefillFromPatient(_patientId);
+      });
     }
   }
 
@@ -681,7 +725,13 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
     try {
       final online = await widget.service.dispense(widget.organizationId, {
         'reference': 'DIS-${DateTime.now().millisecondsSinceEpoch}',
-        if (_forPatient) 'patient_id': _patientId,
+        if (_forPatient) ...{
+          'patient_id': _patientId,
+          'patient_age_years': _ageYears,
+          'patient_sex': _sex,
+          'prescription_number': _prescriptionNumber.text.trim(),
+          'prescriber_name': _prescriber.text.trim(),
+        },
         'site_id': _siteId,
         'destination_type': _destination,
         if (_destination == 'hospital_service')
@@ -885,13 +935,48 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
                 ),
               )
               .toList(),
-          onChanged: (value) => setState(() => _patientId = value),
+          onChanged: (value) => setState(() {
+            _patientId = value;
+            _prefillFromPatient(value);
+          }),
         ),
         const SizedBox(height: 14),
         AppButton.add(
           label: 'Nouveau patient',
           expanded: true,
           onPressed: _siteId == null ? null : _createPatient,
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _age,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Âge (années) *',
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                // Reconstruit quand le patient change (sexe repris du dossier).
+                key: ValueKey('sexe-$_patientId'),
+                isExpanded: true,
+                initialValue: _sex,
+                decoration: const InputDecoration(labelText: 'Sexe *'),
+                items: const [
+                  DropdownMenuItem(value: 'female', child: Text('Féminin')),
+                  DropdownMenuItem(value: 'male', child: Text('Masculin')),
+                  DropdownMenuItem(value: 'other', child: Text('Autre')),
+                ],
+                onChanged: (value) => setState(() => _sex = value),
+              ),
+            ),
+          ],
         ),
       ],
     ],
@@ -940,6 +1025,21 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
           ),
         ],
       ),
+      if (_forPatient) ...[
+        const SizedBox(height: 16),
+        TextField(
+          controller: _prescriptionNumber,
+          decoration: const InputDecoration(labelText: 'N° d’ordonnance *'),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _prescriber,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: 'Prescripteur *'),
+          onChanged: (_) => setState(() {}),
+        ),
+      ],
     ],
   );
 
@@ -1051,16 +1151,24 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
         subtitle: Text(
           patient.isEmpty
               ? '—'
-              : '${patient.first['last_name']} ${patient.first['first_name']}',
+              : [
+                  '${patient.first['last_name']} ${patient.first['first_name']}',
+                  if (_forPatient)
+                    '${_ageYears ?? '—'} ans · ${const {'female': 'Féminin', 'male': 'Masculin', 'other': 'Autre'}[_sex] ?? '—'}',
+                ].join('\n'),
         ),
       ),
       ListTile(
         leading: const Icon(Icons.description_outlined),
         title: const Text('Ordonnance'),
         subtitle: Text(
-          _attachmentPath == null
-              ? 'Aucune photo'
-              : _attachmentName ?? 'Photo enregistrée',
+          [
+            if (_forPatient)
+              'N° ${_prescriptionNumber.text.trim()} · ${_prescriber.text.trim()}',
+            _attachmentPath == null
+                ? 'Aucune photo'
+                : _attachmentName ?? 'Photo enregistrée',
+          ].join('\n'),
         ),
       ),
       ListTile(

@@ -26,8 +26,13 @@
 <label class="field">Site *<select name="site_id" required data-disp-site>@foreach($sites as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach</select></label>
 <label class="field">Couple ONG/Bailleur *<select name="origin_project_id" data-disp-origin>@foreach($originsBySite as $siteId => $origins)@foreach($origins as $origin)<option value="{{ $origin['project_id'] }}" data-site="{{ $siteId }}">{{ $origin['label'] }}</option>@endforeach @endforeach<option value="other">Autre (livré par un tiers)</option></select><input type="hidden" name="origin_type" value="project" data-disp-origin-type></label>
 <label class="field">Destination *<select name="destination_type" required data-disp-destination>@foreach(\App\Models\Dispensation::destinations() as $value => $label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select></label>
-<label class="field" data-for="patient">Patient *<select name="patient_id">@foreach($patients->where('is_active',true) as $p)<option value="{{ $p->id }}">{{ $p->last_name }} {{ $p->first_name }}</option>@endforeach</select></label>
-<label class="field" data-for="patient">Ordonnance<select name="prescription_id"><option value="">Sans ordonnance</option>@foreach($prescriptions->whereIn('status',\App\Models\Prescription::DISPENSABLE_STATUSES) as $rx)<option value="{{ $rx->id }}">{{ $rx->reference }} · {{ $rx->patient?->last_name }}</option>@endforeach</select></label>
+<label class="field" data-for="patient">Patient *<select name="patient_id" data-disp-patient>@foreach($patients->where('is_active',true) as $p)<option value="{{ $p->id }}" data-age="{{ $p->date_of_birth?->age }}" data-sex="{{ in_array($p->sex, ['female','male','other'], true) ? $p->sex : '' }}">{{ $p->last_name }} {{ $p->first_name }}</option>@endforeach</select></label>
+<label class="field" data-for="patient">Ordonnance<select name="prescription_id" data-disp-prescription><option value="">Sans ordonnance</option>@foreach($prescriptions->whereIn('status',\App\Models\Prescription::DISPENSABLE_STATUSES) as $rx)<option value="{{ $rx->id }}" data-number="{{ $rx->reference }}" data-prescriber="{{ $rx->prescriber_name }}">{{ $rx->reference }} · {{ $rx->patient?->last_name }}</option>@endforeach</select></label>
+{{-- Entête Patient (décision du 09/10) : 5 champs obligatoires, contrôlés par le serveur. --}}
+<label class="field" data-for="patient">Âge (années) *<input type="number" min="0" max="130" name="patient_age_years" data-disp-age></label>
+<label class="field" data-for="patient">Sexe *<select name="patient_sex" data-disp-sex><option value="">Choisir</option><option value="female">Féminin</option><option value="male">Masculin</option><option value="other">Autre</option></select></label>
+<label class="field" data-for="patient">N° d’ordonnance *<input name="prescription_number" maxlength="80" data-disp-number></label>
+<label class="field" data-for="patient">Prescripteur *<input name="prescriber_name" maxlength="190" data-disp-prescriber></label>
 <label class="field" data-for="hospital_service">Service hospitalier *<input name="destination_name" placeholder="Ex. Maternité, Pédiatrie"></label>
 <label class="field">Référence *<input name="reference" value="DIS-{{ now()->format('YmdHis') }}" required></label>
 <label class="field">Date et heure<input type="datetime-local" name="dispensed_at" value="{{ now()->format('Y-m-d\TH:i') }}" readonly required></label>
@@ -54,6 +59,13 @@ document.addEventListener('DOMContentLoaded', () => {
         show(batch, 'data-site', (option) => option.dataset.site === site.value && option.dataset.product === product.value && (noCouple || (origin.value === 'other' ? option.dataset.originType === 'other' : option.dataset.originType !== 'other' && (!option.dataset.origin || option.dataset.origin === origin.value))));
     };
     [site, origin, destination, product].forEach((select) => select.addEventListener('change', refresh));
+    // Entête Patient : âge et sexe repris du dossier, n° et prescripteur de l'ordonnance choisie.
+    const patient = form.querySelector('[data-disp-patient]'), prescription = form.querySelector('[data-disp-prescription]');
+    const fill = (selector, value) => { const input = form.querySelector(selector); if (value) input.value = value; };
+    const fromPatient = () => { const option = patient.selectedOptions[0]; if (!option) return; fill('[data-disp-age]', option.dataset.age); fill('[data-disp-sex]', option.dataset.sex); };
+    const fromPrescription = () => { const option = prescription.selectedOptions[0]; if (!option?.value) return; fill('[data-disp-number]', option.dataset.number); fill('[data-disp-prescriber]', option.dataset.prescriber); };
+    patient?.addEventListener('change', fromPatient); prescription?.addEventListener('change', fromPrescription);
+    fromPatient();
     // « Autre » : stock livré par un tiers, sans projet.
     form.addEventListener('submit', () => { if (!origin.disabled && origin.value === 'other') { form.querySelector('[data-disp-origin-type]').value = 'other'; origin.disabled = true; } });
     refresh();

@@ -75,7 +75,13 @@ void main() {
     expect(source, contains("labelText: 'Destination *'"));
     expect(source, contains("'destination_type': _destination"));
     // Patient et photo d'ordonnance seulement pour la destination « Patient ».
-    expect(source, contains("1 => !_forPatient || _attachmentPath != null"));
+    expect(source, contains("!_forPatient ||\n          (_attachmentPath != null &&"));
+    // Entête Patient (décision du 09/10) : âge, sexe, n° d'ordonnance, prescripteur.
+    expect(source, contains("labelText: 'Âge (années) *'"));
+    expect(source, contains("labelText: 'Sexe *'"));
+    expect(source, contains("labelText: 'N° d’ordonnance *'"));
+    expect(source, contains("labelText: 'Prescripteur *'"));
+    expect(source, contains("'patient_age_years': _ageYears"));
     expect(source, contains("labelText: 'Lot périmé ou détérioré *'"));
     expect(source, contains("labelText: 'Service hospitalier *'"));
   });

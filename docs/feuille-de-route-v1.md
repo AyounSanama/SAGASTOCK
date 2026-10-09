@@ -11,10 +11,10 @@ Adoptée le 02/10/2026. **Remplace le plan précédent** (`ameliorations/07-audi
 | 4 | Mode clair / sombre (3 bis) | **Livré le 07/10, à valider** (palette validée le 06/10 ; Web et mobile ; contrastes testés dans les deux modes) |
 | 5 | Écrans Admin Projet (c2 / c3) | **Livré le 06/10, à valider** (Web et mobile ; mobile compilé et testé en local le 07/10) |
 | 6 | Listes Standard (f) | **Livré le 07/10, à valider** (Web et mobile ; « Article hors liste » reporté au niveau 7, car il dépend du champ « Origine ») |
-| 7 | Stock et dispensation FOSA (g) | À faire |
+| 7 | Stock et dispensation FOSA (g) | **En cours** (faits : Origine sur entrées et dispensation, Utilisateur Site sur entrées et inventaires, destinations, FEFO ; tests Android des 6 comptes le 09/10) |
 | 8 | Capture par téléphone | À faire |
 | 9 | Analyses de base (h) | À faire |
-| 10 | Hors ligne et chiffrement (d) | À faire |
+| 10 | Hors ligne et chiffrement (d) | **Commencé le 09/10** (écran Synchronisation du téléphone : refusés réessayer / abandonner ; supervision Web et mobile) |
 | 11 | Tests finaux et recette V1 (e) | À faire |
 | 12 | Préparation du déploiement | À faire |
 
@@ -97,7 +97,7 @@ Réception : 100 % de conformité aux maquettes Admin Projet, dans les deux mode
 - Date de l'ordonnance bloquée sur la date du jour.
 - Statut « validation non requise (V1) » pour les ordonnances.
 - Restriction : jamais plus que le stock disponible, jamais de lot périmé, règle FEFO.
-- DÉCISION NÉCESSAIRE : champs obligatoires de l'entête Patient (4 ou 5).
+- Entête Patient (décidé le 09/10) : 5 champs obligatoires — nom et prénom, âge, sexe, n° d'ordonnance, prescripteur ; téléphone et service facultatifs.
 - Policies : patients et ordonnances.
 
 ## Niveau 8 — Capture par téléphone

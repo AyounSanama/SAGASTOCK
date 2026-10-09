@@ -45,7 +45,7 @@ class DispensationManagementTest extends TestCase
 
     private function patient(array $c): array
     {
-        return $this->postJson("/api/v1/organizations/{$c['organization']->id}/patients", ['code' => 'P001', 'first_name' => 'Marie', 'last_name' => 'Test', 'sex' => 'female', 'allergies' => 'Pénicilline'])->assertCreated()->json('patient');
+        return $this->postJson("/api/v1/organizations/{$c['organization']->id}/patients", ['code' => 'P001', 'first_name' => 'Marie', 'last_name' => 'Test', 'sex' => 'female', 'date_of_birth' => '1990-05-01', 'allergies' => 'Pénicilline'])->assertCreated()->json('patient');
     }
 
     private function prescription(array $c, array $patient, string $reference = 'ORD001', float $quantity = 8): array
