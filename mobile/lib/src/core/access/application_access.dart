@@ -231,6 +231,8 @@ abstract final class ApplicationAccess {
         '/standard-lists',
         // Niveau 6 : sa Liste Standard (sans cette entrée, renvoi à l'accueil).
         '/coordination/standard-list',
+        // Supervision de la synchronisation (comme sur le Web).
+        '/synchronization',
         '/notifications',
         '/profile',
       },
@@ -240,6 +242,7 @@ abstract final class ApplicationAccess {
         '/health-facilities',
         '/users',
         '/standard-lists',
+        '/synchronization',
         '/notifications',
         '/profile',
       },
@@ -287,6 +290,7 @@ abstract final class ApplicationAccess {
               'missions',
               'funding',
               'standard-lists',
+              'synchronization',
               'profile',
             ])
               ...[...baseSource, ..._fallbackManifest]
@@ -311,6 +315,7 @@ abstract final class ApplicationAccess {
         'missions',
         'funding',
         'standard-lists',
+        'synchronization',
         'profile',
       },
       'project_admin' => const {
@@ -319,6 +324,7 @@ abstract final class ApplicationAccess {
         'facilities',
         'users',
         'standard-lists',
+        'synchronization',
         'profile',
       },
       _ => null,

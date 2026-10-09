@@ -24,6 +24,7 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DispensationController;
 use App\Http\Controllers\Web\InventoryController;
 use App\Http\Controllers\Web\SupplyOrderController;
+use App\Http\Controllers\Web\SyncSupervisionController;
 use App\Http\Controllers\Web\UserController as WebUserController;
 use Illuminate\Support\Facades\Route;
 
@@ -155,7 +156,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/inventories', [InventoryController::class, 'index'])->middleware('permission:inventories.view')->name('modules.inventories');
     Route::get('/orders', [SupplyOrderController::class, 'index'])->middleware('permission:orders.view')->name('modules.orders');
     Route::get('/reports', [ModulePlaceholderController::class, 'show'])->defaults('module', 'reports')->middleware('permission:reports.view')->name('modules.reports');
-    Route::get('/synchronization', [ModulePlaceholderController::class, 'show'])->defaults('module', 'synchronization')->middleware('permission:synchronization.view')->name('modules.synchronization');
+    Route::get('/synchronization', [SyncSupervisionController::class, 'index'])->middleware('permission:synchronization.view')->name('modules.synchronization');
     Route::get('/settings', [ModulePlaceholderController::class, 'show'])->defaults('module', 'settings')->middleware('permission:settings.view')->name('modules.settings');
     Route::get('/project-settings', [ModulePlaceholderController::class, 'show'])->defaults('module', 'project-settings')->middleware('permission:project_settings.view')->name('modules.project-settings');
     Route::get('/site-settings', [ModulePlaceholderController::class, 'show'])->defaults('module', 'site-settings')->middleware('permission:site_settings.view')->name('modules.site-settings');

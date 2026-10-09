@@ -26,6 +26,8 @@ class LegacyOutboxMigrator {
     'offline_clinical_outbox_v2': 'clinical',
     'offline_inventory_outbox': 'inventories',
     'offline_order_outbox': 'orders',
+    // Ancienne file propre aux réceptions, reprise par la file commune.
+    'offline_receipt_outbox': 'receipts',
   };
 
   Future<int> migrate() async {

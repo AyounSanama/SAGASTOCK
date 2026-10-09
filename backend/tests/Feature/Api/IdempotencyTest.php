@@ -41,6 +41,31 @@ class IdempotencyTest extends TestCase
             ->assertConflict();
     }
 
+    public function test_refused_operation_is_reexamined_when_the_phone_retries(): void
+    {
+        $frozen = true;
+        $calls = 0;
+        Route::post('/api/v1/test-idempotency-retry', function () use (&$frozen, &$calls) {
+            $calls++;
+            abort_if($frozen, 423, 'Le stock de ce site est gelé par un inventaire en cours.');
+
+            return response()->json(['calls' => $calls], 201);
+        })->middleware(['auth:sanctum', 'idempotency']);
+
+        Sanctum::actingAs(User::factory()->create());
+        $key = '5d6f0a66-7a62-4cb1-999c-81435c806999';
+
+        $this->postJson('/api/v1/test-idempotency-retry', [], ['Idempotency-Key' => $key])->assertStatus(423);
+        $frozen = false;
+        $this->postJson('/api/v1/test-idempotency-retry', [], ['Idempotency-Key' => $key])->assertCreated();
+        // Réussite enregistrée : un nouvel envoi est rejoué, sans doublon.
+        $this->postJson('/api/v1/test-idempotency-retry', [], ['Idempotency-Key' => $key])
+            ->assertCreated()->assertHeader('Idempotency-Replayed', 'true');
+
+        $this->assertSame(2, $calls);
+        $this->assertDatabaseHas('api_idempotency_keys', ['key' => $key, 'response_status' => 201]);
+    }
+
     public function test_cached_response_is_rejected_after_authorization_context_changes(): void
     {
         Route::post('/api/v1/test-idempotency-scope', fn () => response()->json(['private' => true]))

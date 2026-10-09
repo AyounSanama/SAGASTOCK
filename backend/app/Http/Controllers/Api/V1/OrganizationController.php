@@ -30,6 +30,13 @@ class OrganizationController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        // Les écrans de FOSA (stocks, réceptions…) des comptes Site lisent leur
+        // organisation ici ; les autres rôles gardent organizations.view.
+        abort_unless(
+            $request->user()->hasPermission('organizations.view')
+                || $this->scopes->directSiteIds($request->user())->isNotEmpty(),
+            403,
+        );
         $organizations = $this->scopes->organizations($request->user())
             ->withCount('missions')
             ->when($request->string('search')->toString(), fn ($query, $search) => $query

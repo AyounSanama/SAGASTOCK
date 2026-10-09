@@ -45,6 +45,23 @@ class EnsureIdempotentApiRequest
                 'Cette clé d’idempotence ne correspond plus à la requête ou au périmètre autorisé.'
             );
 
+            // Refus précédent (stock gelé, règle non remplie…) : rien n'a été
+            // créé, la même opération est donc réexaminée quand le téléphone
+            // réessaie. Une réussite, elle, est rejouée pour éviter tout doublon.
+            if ($stored->response_status >= 400) {
+                $response = $next($request);
+                if ($response->getStatusCode() < 500) {
+                    $stored->update([
+                        'response_status' => $response->getStatusCode(),
+                        'response_body' => $response->getContent(),
+                        'content_type' => $response->headers->get('Content-Type'),
+                        'expires_at' => now()->addDays(30),
+                    ]);
+                }
+
+                return $response;
+            }
+
             return response(
                 $stored->response_body,
                 $stored->response_status,

@@ -56,7 +56,7 @@ class V1AdminProjectStructureAndMaskingTest extends TestCase
     {
         $admin = $this->actor('project_admin', 'project', $this->project->id);
         $menu = collect(app(ApplicationNavigationService::class)->items($admin))->where('menu', true);
-        $this->assertSame(['Tableau de bord', 'Projet & FOSA', 'Liste standard', 'Mon profil'], $menu->pluck('label')->values()->all());
+        $this->assertSame(['Tableau de bord', 'Projet & FOSA', 'Liste standard', 'Synchronisation', 'Mon profil'], $menu->pluck('label')->values()->all());
 
         // Niveau 5 (maquette AdminProjet 02) : onglets FOSA, Comptes utilisateurs, Paramètres d'approvisionnement.
         $this->actingAs($admin)->get('/health-facilities')->assertOk()

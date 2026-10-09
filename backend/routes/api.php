@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\ConfigurationWorkflowController;
 use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DeviceController;
+use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\DispensationController;
 use App\Http\Controllers\Api\V1\EffectiveConfigurationController;
 use App\Http\Controllers\Api\V1\FundingController;
@@ -160,6 +161,9 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/auth/password', [PasswordController::class, 'update']);
         Route::get('/auth/devices', [DeviceController::class, 'index']);
         Route::delete('/auth/devices/{device}', [DeviceController::class, 'revoke']);
+        // Synchronisation : état déclaré par le téléphone, supervision en lecture.
+        Route::post('/sync/report', [SyncController::class, 'report'])->middleware('permission:synchronization.view');
+        Route::get('/sync/supervision', [SyncController::class, 'supervision'])->middleware('permission:synchronization.view');
         Route::get('/roles', [UserController::class, 'roles'])->middleware('permission:users.view');
         Route::get('/assignable-roles', [UserController::class, 'assignableRoles']);
         Route::get('/security/roles', [RoleController::class, 'index'])->middleware('permission:roles.manage');
@@ -176,9 +180,9 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:users.manage|users.update_site_admin');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.manage|users.suspend_site_admin');
         Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->middleware('permission:users.manage|users.update_site_admin');
-        // Lecture limitée au périmètre du compte : aussi pour les comptes FOSA, dont
-        // tous les écrans (stocks, entrées, dispensation…) en ont besoin.
-        Route::get('/organizations', [OrganizationController::class, 'index'])->middleware('permission:organizations.view|stocks.view|receipts.view|dispensing.view|inventories.view|orders.view|catalog.view');
+        // Lecture limitée au périmètre : organizations.view, ou compte de FOSA (contrôle
+        // dans le contrôleur), dont tous les écrans (stocks, entrées…) en ont besoin.
+        Route::get('/organizations', [OrganizationController::class, 'index']);
         Route::get('/organizations/archived', [OrganizationController::class, 'archived'])->middleware('permission:organizations.view');
         Route::post('/organizations/archived/{organization}/restore', [OrganizationController::class, 'restore'])->middleware('permission:organizations.manage');
         Route::get('/organizations/{organization}', [OrganizationController::class, 'show'])->middleware('permission:organizations.view');

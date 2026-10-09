@@ -4,13 +4,16 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/sync/offline_operation_service.dart';
 
 class ReceiptService {
-  ReceiptService({ApiClient? client}) : _client = client ?? ApiClient();
+  ReceiptService({ApiClient? client}) : _client = client ?? ApiClient() {
+    _operations = OfflineOperationService(client: _client);
+  }
 
   final ApiClient _client;
+  late final OfflineOperationService _operations;
   final _storage = const FlutterSecureStorage();
-  static const _outboxKey = 'offline_receipt_outbox';
 
   Future<Options> _authorized() async => Options(
     headers: {
@@ -23,7 +26,7 @@ class ReceiptService {
   }
 
   Future<List<Map<String, dynamic>>> list(String organizationId) async {
-    await syncOutbox();
+    await _operations.synchronize();
     return _cachedList(
       '/organizations/$organizationId/receipts',
       'offline_receipts_$organizationId',
@@ -50,30 +53,18 @@ class ReceiptService {
     }
   }
 
+  /// Envoi immédiat, sinon file hors connexion commune (visible dans
+  /// Synchronisation, où un refus du serveur peut être réessayé ou abandonné).
   Future<bool> create(
     String organizationId, {
     required Map<String, dynamic> data,
-  }) async {
-    final path = '/organizations/$organizationId/receipts';
-    try {
-      await _client.dio.post<Map<String, dynamic>>(
-        path,
-        data: data,
-        options: await _authorized(),
-      );
-      return true;
-    } on DioException catch (error) {
-      if (error.response != null) rethrow;
-      final pending = await _readOutbox();
-      pending.add({
-        'path': path,
-        'data': data,
-        'queued_at': DateTime.now().toIso8601String(),
-      });
-      await _storage.write(key: _outboxKey, value: jsonEncode(pending));
-      return false;
-    }
-  }
+  }) => _operations.execute(
+    method: 'post',
+    endpoint: '/organizations/$organizationId/receipts',
+    payload: data,
+    entityType: 'receipts',
+    organizationId: organizationId,
+  );
 
   Future<void> validate(String organizationId, String receiptId) async {
     await _client.dio.post<void>(
@@ -82,41 +73,7 @@ class ReceiptService {
     );
   }
 
-  Future<int> pendingCount() async => (await _readOutbox()).length;
-
-  /// Synchronisation en cours, partagée : deux écrans ne renvoient jamais la
-  /// même réception en parallèle.
-  static Future<void>? _syncing;
-
-  Future<void> syncOutbox() =>
-      _syncing ??= _syncOutbox().whenComplete(() => _syncing = null);
-
-  Future<void> _syncOutbox() async {
-    final pending = await _readOutbox();
-    if (pending.isEmpty) return;
-    final remaining = <Map<String, dynamic>>[];
-    for (final item in pending) {
-      try {
-        await _client.dio.post<void>(
-          item['path'] as String,
-          data: item['data'],
-          options: await _authorized(),
-        );
-      } on DioException catch (error) {
-        // Référence déjà connue du serveur : la réception a été reçue lors
-        // d'un envoi précédent dont la réponse s'est perdue.
-        final errors = error.response?.data is Map
-            ? (error.response!.data as Map)['errors']
-            : null;
-        final alreadySent = error.response?.statusCode == 422 &&
-            errors is Map &&
-            errors.length == 1 &&
-            errors.containsKey('reference');
-        if (!alreadySent) remaining.add(item);
-      }
-    }
-    await _storage.write(key: _outboxKey, value: jsonEncode(remaining));
-  }
+  Future<int> pendingCount() => _operations.pendingCount(entityType: 'receipts');
 
   Future<List<Map<String, dynamic>>> _cachedList(
     String path,
@@ -149,10 +106,4 @@ class ReceiptService {
     'products': (data['products'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>(),
   };
-
-  Future<List<Map<String, dynamic>>> _readOutbox() async {
-    final value = await _storage.read(key: _outboxKey);
-    return (value == null ? <dynamic>[] : jsonDecode(value) as List)
-        .cast<Map<String, dynamic>>();
-  }
 }

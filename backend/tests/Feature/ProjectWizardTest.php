@@ -47,7 +47,7 @@ class ProjectWizardTest extends TestCase
         $menu = collect(app(ApplicationNavigationService::class)->items($this->coordination))
             ->filter(fn (array $item) => $item['menu'] && $item['key'] !== 'profile');
 
-        $this->assertSame(['Tableau de bord', 'Ma Coordination', 'Référentiels', 'Liste Standard'], $menu->pluck('label')->values()->all());
+        $this->assertSame(['Tableau de bord', 'Ma Coordination', 'Référentiels', 'Liste Standard', 'Synchronisation'], $menu->pluck('label')->values()->all());
         // Masqué du menu, pas supprimé : la route reste ouverte.
         $this->actingAs($this->coordination)->get('/projects')->assertOk();
 

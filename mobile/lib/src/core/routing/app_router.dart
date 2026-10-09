@@ -28,6 +28,7 @@ import '../../features/reports/presentation/operational_reports_page.dart';
 import '../../features/orders/presentation/orders_page.dart';
 import '../../features/stocks/presentation/stocks_page.dart';
 import '../../features/stocks/presentation/batches_page.dart';
+import '../../features/synchronization/presentation/synchronization_entry.dart';
 import '../../features/structures/presentation/facilities_page.dart';
 import '../../features/structures/presentation/scoped_facilities_page.dart';
 import '../../features/structures/presentation/scoped_sites_page.dart';
@@ -244,8 +245,11 @@ GoRouter createAppRouter({required String initialLocation}) => GoRouter(
             other: StandardListEntryPage(),
           ),
         ),
+        GoRoute(
+          path: '/synchronization',
+          builder: (context, state) => const SynchronizationEntry(),
+        ),
         for (final module in const <(String, String, IconData)>[
-          ('/synchronization', 'Synchronisation', Icons.sync_outlined),
           ('/settings', 'Paramètres organisation', Icons.settings_outlined),
           ('/project-settings', 'Paramètres du projet', Icons.tune_outlined),
           ('/site-settings', 'Paramètres du site', Icons.tune_outlined),

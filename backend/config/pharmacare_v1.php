@@ -15,24 +15,26 @@ return [
         'legacy_project_form' => false,
     ],
     'navigation' => [
-        'coordination_admin' => ['dashboard', 'missions', 'projects', 'referentials', 'standard-lists', 'profile'],
-        'project_admin' => ['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'profile'],
+        'coordination_admin' => ['dashboard', 'missions', 'projects', 'referentials', 'standard-lists', 'synchronization', 'profile'],
+        'project_admin' => ['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'synchronization', 'profile'],
     ],
     // Entrées affichées dans le menu latéral (les autres restent accessibles
     // par onglets ; le manifeste mobile les conserve pour la navigation).
     'menu' => [
         // Niveau 2 : « Configuration des projets » quitte le menu (création et
         // ouverture depuis « Ma Coordination »).
-        'coordination_admin' => ['dashboard', 'missions', 'referentials', 'standard-lists', 'profile'],
-        'project_admin' => ['dashboard', 'projects', 'standard-lists', 'profile'],
+        'coordination_admin' => ['dashboard', 'missions', 'referentials', 'standard-lists', 'synchronization', 'profile'],
+        'project_admin' => ['dashboard', 'projects', 'standard-lists', 'synchronization', 'profile'],
     ],
     'web_paths' => [
-        'coordination_admin' => ['dashboard', 'missions', 'coordination', 'projects', 'funding', 'standard-lists', 'profile'],
-        'project_admin' => ['dashboard', 'projects', 'health-facilities', 'users', 'standard-lists', 'profile'],
+        'coordination_admin' => ['dashboard', 'missions', 'coordination', 'projects', 'funding', 'standard-lists', 'synchronization', 'profile'],
+        'project_admin' => ['dashboard', 'projects', 'health-facilities', 'users', 'standard-lists', 'synchronization', 'profile'],
     ],
     'api_patterns' => [
         'coordination_admin' => [
             '#^api/v1/(?:auth|me|profile|navigation|dashboard)(?:/|$)#',
+            // Supervision de la synchronisation et état déclaré par le téléphone.
+            '#^api/v1/sync(?:/|$)#',
             '#^api/v1/organizations/?$#',
             '#^api/v1/organizations/[^/]+/?$#',
             '#^api/v1/organizations/[^/]+/missions(?:/|$)#',
@@ -49,6 +51,8 @@ return [
             '#^api/v1/(?:auth|me|profile|navigation|dashboard)(?:/|$)#',
             // Niveau 5 : espace Admin Projet (tableau de bord, FOSA, Liste Standard).
             '#^api/v1/project-admin(?:/|$)#',
+            // Supervision de la synchronisation et état déclaré par le téléphone.
+            '#^api/v1/sync(?:/|$)#',
             '#^api/v1/organizations/?$#',
             '#^api/v1/organizations/[^/]+/?$#',
             '#^api/v1/projects(?:/|$)#',

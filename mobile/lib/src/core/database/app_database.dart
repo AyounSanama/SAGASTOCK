@@ -386,6 +386,54 @@ class AppDatabase extends _$AppDatabase {
   Future<int> pendingOperationCount(String ownerUserId, {String? entityType}) =>
       watchPendingOperationCount(ownerUserId, entityType: entityType).first;
 
+  /// Envois refusés par le serveur ou en conflit : conservés sur le téléphone
+  /// jusqu'à ce que l'utilisateur réessaie, abandonne ou prenne acte.
+  static const issueStatuses = ['failed', 'conflict', 'conflict_reported'];
+
+  Future<List<OfflineOperation>> issueOperations(String ownerUserId) =>
+      (select(offlineOperations)
+            ..where(
+              (row) =>
+                  row.ownerUserId.equals(ownerUserId) &
+                  row.status.isIn(issueStatuses),
+            )
+            ..orderBy([(row) => OrderingTerm.desc(row.updatedAt)]))
+          .get();
+
+  /// Opérations en attente d'envoi, par type (réceptions, inventaires…).
+  Future<Map<String, int>> pendingCountsByEntity(String ownerUserId) async {
+    final rows =
+        await (select(offlineOperations)..where(
+              (row) =>
+                  row.ownerUserId.equals(ownerUserId) &
+                  row.status.isIn(const ['pending', 'retry', 'syncing']),
+            ))
+            .get();
+    final counts = <String, int>{};
+    for (final row in rows) {
+      counts[row.entityType] = (counts[row.entityType] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Change le statut d'une opération sans jamais effacer sa saisie :
+  /// `pending` (réessayer), `abandoned`, `conflict_reported`, `archived`.
+  Future<void> setOperationStatus(
+    String operationId,
+    String status, {
+    bool retry = false,
+  }) =>
+      (update(
+        offlineOperations,
+      )..where((row) => row.operationId.equals(operationId))).write(
+        OfflineOperationsCompanion(
+          status: Value(status),
+          attemptCount: retry ? const Value(0) : const Value.absent(),
+          nextAttemptAt: retry ? const Value(null) : const Value.absent(),
+          updatedAt: Value(DateTime.now().toUtc()),
+        ),
+      );
+
   Future<void> clearIdentityData(String ownerUserId) async {
     await transaction(() async {
       await (delete(

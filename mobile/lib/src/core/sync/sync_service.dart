@@ -10,6 +10,7 @@ import '../connectivity/connectivity_service.dart';
 import '../database/app_database.dart';
 import '../network/api_client.dart';
 import 'offline_request_data.dart';
+import 'sync_status_service.dart';
 
 typedef OperationSender =
     Future<Map<String, dynamic>?> Function(OfflineOperation operation);
@@ -101,6 +102,7 @@ class SyncService {
     var failed = 0;
     var conflicts = 0;
     var authenticationRequired = false;
+    var networkLost = false;
     try {
       final operations = await database.pendingOperations(
         ownerUserId: ownerUserId,
@@ -130,11 +132,31 @@ class SyncService {
           final result = await _handleDioFailure(operation, error);
           failed++;
           if (result == 'conflict') conflicts++;
-          if (error.response == null) break;
+          if (error.response == null) {
+            networkLost = true;
+            break;
+          }
         } catch (error) {
           await _scheduleRetry(operation, error.toString());
           failed++;
         }
+      }
+      // Passage complet avec le serveur (même si des envois sont refusés) :
+      // c'est la « dernière synchronisation réussie » de l'écran et de la
+      // supervision.
+      // Envoyeur injecté (tests) : ni horodatage ni déclaration au serveur.
+      if (_sender == null && !networkLost && !authenticationRequired) {
+        await SyncStatusService.recordSuccess(ownerUserId, storage: _storage);
+      }
+      if (_sender == null && !authenticationRequired) {
+        unawaited(
+          SyncStatusService(
+            database: database,
+            ownerUserId: ownerUserId,
+            client: _client,
+            storage: _storage,
+          ).reportQuietly(),
+        );
       }
       return SyncReport(
         processed: processed,
@@ -208,13 +230,32 @@ class SyncService {
     return value;
   }
 
+  /// Première erreur de validation, sinon message du serveur (300 caractères).
+  static String? serverReason(Object? data) {
+    String? reason;
+    if (data is Map) {
+      final errors = data['errors'];
+      if (errors is Map && errors.isNotEmpty) {
+        final first = errors.values.first;
+        reason = first is List && first.isNotEmpty ? '${first.first}' : '$first';
+      } else if (data['message'] != null) {
+        reason = '${data['message']}';
+      }
+    }
+    if (reason == null || reason.trim().isEmpty) return null;
+    reason = reason.trim();
+    return reason.length > 300 ? '${reason.substring(0, 297)}…' : reason;
+  }
+
   Future<String> _handleDioFailure(
     OfflineOperation operation,
     DioException error,
   ) async {
     final statusCode = error.response?.statusCode;
+    // Motif lisible du serveur (affiché dans Synchronisation), pas la réponse
+    // brute.
     final message =
-        error.response?.data?.toString() ??
+        serverReason(error.response?.data) ??
         error.message ??
         'Erreur de synchronisation inconnue';
     if (statusCode == 409) {

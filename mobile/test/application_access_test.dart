@@ -201,6 +201,19 @@ void main() {
       'Liste Standard',
       'Mon profil',
     ]);
+    // Supervision de la synchronisation : même entrée que le menu Web.
+    final withSync = ApplicationAccess.navigation({
+      ...coordination,
+      'permissions': [
+        ...coordination['permissions'] as List,
+        'synchronization.view',
+      ],
+    });
+    expect(withSync.map((item) => item.label), contains('Synchronisation'));
+    expect(
+      ApplicationAccess.moduleAvailable(coordination, '/synchronization'),
+      isTrue,
+    );
     expect(ApplicationAccess.moduleAvailable(coordination, '/stocks'), isFalse);
     expect(
       ApplicationAccess.moduleAvailable(coordination, '/projects/42'),

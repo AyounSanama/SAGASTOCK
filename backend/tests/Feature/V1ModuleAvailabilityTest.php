@@ -27,28 +27,28 @@ class V1ModuleAvailabilityTest extends TestCase
         $project = $this->actor('project_admin', 'project');
 
         $coordinationItems = collect($navigation->items($coordination));
-        $this->assertSame(['dashboard', 'missions', 'projects', 'referentials', 'standard-lists', 'profile'], $coordinationItems->pluck('key')->all());
-        $this->assertSame(['Tableau de bord', 'Ma Coordination', 'Configuration des projets', 'Référentiels', 'Liste Standard', 'Mon profil'], $coordinationItems->pluck('label')->all());
+        $this->assertSame(['dashboard', 'missions', 'projects', 'referentials', 'standard-lists', 'synchronization', 'profile'], $coordinationItems->pluck('key')->all());
+        $this->assertSame(['Tableau de bord', 'Ma Coordination', 'Configuration des projets', 'Référentiels', 'Liste Standard', 'Synchronisation', 'Mon profil'], $coordinationItems->pluck('label')->all());
         $this->assertSame('/projects', $coordinationItems->firstWhere('key', 'projects')['path']);
         // Niveau 2 : « Configuration des projets » quitte le menu (route conservée).
-        $this->assertSame(['dashboard', 'missions', 'referentials', 'standard-lists', 'profile'], $coordinationItems->where('menu', true)->pluck('key')->values()->all());
+        $this->assertSame(['dashboard', 'missions', 'referentials', 'standard-lists', 'synchronization', 'profile'], $coordinationItems->where('menu', true)->pluck('key')->values()->all());
 
         $projectItems = collect($navigation->items($project));
-        $this->assertSame(['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'profile'], $projectItems->pluck('key')->all());
-        $this->assertSame(['Tableau de bord', 'Projet & FOSA', 'FOSA', 'Équipe FOSA', 'Liste standard', 'Mon profil'], $projectItems->pluck('label')->all());
+        $this->assertSame(['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'synchronization', 'profile'], $projectItems->pluck('key')->all());
+        $this->assertSame(['Tableau de bord', 'Projet & FOSA', 'FOSA', 'Équipe FOSA', 'Liste standard', 'Synchronisation', 'Mon profil'], $projectItems->pluck('label')->all());
         // Menu V1 (Q-3) : 4 entrées ; FOSA et Comptes deviennent des onglets de « Projet & FOSA ».
-        $this->assertSame(['dashboard', 'projects', 'standard-lists', 'profile'], $projectItems->where('menu', true)->pluck('key')->values()->all());
+        $this->assertSame(['dashboard', 'projects', 'standard-lists', 'synchronization', 'profile'], $projectItems->where('menu', true)->pluck('key')->values()->all());
     }
 
     public function test_hidden_v1_modules_are_refused_without_being_removed(): void
     {
         $coordination = $this->actor('coordination_admin', 'mission');
-        foreach (['/health-facilities', '/dispensing-sites', '/users', '/products', '/stocks', '/receipts', '/dispensations', '/inventories', '/orders', '/reports', '/synchronization'] as $path) {
+        foreach (['/health-facilities', '/dispensing-sites', '/users', '/products', '/stocks', '/receipts', '/dispensations', '/inventories', '/orders', '/reports'] as $path) {
             $this->actingAs($coordination)->get($path)->assertForbidden();
         }
 
         $project = $this->actor('project_admin', 'project');
-        foreach (['/missions', '/products', '/stocks', '/receipts', '/dispensations', '/inventories', '/orders', '/reports', '/synchronization'] as $path) {
+        foreach (['/missions', '/products', '/stocks', '/receipts', '/dispensations', '/inventories', '/orders', '/reports'] as $path) {
             $this->actingAs($project)->get($path)->assertForbidden();
         }
 

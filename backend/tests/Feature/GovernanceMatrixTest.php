@@ -189,20 +189,20 @@ class GovernanceMatrixTest extends TestCase
         $coordination = collect($navigation->mobileItems(
             $this->actor('coordination_admin', 'organization', $organization->id)
         ))->pluck('key');
-        foreach (['dashboard', 'missions', 'projects', 'standard-lists', 'profile'] as $key) {
+        foreach (['dashboard', 'missions', 'projects', 'standard-lists', 'synchronization', 'profile'] as $key) {
             $this->assertTrue($coordination->contains($key), "Coordination menu is missing {$key}");
         }
-        foreach (['users', 'facilities', 'sites', 'products', 'stocks', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'synchronization', 'configuration', 'organizations', 'funding', 'inventories', 'orders', 'settings', 'activity_logs'] as $key) {
+        foreach (['users', 'facilities', 'sites', 'products', 'stocks', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'configuration', 'organizations', 'funding', 'inventories', 'orders', 'settings', 'activity_logs'] as $key) {
             $this->assertFalse($coordination->contains($key));
         }
 
         $projectMenu = collect($navigation->mobileItems(
             $this->actor('project_admin', 'project', $project->id)
         ))->pluck('key');
-        foreach (['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'profile'] as $key) {
+        foreach (['dashboard', 'projects', 'facilities', 'users', 'standard-lists', 'synchronization', 'profile'] as $key) {
             $this->assertTrue($projectMenu->contains($key), "Project menu is missing {$key}");
         }
-        foreach (['products', 'stocks', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'synchronization', 'configuration', 'organizations', 'missions', 'funding', 'sites', 'inventories', 'orders', 'settings', 'project_settings', 'site_settings', 'activity_logs'] as $key) {
+        foreach (['products', 'stocks', 'receipts', 'dispensing', 'inventory-orders', 'reports', 'configuration', 'organizations', 'missions', 'funding', 'sites', 'inventories', 'orders', 'settings', 'project_settings', 'site_settings', 'activity_logs'] as $key) {
             $this->assertFalse($projectMenu->contains($key), "Project menu must not contain {$key}");
         }
 
