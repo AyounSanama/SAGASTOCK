@@ -104,9 +104,9 @@ final class RolePermissions
         'owner' => ['Admin Sago (alias historique)', 'platform', self::SAGO_ADMIN],
         'coordination_admin' => ['Admin Coordination', 'organization', [
             'dashboard.view', 'missions.view', 'missions.manage', 'standard_lists.view', 'catalog.view',
+            // Niveau 7 (09/10, matrice E1) : ni saisie ni fiche patient ; ordonnances et dispensations en consultation.
             'products.view', 'stocks.view', 'receipts.view', 'receipts.manage', 'dispensing.view',
-            'dispensing.manage', 'patients.view', 'patients.manage', 'prescriptions.view',
-            'prescriptions.manage', 'prescriptions.validate', 'dispensations.view', 'dispensations.manage',
+            'prescriptions.view', 'dispensations.view',
             'inventories.view', 'inventories.manage', 'inventories.validate', 'orders.view', 'orders.manage',
             'orders.approve', 'reports.view', 'reports.export', 'synchronization.view', 'users.view',
             'users.manage', 'activity_logs.view', 'projects.view', 'projects.manage', 'funding.view',
@@ -115,9 +115,9 @@ final class RolePermissions
         ]],
         'project_admin' => ['Admin Projet', 'project', [
             'dashboard.view', 'standard_lists.view', 'catalog.view', 'products.view', 'products.manage',
-            'stocks.view', 'receipts.view', 'receipts.manage', 'dispensing.view', 'dispensing.manage',
-            'patients.view', 'patients.manage', 'prescriptions.view', 'prescriptions.manage',
-            'prescriptions.validate', 'dispensations.view', 'dispensations.manage', 'inventories.view',
+            // Niveau 7 (09/10, matrice E1) : ni saisie ni fiche patient ; ordonnances et dispensations en consultation.
+            'stocks.view', 'receipts.view', 'receipts.manage', 'dispensing.view',
+            'prescriptions.view', 'dispensations.view', 'inventories.view',
             'inventories.manage', 'orders.view', 'orders.manage', 'reports.view', 'reports.export',
             'synchronization.view', 'health_facilities.view', 'health_facilities.manage',
             'dispensing_sites.view', 'dispensing_sites.manage', 'users.view', 'users.create_site_admin',

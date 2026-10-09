@@ -11,8 +11,10 @@ use App\Models\Prescription;
 use App\Models\Product;
 use App\Models\Site;
 use App\Services\UserScopeService;
+use App\Policies\PatientPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class DispensationController extends Controller
@@ -28,9 +30,14 @@ class DispensationController extends Controller
             : ($organizations->firstWhere('id', $request->user()->organization_id) ?? $organizations->first());
         abort_if(! $organization, $request->filled('organization_id') ? 404 : 403);
         $siteIds = $this->scopes->sites($request->user())->where('organization_id', $organization->id)->pluck('id');
-        $patients = Patient::where('organization_id', $organization->id)->orderBy('last_name')->orderBy('first_name')->get();
-        $prescriptions = Prescription::with(['patient', 'site', 'items.product'])->where('organization_id', $organization->id)->whereIn('site_id', $siteIds)->latest('prescribed_on')->get();
-        $dispensations = Dispensation::with(['patient', 'prescription', 'site', 'items.product', 'items.batch'])->where('organization_id', $organization->id)->whereIn('site_id', $siteIds)->latest('dispensed_at')->get();
+        // Niveau 7 (matrice E1) : patients du périmètre, et seulement avec la fiche patient.
+        $identity = Gate::allows('viewIdentity', Patient::class);
+        $patients = $identity
+            ? app(PatientPolicy::class)->scope($request->user())->where('organization_id', $organization->id)->orderBy('last_name')->orderBy('first_name')->get()
+            : collect();
+        $hide = fn ($model) => $identity ? $model : PatientPolicy::withoutIdentity($model);
+        $prescriptions = Prescription::with(['patient', 'site', 'items.product'])->where('organization_id', $organization->id)->whereIn('site_id', $siteIds)->latest('prescribed_on')->get()->each($hide);
+        $dispensations = Dispensation::with(['patient', 'prescription', 'site', 'items.product', 'items.batch'])->where('organization_id', $organization->id)->whereIn('site_id', $siteIds)->latest('dispensed_at')->get()->each($hide);
         $sites = Site::with('healthFacility:id,name')->whereIn('id', $siteIds)->orderBy('name')->get();
         $products = Product::where('organization_id', $organization->id)->where('is_active', true)->orderBy('name')->get();
         // Niveau 7 : couples ONG/Bailleur par site et lots en stock (sortie de lots périmés ou détériorés).

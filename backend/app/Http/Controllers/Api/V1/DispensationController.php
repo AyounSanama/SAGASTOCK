@@ -23,6 +23,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -42,7 +43,8 @@ class DispensationController extends Controller
     public function patientHistory(Request $request, Organization $organization, Patient $patient): JsonResponse
     {
         $this->access($request, $organization, 'patients.view');
-        abort_unless($this->patientQuery($request, $organization)->whereKey($patient->id)->exists(), 404);
+        abort_unless($patient->organization_id === $organization->id, 404);
+        Gate::authorize('view', $patient);
         return response()->json(['patient' => $patient, 'prescriptions' => $patient->prescriptions()
             ->with(['site', 'items.product', 'dispensations.items.batch'])->latest('prescribed_on')->get(),
             'dispensations' => $patient->dispensations()->with(['site', 'prescription', 'items.product', 'items.batch'])->latest('dispensed_at')->get()]);
@@ -70,7 +72,8 @@ class DispensationController extends Controller
     public function updatePatient(Request $request, Organization $organization, Patient $patient): JsonResponse
     {
         $this->access($request, $organization, 'patients.manage');
-        abort_unless($this->patientQuery($request, $organization)->whereKey($patient->id)->exists(), 404);
+        abort_unless($patient->organization_id === $organization->id, 404);
+        Gate::authorize('update', $patient);
         $old = $patient->toArray();
         $data = $this->patientData($request, $organization, $patient);
         if (array_key_exists('site_id', $data)) {
@@ -85,7 +88,8 @@ class DispensationController extends Controller
     public function archivePatient(Request $request, Organization $organization, Patient $patient): JsonResponse
     {
         $this->access($request, $organization, 'patients.manage');
-        abort_unless($this->patientQuery($request, $organization)->whereKey($patient->id)->exists(), 404);
+        abort_unless($patient->organization_id === $organization->id, 404);
+        Gate::authorize('update', $patient);
         $patient->update(['is_active' => false]); $patient->delete();
         $this->audit->record($request, 'patient.archived', $patient);
         return response()->json(status: 204);
@@ -106,7 +110,19 @@ class DispensationController extends Controller
         $this->access($request, $organization, 'prescriptions.view');
         return response()->json(Prescription::with(['patient', 'site', 'items.product'])->where('organization_id', $organization->id)
             ->whereIn('site_id', $this->siteIds($request, $organization))
-            ->when($request->input('status'), fn ($q, $v) => $q->where('status', $v))->latest('prescribed_on')->paginate(30));
+            ->when($request->input('status'), fn ($q, $v) => $q->where('status', $v))->latest('prescribed_on')->paginate(30)
+            ->through(fn ($model) => $this->withoutIdentity($request, $model)));
+    }
+
+    /**
+     * Niveau 7 (matrice E1) : sans `patients.view` (Coordination, Admin
+     * Projet), le patient n'apparaît que par son code, jamais son identité.
+     */
+    private function withoutIdentity(Request $request, $model)
+    {
+        return Gate::forUser($request->user())->allows('viewIdentity', Patient::class)
+            ? $model
+            : \App\Policies\PatientPolicy::withoutIdentity($model);
     }
 
     public function storePrescription(Request $request, Organization $organization): JsonResponse
@@ -159,7 +175,8 @@ class DispensationController extends Controller
     public function validatePrescription(Request $request, Organization $organization, Prescription $prescription): JsonResponse
     {
         $this->access($request, $organization, 'prescriptions.validate');
-        abort_unless($prescription->organization_id === $organization->id && $this->siteIds($request, $organization)->contains($prescription->site_id), 404);
+        abort_unless($prescription->organization_id === $organization->id, 404);
+        Gate::authorize('validate', $prescription);
         abort_unless($prescription->status === 'draft', 422, 'Cette ordonnance ne peut plus être validée.');
         $data = $request->validate([
             'decision' => ['required', Rule::in(['approve', 'reject'])],
@@ -183,7 +200,8 @@ class DispensationController extends Controller
         $this->access($request, $organization, 'dispensations.view');
         return response()->json(Dispensation::with(['patient', 'prescription', 'site', 'items.product', 'items.batch'])
             ->where('organization_id', $organization->id)->whereIn('site_id', $this->siteIds($request, $organization))
-            ->when($request->input('status'), fn ($q, $v) => $q->where('status', $v))->latest('dispensed_at')->paginate(30));
+            ->when($request->input('status'), fn ($q, $v) => $q->where('status', $v))->latest('dispensed_at')->paginate(30)
+            ->through(fn ($model) => $this->withoutIdentity($request, $model)));
     }
 
     public function options(Request $request, Organization $organization): JsonResponse
@@ -398,14 +416,10 @@ class DispensationController extends Controller
     }
 
     private function access(Request $request, Organization $organization, string $permission): void { abort_unless($request->user()->hasPermission($permission), 403); abort_unless($this->scopes->organizations($request->user())->whereKey($organization->id)->exists(), 404); }
+    /** Patients de l'organisation dans le périmètre du compte (même règle que PatientPolicy). */
     private function patientQuery(Request $request, Organization $organization): Builder
     {
-        $siteIds = $this->siteIds($request, $organization);
-        return Patient::where('organization_id', $organization->id)->where(function (Builder $query) use ($siteIds): void {
-            $query->whereIn('site_id', $siteIds)
-                ->orWhereHas('prescriptions', fn (Builder $q) => $q->whereIn('site_id', $siteIds))
-                ->orWhereHas('dispensations', fn (Builder $q) => $q->whereIn('site_id', $siteIds));
-        });
+        return app(\App\Policies\PatientPolicy::class)->scope($request->user())->where('organization_id', $organization->id);
     }
     private function patientSite(Request $request, Organization $organization, ?string $siteId): Site
     {
