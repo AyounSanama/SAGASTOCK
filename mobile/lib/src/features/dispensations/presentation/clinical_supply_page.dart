@@ -97,6 +97,24 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
     }
   }
 
+  /// Bénéficiaire affiché dans la liste : patient, ou destination (niveau 7).
+  String _recipient(Map<String, dynamic> d) {
+    final patient = d['patient'];
+    if (patient is Map) {
+      return '${patient['last_name'] ?? ''} ${patient['first_name'] ?? ''}'
+          .trim();
+    }
+    final label = const {
+          'hospital_service': 'Service hospitalier',
+          'expired_damaged': 'Périmés / détériorés',
+          'ngo_return': 'Retour pharmacie ONG',
+          'community': 'Communauté',
+        }[d['destination_type']] ??
+        'Destination';
+    final name = '${d['destination_name'] ?? ''}'.trim();
+    return name.isEmpty ? label : '$label · $name';
+  }
+
   String apiError(DioException e) {
     final d = e.response?.data;
     if (d is Map && d['errors'] is Map) {
@@ -388,7 +406,7 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                   subtitle: Text(
-                    '${d['patient']?['last_name'] ?? ''} · ${(d['items'] as List? ?? []).length} lot(s)',
+                    '${_recipient(d)} · ${(d['items'] as List? ?? []).length} lot(s)',
                   ),
                   trailing: Icon(
                     Icons.verified_outlined,
@@ -1039,7 +1057,11 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
       ListTile(
         leading: const Icon(Icons.description_outlined),
         title: const Text('Ordonnance'),
-        subtitle: Text(_attachmentName ?? 'Photo enregistrée'),
+        subtitle: Text(
+          _attachmentPath == null
+              ? 'Aucune photo'
+              : _attachmentName ?? 'Photo enregistrée',
+        ),
       ),
       ListTile(
         leading: const Icon(Icons.medication_outlined),

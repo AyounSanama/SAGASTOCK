@@ -313,7 +313,9 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
     _quantities = {
       for (final line in _lines)
         '${line['id']}': TextEditingController(
-          text: '${line['physical_quantity'] ?? ''}',
+          text: line['physical_quantity'] == null
+              ? ''
+              : formatQuantity(line['physical_quantity']),
         ),
     };
     _reasons = {

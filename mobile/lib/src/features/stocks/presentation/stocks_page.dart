@@ -268,15 +268,18 @@ class _StocksPageState extends State<StocksPage> {
         title: const Text(AppTerms.medicationStock),
         actions: [
           IconButton(
-            tooltip: 'Gérer les lots',
+            tooltip: ApplicationAccess.allows(_user, 'batches.manage')
+                ? 'Gérer les lots'
+                : 'Voir les lots',
             onPressed: () => context.go('/stocks/lots'),
             icon: const Icon(Icons.inventory_2_outlined),
           ),
-          IconButton(
-            tooltip: 'Nouveau mouvement',
-            onPressed: _organizationId == null ? null : _openMovementForm,
-            icon: const Icon(Icons.add_circle_outline),
-          ),
+          if (ApplicationAccess.allows(_user, 'stocks.manage'))
+            IconButton(
+              tooltip: 'Nouveau mouvement',
+              onPressed: _organizationId == null ? null : _openMovementForm,
+              icon: const Icon(Icons.add_circle_outline),
+            ),
         ],
       ),
       body: RefreshIndicator(

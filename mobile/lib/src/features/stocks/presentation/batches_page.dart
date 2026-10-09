@@ -6,6 +6,7 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/access/application_access.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
+import '../../../core/format/display_format.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
 import '../../auth/data/auth_service.dart';
 import '../data/stock_service.dart';
@@ -284,12 +285,22 @@ class _BatchesPageState extends State<BatchesPage> {
                     ],
                   ),
                 ),
-                Chip(label: Text('${batch['status']}')),
+                Chip(
+                  label: Text(
+                    const {
+                          'available': 'Disponible',
+                          'quarantine': 'Quarantaine',
+                          'expired': 'Périmé',
+                          'destroyed': 'Détruit',
+                        }[batch['status']] ??
+                        '${batch['status']}',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
             Text(
-              'Expiration : ${batch['expires_on']} • Fournisseur : ${batch['supplier']?['name'] ?? 'Non renseigné'}',
+              'Expiration : ${formatDay(batch['expires_on'])} • Fournisseur : ${batch['supplier']?['name'] ?? 'Non renseigné'}',
               style: TextStyle(
                 color: urgent ? Theme.of(context).colorScheme.error : null,
                 fontWeight: urgent ? FontWeight.w700 : null,

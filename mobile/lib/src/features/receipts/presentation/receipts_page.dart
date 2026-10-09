@@ -155,12 +155,18 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
         const SnackBar(content: Text('Réception validée et stock mis à jour.')),
       );
       await _loadReceipts();
-    } on DioException {
+    } on DioException catch (error) {
       if (mounted) {
+        // Refus du serveur (stock gelé par un inventaire…) : son motif ;
+        // sinon, absence de réseau.
+        final data = error.response?.data;
+        final reason = data is Map ? data['message']?.toString() : null;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'La validation nécessite une connexion au serveur. Le brouillon est conservé.',
+              error.response == null
+                  ? 'La validation nécessite une connexion au serveur. Le brouillon est conservé.'
+                  : '${reason ?? 'Validation refusée.'} Le brouillon est conservé.',
             ),
           ),
         );

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/access/application_access.dart';
@@ -36,15 +37,19 @@ class _OrdersPageState extends State<OrdersPage> {
       organizations = await service.organizations();
       organizationId ??= organizations.firstOrNull?['id']?.toString();
       if (organizationId != null) {
-        final values = await Future.wait([
-          service.orders(organizationId!),
-          service.options(organizationId!),
-        ]);
-        orders = values[0] as List<Map<String, dynamic>>;
-        options = values[1] as Map<String, dynamic>;
+        orders = await service.orders(organizationId!);
+        // Options de création réservées à orders.manage : un refus (403)
+        // vidait toute la liste pour un compte en lecture seule.
+        options = _canManage ? await service.options(organizationId!) : {};
         // Lu après la liste, qui synchronise d'abord la file hors connexion.
         pending = await service.pendingCount();
       }
+    } on DioException catch (error) {
+      _message(
+        error.response?.statusCode == 403
+            ? 'Votre rôle ne permet pas de consulter les commandes.'
+            : 'Chargement impossible. Les données locales restent affichées.',
+      );
     } finally {
       if (mounted) setState(() => loading = false);
     }
