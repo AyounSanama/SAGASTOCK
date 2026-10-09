@@ -15,6 +15,7 @@ void main() {
       '_attachment_path': file.path,
       '_attachment_name': 'ordonnance.jpg',
       'patient_id': 'patient-1',
+      'allow_partial': false,
       'items': [
         {'product_id': 'product-1', 'quantity': 2},
       ],
@@ -25,6 +26,11 @@ void main() {
     expect(form.files.single.key, 'attachment');
     expect(form.files.single.value.filename, 'ordonnance.jpg');
     expect(form.fields.any((entry) => entry.key == 'patient_id'), isTrue);
+    // Booléen envoyé sous une forme que la validation « boolean » accepte.
+    expect(
+      form.fields.singleWhere((entry) => entry.key == 'allow_partial').value,
+      '0',
+    );
   });
 
   test('ordinary offline payload remains JSON', () async {

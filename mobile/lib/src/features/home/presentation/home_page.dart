@@ -438,6 +438,12 @@ class _QuickActions extends StatelessWidget {
   final Map<String, dynamic>? user;
   final List<Map<String, dynamic>> navigation;
 
+  /// Libellés courts pour les tuiles : un quart de largeur et deux lignes.
+  static const _shortLabels = {
+    'Listes standards de médicaments': 'Listes standards',
+    'Dispensation de médicaments': 'Dispensation',
+  };
+
   @override
   Widget build(BuildContext context) {
     final role = '${user?['role'] ?? ''}'.toLowerCase();
@@ -478,7 +484,7 @@ class _QuickActions extends StatelessWidget {
               .take(4)
               .map(
                 (item) => _ActionData(
-                  '${item['label'] ?? ''}',
+                  _shortLabels['${item['label']}'] ?? '${item['label'] ?? ''}',
                   ModuleIconRegistry.resolve(item['icon']?.toString()),
                   '${item['path'] ?? '/home'}',
                 ),
@@ -544,6 +550,7 @@ class _QuickAction extends StatelessWidget {
           Text(
             data.label,
             maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppTheme.ink,

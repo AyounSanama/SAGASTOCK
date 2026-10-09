@@ -84,7 +84,14 @@ class ReceiptService {
 
   Future<int> pendingCount() async => (await _readOutbox()).length;
 
-  Future<void> syncOutbox() async {
+  /// Synchronisation en cours, partagée : deux écrans ne renvoient jamais la
+  /// même réception en parallèle.
+  static Future<void>? _syncing;
+
+  Future<void> syncOutbox() =>
+      _syncing ??= _syncOutbox().whenComplete(() => _syncing = null);
+
+  Future<void> _syncOutbox() async {
     final pending = await _readOutbox();
     if (pending.isEmpty) return;
     final remaining = <Map<String, dynamic>>[];
@@ -95,8 +102,17 @@ class ReceiptService {
           data: item['data'],
           options: await _authorized(),
         );
-      } on DioException {
-        remaining.add(item);
+      } on DioException catch (error) {
+        // Référence déjà connue du serveur : la réception a été reçue lors
+        // d'un envoi précédent dont la réponse s'est perdue.
+        final errors = error.response?.data is Map
+            ? (error.response!.data as Map)['errors']
+            : null;
+        final alreadySent = error.response?.statusCode == 422 &&
+            errors is Map &&
+            errors.length == 1 &&
+            errors.containsKey('reference');
+        if (!alreadySent) remaining.add(item);
       }
     }
     await _storage.write(key: _outboxKey, value: jsonEncode(remaining));

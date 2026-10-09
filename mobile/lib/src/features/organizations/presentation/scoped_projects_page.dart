@@ -225,6 +225,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   )
                 else
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: missionId,
                     decoration: const InputDecoration(labelText: 'Mission *'),
                     items: _missions
@@ -326,6 +327,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _projectStatuses.containsKey(status)
                       ? status
                       : 'active',
@@ -357,6 +359,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
+                    isExpanded: true,
                     initialValue: orderPeriodMonths,
                     decoration: const InputDecoration(
                       labelText: 'Périodicité de commande',
@@ -371,6 +374,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
+                    isExpanded: true,
                     initialValue: deliveryLeadTimeMonths,
                     decoration: const InputDecoration(
                       labelText: 'Délai de livraison',
@@ -385,6 +389,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<num>(
+                    isExpanded: true,
                     initialValue: safetyStockMonths,
                     decoration: const InputDecoration(
                       labelText: 'Stock de sécurité',
@@ -412,6 +417,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
+                    isExpanded: true,
                     initialValue: orderPeriodMonths,
                     decoration: const InputDecoration(
                       labelText: 'Périodicité de commande',
@@ -426,6 +432,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
+                    isExpanded: true,
                     initialValue: deliveryLeadTimeMonths,
                     decoration: const InputDecoration(
                       labelText: 'Délai de livraison',
@@ -440,6 +447,7 @@ class _ScopedProjectsPageState extends State<ScopedProjectsPage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<num>(
+                    isExpanded: true,
                     initialValue: safetyStockMonths,
                     decoration: const InputDecoration(
                       labelText: 'Stock de sécurité',

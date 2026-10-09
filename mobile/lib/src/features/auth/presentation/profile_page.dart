@@ -173,6 +173,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: _preferredLocale,
                         decoration: const InputDecoration(
                           labelText: 'Langue de l’interface',

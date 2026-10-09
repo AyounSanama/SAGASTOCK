@@ -239,6 +239,7 @@ class _CatalogPageState extends State<CatalogPage>
             child: Column(
               children: [
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: projectId,
                   decoration: const InputDecoration(labelText: 'Projet *'),
                   items: _projects
@@ -270,6 +271,7 @@ class _CatalogPageState extends State<CatalogPage>
                 _requiredField(name, 'Nom de la liste'),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: careLevel.isEmpty ? null : careLevel,
                   decoration: const InputDecoration(
                     labelText: 'Niveau de soins / Programme *',
@@ -286,6 +288,7 @@ class _CatalogPageState extends State<CatalogPage>
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: facilityCategory.isEmpty
                       ? null
                       : facilityCategory,
@@ -447,6 +450,7 @@ class _CatalogPageState extends State<CatalogPage>
             child: Column(
               children: [
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: type,
                   decoration: const InputDecoration(
                     labelText: 'Type de référentiel',
@@ -565,6 +569,7 @@ class _CatalogPageState extends State<CatalogPage>
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: type,
                   decoration: const InputDecoration(
                     labelText: 'Type de produit',
@@ -828,6 +833,7 @@ class _CatalogPageState extends State<CatalogPage>
         .where((item) => item['reference_type'] == type)
         .toList();
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       initialValue: values.any((item) => '${item['id']}' == value)
           ? value
           : null,
@@ -955,6 +961,7 @@ class _CatalogPageState extends State<CatalogPage>
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 100),
         children: [
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _organizationId,
             decoration: const InputDecoration(
               labelText: 'Organisation',
@@ -994,6 +1001,7 @@ class _CatalogPageState extends State<CatalogPage>
               SizedBox(
                 width: 190,
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _status,
                   decoration: const InputDecoration(labelText: 'Statut'),
                   items: const [
@@ -1017,6 +1025,7 @@ class _CatalogPageState extends State<CatalogPage>
                 SizedBox(
                   width: 230,
                   child: DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: _productType,
                     decoration: const InputDecoration(labelText: 'Type'),
                     items: [
@@ -1041,6 +1050,7 @@ class _CatalogPageState extends State<CatalogPage>
                 SizedBox(
                   width: 240,
                   child: DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: _referenceType,
                     decoration: const InputDecoration(labelText: 'Type'),
                     items: [

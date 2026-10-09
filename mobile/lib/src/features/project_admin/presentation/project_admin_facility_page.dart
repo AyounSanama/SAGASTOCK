@@ -278,6 +278,7 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<int>(
+                            isExpanded: true,
                             initialValue: _period,
                             decoration: InputDecoration(labelText: 'Périodicité (mois)', errorText: _fieldErrors['order_period_months']),
                             items: [for (var month = 1; month <= 12; month++) DropdownMenuItem(value: month, child: Text('$month'))],
@@ -287,6 +288,7 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<int>(
+                            isExpanded: true,
                             initialValue: _lead,
                             decoration: InputDecoration(labelText: 'Délai DL (mois)', errorText: _fieldErrors['delivery_lead_time_months']),
                             items: [for (var month = 1; month <= 12; month++) DropdownMenuItem(value: month, child: Text('$month'))],
@@ -297,6 +299,7 @@ class _ProjectAdminFacilityPageState extends State<ProjectAdminFacilityPage> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<num>(
+                      isExpanded: true,
                       initialValue: [
                         for (final value in (_options['safety_stock_options'] as List? ?? const [])) if (value is num) value,
                       ].where((option) => option == _safety).firstOrNull,

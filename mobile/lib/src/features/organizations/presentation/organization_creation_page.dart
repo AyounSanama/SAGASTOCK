@@ -404,6 +404,7 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
     child: _card(
       children: [
         DropdownButtonFormField<bool>(
+          isExpanded: true,
           initialValue: multiCountry,
           decoration: const InputDecoration(
             labelText: 'Type d’accès *',
@@ -479,6 +480,7 @@ class _OrganizationCreationPageState extends State<OrganizationCreationPage> {
             ),
           if (multiCountry && selectedCountries.isNotEmpty)
             DropdownButtonFormField<String>(
+              isExpanded: true,
               key: ValueKey('admin-country-${selectedCountries.join('-')}'),
               initialValue: selectedCountries.contains(adminCountryId)
                   ? adminCountryId

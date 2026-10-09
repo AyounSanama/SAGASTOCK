@@ -60,14 +60,13 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        _service.list(organizationId),
-        _service.pendingCount(),
-      ]);
+      // Le compteur est lu après la liste, qui synchronise d'abord la file.
+      final receipts = await _service.list(organizationId);
+      final pending = await _service.pendingCount();
       if (!mounted) return;
       setState(() {
-        _receipts = results[0] as List<Map<String, dynamic>>;
-        _pending = results[1] as int;
+        _receipts = receipts;
+        _pending = pending;
       });
     } on DioException catch (error) {
       if (mounted) {
@@ -187,6 +186,7 @@ class _ReceiptsPageState extends State<ReceiptsPage> {
           padding: const EdgeInsets.all(16),
           children: [
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _organizationId,
               decoration: const InputDecoration(
                 labelText: 'Organisation',
@@ -392,7 +392,8 @@ class _ReceiptCard extends StatelessWidget {
             ),
             const SizedBox(height: 9),
             Text(
-              '${receipt['site']?['name'] ?? 'Site'} · ${receipt['received_on'] ?? ''}',
+              // Date de réception seule, sans l'heure ajoutée par le serveur.
+              '${receipt['site']?['name'] ?? 'Site'} · ${'${receipt['received_on'] ?? ''}'.split('T').first}',
               style: TextStyle(color: AppTheme.muted, fontSize: 12),
             ),
             const SizedBox(height: 3),
@@ -489,9 +490,13 @@ class _ReceiptFormState extends State<_ReceiptForm> {
   }
 
   Future<void> _save() async {
-    if (!(_informationKey.currentState?.validate() ?? false) ||
-        !(_productsKey.currentState?.validate() ?? false) ||
-        !(_lotsKey.currentState?.validate() ?? false)) {
+    // Une étape qui n'est plus affichée n'a plus de formulaire monté
+    // (currentState null) : elle a été validée au passage à la suivante.
+    // Avant : « null » comptait comme invalide et l'enregistrement
+    // s'arrêtait sans aucun message.
+    if (!(_informationKey.currentState?.validate() ?? true) ||
+        !(_productsKey.currentState?.validate() ?? true) ||
+        !(_lotsKey.currentState?.validate() ?? true)) {
       return;
     }
     for (var index = 0; index < _lines.length; index++) {
@@ -585,6 +590,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                     child: Column(
                       children: [
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           initialValue: _siteId,
                           decoration: const InputDecoration(
                             labelText: 'Point de dispensation destinataire *',
@@ -660,6 +666,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                         ],
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           initialValue: _supplierId,
                           decoration: const InputDecoration(
                             labelText: 'Fournisseur',
@@ -887,7 +894,9 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                   ),
               ],
             ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: line.productId,
               decoration: const InputDecoration(labelText: 'Produit *'),
               items: widget.products
@@ -921,9 +930,9 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                     line.received,
                     'Livrée',
                     onChanged: (value) {
-                      if (line.accepted.text.isEmpty) {
-                        line.accepted.text = value;
-                      }
+                      // La quantité acceptée suit la quantité livrée tant que
+                      // l’utilisateur ne l’a pas saisie lui-même.
+                      if (!line.acceptedEdited) line.accepted.text = value;
                     },
                   ),
                 ),
@@ -960,10 +969,12 @@ class _ReceiptFormState extends State<_ReceiptForm> {
             const SizedBox(height: 10),
             TextFormField(
               controller: line.expiry,
-              keyboardType: TextInputType.datetime,
+              readOnly: true,
+              onTap: () => _pickExpiry(line),
               decoration: const InputDecoration(
                 labelText: 'Date de péremption *',
                 hintText: 'AAAA-MM-JJ',
+                suffixIcon: Icon(Icons.event_outlined),
               ),
               validator: (value) {
                 final date = DateTime.tryParse(value ?? '');
@@ -980,6 +991,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                     line.accepted,
                     'Acceptée',
                     allowZero: true,
+                    onChanged: (_) => line.acceptedEdited = true,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -993,7 +1005,12 @@ class _ReceiptFormState extends State<_ReceiptForm> {
               ],
             ),
             const SizedBox(height: 10),
-            _numberField(line.cost, 'Coût unitaire', allowZero: true),
+            _numberField(
+              line.cost,
+              'Coût unitaire',
+              allowZero: true,
+              optional: true,
+            ),
             const SizedBox(height: 10),
             TextFormField(
               controller: line.reason,
@@ -1045,10 +1062,26 @@ class _ReceiptFormState extends State<_ReceiptForm> {
     return true;
   }
 
+  Future<void> _pickExpiry(_ReceiptLine line) async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: DateTime.tryParse(line.expiry.text) ??
+          DateTime(now.year + 1, now.month, now.day),
+      firstDate: now.add(const Duration(days: 1)),
+      lastDate: DateTime(now.year + 15),
+      helpText: 'Date de péremption',
+    );
+    if (selected != null && mounted) {
+      line.expiry.text = selected.toIso8601String().substring(0, 10);
+    }
+  }
+
   Widget _numberField(
     TextEditingController controller,
     String label, {
     bool allowZero = false,
+    bool optional = false,
     ValueChanged<String>? onChanged,
   }) => TextFormField(
     controller: controller,
@@ -1056,6 +1089,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
     decoration: InputDecoration(labelText: label),
     onChanged: onChanged,
     validator: (value) {
+      if (optional && (value ?? '').trim().isEmpty) return null;
       final number = double.tryParse((value ?? '').replaceAll(',', '.'));
       if (number == null || (allowZero ? number < 0 : number <= 0)) {
         return allowZero ? '≥ 0 requis' : '> 0 requis';
@@ -1082,6 +1116,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<String>(
+              isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Site destinataire',
                 prefixIcon: Icon(Icons.location_on_outlined),
@@ -1099,6 +1134,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Fournisseur / origine',
                 prefixIcon: Icon(Icons.local_shipping_outlined),
@@ -1231,6 +1267,7 @@ class _ReceiptLine {
   final cost = TextEditingController();
   final reason = TextEditingController();
   String? productId;
+  bool acceptedEdited = false;
 
   Map<String, dynamic> toJson() => {
     'product_id': productId,
@@ -1324,6 +1361,7 @@ class _ReceiptLineCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Médicament / produit',
               ),

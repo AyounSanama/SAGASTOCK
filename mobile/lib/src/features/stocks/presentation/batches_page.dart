@@ -173,6 +173,7 @@ class _BatchesPageState extends State<BatchesPage> {
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 100),
         children: [
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _organizationId,
             decoration: const InputDecoration(
               labelText: 'Organisation',
@@ -206,6 +207,7 @@ class _BatchesPageState extends State<BatchesPage> {
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _status,
             decoration: const InputDecoration(labelText: 'Statut'),
             items: const [
@@ -444,6 +446,7 @@ class _BatchFormState extends State<_BatchForm> {
       child: Column(
         children: [
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _productId,
             decoration: const InputDecoration(labelText: 'Produit médical *'),
             items: widget.products
@@ -468,6 +471,7 @@ class _BatchFormState extends State<_BatchForm> {
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _supplierId,
             decoration: const InputDecoration(labelText: 'Fournisseur'),
             items: [
@@ -542,6 +546,7 @@ class _BatchFormState extends State<_BatchForm> {
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _status,
             decoration: const InputDecoration(labelText: 'Statut'),
             items: const [

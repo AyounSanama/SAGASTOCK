@@ -14,6 +14,7 @@ import '../../../core/widgets/app_form_sheet.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
 import '../data/clinical_supply_service.dart';
 import '../../auth/data/auth_service.dart';
+import '../../../core/format/display_format.dart';
 
 class ClinicalSupplyPage extends StatefulWidget {
   const ClinicalSupplyPage({super.key, this.initialTab = 0});
@@ -74,12 +75,12 @@ class _ClinicalSupplyPageState extends State<ClinicalSupplyPage>
         service.patients(organizationId!),
         service.prescriptions(organizationId!),
         service.dispensations(organizationId!),
-        service.pendingCount(),
       ]);
-      patients = v[0] as List<Map<String, dynamic>>;
-      prescriptions = v[1] as List<Map<String, dynamic>>;
-      dispensations = v[2] as List<Map<String, dynamic>>;
-      pending = v[3] as int;
+      patients = v[0];
+      prescriptions = v[1];
+      dispensations = v[2];
+      // Lu après la liste, qui synchronise d'abord la file hors connexion.
+      pending = await service.pendingCount();
       error = null;
     } on DioException catch (e) {
       error = e.response?.statusCode == 403
@@ -774,6 +775,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
     'Recherchez un patient existant ou créez un nouveau dossier.',
     [
       DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: _siteId,
         decoration: const InputDecoration(labelText: 'Formation sanitaire'),
         items: (_options['sites'] ?? const [])
@@ -819,6 +821,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
       ],
       const SizedBox(height: 14),
       DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: _destination,
         decoration: const InputDecoration(labelText: 'Destination *'),
         items: [
@@ -851,6 +854,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
       if (_forPatient) ...[
         const SizedBox(height: 14),
         DropdownButtonFormField<String>(
+          isExpanded: true,
           initialValue: _patientId,
           decoration: const InputDecoration(labelText: 'Patient'),
           items: (_options['patients'] ?? const [])
@@ -933,6 +937,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: _productId,
         decoration: const InputDecoration(labelText: 'Produit'),
         items: (_options['products'] ?? const [])
@@ -987,7 +992,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
         (entry) => Card(
           child: ListTile(
             title: Text('${entry.value['name']}'),
-            subtitle: Text('Quantité : ${entry.value['quantity']}'),
+            subtitle: Text('Quantité : ${formatQuantity(entry.value['quantity'])}'),
             trailing: IconButton(
               icon: Icon(Icons.delete_outline, color: AppTheme.red),
               onPressed: () => setState(() => _items.removeAt(entry.key)),
@@ -1040,7 +1045,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
         leading: const Icon(Icons.medication_outlined),
         title: const Text('Produits'),
         subtitle: Text(
-          '${_items.length} produit(s) · ${_items.fold<double>(0, (sum, item) => sum + (item['quantity'] as num).toDouble())} unité(s)',
+          '${_items.length} produit(s) · ${formatQuantity(_items.fold<double>(0, (sum, item) => sum + (item['quantity'] as num).toDouble()))} unité(s)',
         ),
       ),
       Card(
@@ -1301,6 +1306,7 @@ class _PatientFormState extends State<PatientForm> {
       field(last, 'Nom'),
       field(first, 'Prénom'),
       DropdownButtonFormField<String>(
+        isExpanded: true,
         decoration: const InputDecoration(labelText: 'Sexe'),
         items: const [
           DropdownMenuItem(value: 'female', child: Text('Féminin')),
@@ -1508,6 +1514,7 @@ class _ClinicalValidationFormState extends State<ClinicalValidationForm> {
     },
     children: [
       DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: decision,
         decoration: const InputDecoration(labelText: 'Décision clinique'),
         items: const [
@@ -1602,6 +1609,7 @@ Widget drop(
   ValueChanged<String?> changed,
   String Function(Map<String, dynamic>) labelOf,
 ) => DropdownButtonFormField<String>(
+  isExpanded: true,
   initialValue: value,
   decoration: InputDecoration(labelText: label),
   items: values

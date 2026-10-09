@@ -163,6 +163,7 @@ class _ScopedSitesPageState extends State<ScopedSitesPage> {
               child: Column(
                 children: [
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: facilityId,
                     decoration: const InputDecoration(
                       labelText: 'Formation sanitaire *',
@@ -199,6 +200,7 @@ class _ScopedSitesPageState extends State<ScopedSitesPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: DropdownButtonFormField<String>(
+                          isExpanded: true,
                           initialValue: siteType,
                           decoration: const InputDecoration(
                             labelText: 'Type *',
@@ -227,6 +229,7 @@ class _ScopedSitesPageState extends State<ScopedSitesPage> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String?>(
+                          isExpanded: true,
                           initialValue: departmentId,
                           decoration: const InputDecoration(
                             labelText: 'Département',
@@ -248,6 +251,7 @@ class _ScopedSitesPageState extends State<ScopedSitesPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: DropdownButtonFormField<String?>(
+                          isExpanded: true,
                           initialValue: pharmacyId,
                           decoration: const InputDecoration(
                             labelText: 'Pharmacie',

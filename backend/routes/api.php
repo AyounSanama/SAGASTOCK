@@ -176,7 +176,9 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:users.manage|users.update_site_admin');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.manage|users.suspend_site_admin');
         Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->middleware('permission:users.manage|users.update_site_admin');
-        Route::get('/organizations', [OrganizationController::class, 'index'])->middleware('permission:organizations.view');
+        // Lecture limitée au périmètre du compte : aussi pour les comptes FOSA, dont
+        // tous les écrans (stocks, entrées, dispensation…) en ont besoin.
+        Route::get('/organizations', [OrganizationController::class, 'index'])->middleware('permission:organizations.view|stocks.view|receipts.view|dispensing.view|inventories.view|orders.view|catalog.view');
         Route::get('/organizations/archived', [OrganizationController::class, 'archived'])->middleware('permission:organizations.view');
         Route::post('/organizations/archived/{organization}/restore', [OrganizationController::class, 'restore'])->middleware('permission:organizations.manage');
         Route::get('/organizations/{organization}', [OrganizationController::class, 'show'])->middleware('permission:organizations.view');

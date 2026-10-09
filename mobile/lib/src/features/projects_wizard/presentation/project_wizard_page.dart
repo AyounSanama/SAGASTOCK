@@ -1097,6 +1097,7 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
         subtitle: 'Ils seront proposés par défaut à chaque FOSA du projet, puis modifiables par FOSA.',
         children: [
           DropdownButtonFormField<int>(
+            isExpanded: true,
             initialValue: _period,
             decoration: InputDecoration(
               labelText: 'Périodicité de commande *',
@@ -1114,6 +1115,7 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
           ),
           const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<int>(
+            isExpanded: true,
             initialValue: _lead,
             decoration: InputDecoration(
               labelText: 'Délai de livraison *',
@@ -1131,6 +1133,7 @@ class _ProjectWizardPageState extends State<ProjectWizardPage> {
           ),
           const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<num>(
+            isExpanded: true,
             initialValue: safetyOptions.where((option) => option == _safety).firstOrNull,
             decoration: InputDecoration(
               labelText: 'Stock de sécurité *',

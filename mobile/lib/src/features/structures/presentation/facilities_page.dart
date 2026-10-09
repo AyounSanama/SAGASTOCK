@@ -735,6 +735,7 @@ class _FacilityFormState extends State<_FacilityForm> {
                           if (widget.missions.isNotEmpty) ...[
                             const SizedBox(height: 12),
                             DropdownButtonFormField<String?>(
+                              isExpanded: true,
                               initialValue: _missionId,
                               decoration: const InputDecoration(
                                 labelText: 'Coordination / Mission',
@@ -773,6 +774,7 @@ class _FacilityFormState extends State<_FacilityForm> {
                             child: Column(
                               children: [
                                 DropdownButtonFormField<String>(
+                                  isExpanded: true,
                                   initialValue: _careLevel,
                                   decoration: const InputDecoration(
                                     labelText: 'Niveau de soins *',
@@ -796,6 +798,7 @@ class _FacilityFormState extends State<_FacilityForm> {
                                 ),
                                 const SizedBox(height: 14),
                                 DropdownButtonFormField<String>(
+                                  isExpanded: true,
                                   initialValue: _type,
                                   decoration: const InputDecoration(
                                     labelText:
@@ -1133,6 +1136,7 @@ class _FacilityFormState extends State<_FacilityForm> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<int>(
+          isExpanded: true,
           initialValue: _orderPeriod,
           decoration: const InputDecoration(
             labelText: 'Périodicité de commande',
@@ -1145,6 +1149,7 @@ class _FacilityFormState extends State<_FacilityForm> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<int>(
+          isExpanded: true,
           initialValue: _leadTime,
           decoration: const InputDecoration(
             labelText: 'Délai de livraison (DL)',
@@ -1157,6 +1162,7 @@ class _FacilityFormState extends State<_FacilityForm> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<double>(
+          isExpanded: true,
           initialValue: _safetyStock,
           decoration: const InputDecoration(labelText: 'Stock de sécurité'),
           items: [

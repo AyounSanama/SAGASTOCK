@@ -1,10 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/access/application_access.dart';
+import '../../../core/format/display_format.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_form_sheet.dart';
 import '../../../core/widgets/app_navigation_drawer.dart';
+import '../../auth/data/auth_service.dart';
 import '../data/inventory_service.dart';
 
 class InventoriesPage extends StatefulWidget {
@@ -26,8 +30,11 @@ class _InventoriesPageState extends State<InventoriesPage> {
     _init();
   }
 
+  Map<String, dynamic>? _user;
+
   Future<void> _init() async {
     try {
+      _user = await AuthService().cachedUser();
       organizations = await service.organizations();
       organizationId = organizations.isEmpty
           ? null
@@ -47,11 +54,11 @@ class _InventoriesPageState extends State<InventoriesPage> {
       final r = await Future.wait([
         service.inventories(organizationId!),
         service.sites(organizationId!),
-        service.pendingCount(),
       ]);
-      inventories = r[0] as List<Map<String, dynamic>>;
-      sites = r[1] as List<Map<String, dynamic>>;
-      pending = r[2] as int;
+      inventories = r[0];
+      sites = r[1];
+      // Lu après la liste, qui synchronise d'abord la file hors connexion.
+      pending = await service.pendingCount();
       error = null;
     } on DioException catch (e) {
       error = e.response == null
@@ -140,16 +147,29 @@ class _InventoriesPageState extends State<InventoriesPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     drawer: const AppNavigationDrawer(),
-    appBar: AppBar(title: const Text('Inventaires physiques')),
+    appBar: AppBar(
+      title: const Text('Inventaires physiques'),
+      // Le menu « Inventaires & Commandes » arrive ici : accès aux commandes.
+      actions: [
+        if (ApplicationAccess.allows(_user, 'orders.view'))
+          TextButton.icon(
+            onPressed: () => context.go('/orders'),
+            icon: const Icon(Icons.shopping_cart_outlined),
+            label: const Text('Commandes'),
+          ),
+      ],
+    ),
     floatingActionButton: AppFab(
       tooltip: 'Nouvel inventaire',
-      onPressed: organizationId == null ? null : create,
+      // Inactif pendant le chargement : la liste des sites serait vide.
+      onPressed: organizationId == null || loading ? null : create,
     ),
     body: Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
           child: DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: organizationId,
             decoration: const InputDecoration(
               labelText: 'Organisation',
@@ -201,6 +221,14 @@ class _InventoriesPageState extends State<InventoriesPage> {
       ],
     ),
   );
+  static const _statusLabels = {
+    'draft': 'Brouillon',
+    'counting': 'Comptage en cours',
+    'submitted': 'Soumis',
+    'validated': 'Validé',
+    'rejected': 'Rejeté',
+  };
+
   Widget card(Map<String, dynamic> inv) {
     final lines = (inv['lines'] as List? ?? []).cast<Map<String, dynamic>>(),
         status = '${inv['status']}';
@@ -221,11 +249,11 @@ class _InventoriesPageState extends State<InventoriesPage> {
                     ),
                   ),
                 ),
-                Chip(label: Text(status)),
+                Chip(label: Text(_statusLabels[status] ?? status)),
               ],
             ),
             Text(
-              '${inv['site']?['name'] ?? ''} · ${inv['period_date']}',
+              '${inv['site']?['name'] ?? ''} · ${formatDay(inv['period_date'])}',
               style: TextStyle(color: AppTheme.muted),
             ),
             if (status == 'counting')
@@ -366,13 +394,13 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
         SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(10), child: Row(children: List.generate(4, (index) => Padding(padding: const EdgeInsets.only(right: 8), child: ChoiceChip(label: Text('${index + 1}. ${labels[index]}'), selected: _step == index, onSelected: (_) => _go(index))))),
         Expanded(child: PageView(controller: _pages, onPageChanged: (index) async { if (index > _step && !_valid(_step)) { await _pages.animateToPage(_step, duration: const Duration(milliseconds: 220), curve: Curves.easeOut); return; } setState(() => _step = index); }, children: [
           _page(Column(children: [
-            _InventorySummaryLine('Référence', '${widget.inventory['reference']}'), _InventorySummaryLine('Date', '${widget.inventory['period_date']}'),
+            _InventorySummaryLine('Référence', '${widget.inventory['reference']}'), _InventorySummaryLine('Date', formatDay(widget.inventory['period_date'])),
             _InventorySummaryLine('FOSA / Point', '${widget.inventory['site']?['name'] ?? ''}'), _InventorySummaryLine('Statut', 'Comptage en cours'),
           ])),
           _page(Column(children: [for (final line in _lines) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${line['product']?['code'] ?? ''} · ${line['product']?['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
-            Text('Lot ${line['batch']?['batch_number'] ?? ''} · Exp. ${line['batch']?['expires_on'] ?? '—'}'),
-            const SizedBox(height: 8), Text('Stock théorique : ${line['theoretical_quantity']}'), const SizedBox(height: 8),
+            Text('Lot ${line['batch']?['batch_number'] ?? ''} · Exp. ${formatDay(line['batch']?['expires_on'])}'),
+            const SizedBox(height: 8), Text('Stock théorique : ${formatQuantity(line['theoretical_quantity'])}'), const SizedBox(height: 8),
             TextField(controller: _quantities['${line['id']}'], keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Quantité comptée *')),
             const SizedBox(height: 8), TextField(controller: _reasons['${line['id']}'], decoration: const InputDecoration(labelText: 'Justification si écart')),
           ])))])),
@@ -439,7 +467,7 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
                         ),
                         _InventorySummaryLine(
                           'Date',
-                          '${widget.inventory['period_date']}',
+                          formatDay(widget.inventory['period_date']),
                         ),
                         _InventorySummaryLine(
                           'FOSA / Point',
@@ -468,6 +496,20 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
                 ],
               ),
             ),
+            // Trois boutons côte à côte coupaient leurs libellés : le
+            // brouillon passe sur sa propre ligne à la dernière étape.
+            if (_step == 3)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+                child: AppButton.save(
+                  label: 'Enregistrer brouillon',
+                  expanded: true,
+                  onPressed: () => Navigator.pop(
+                    context,
+                    _InventoryWorkflowResult(_payload(), submit: false),
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(14),
               child: Row(
@@ -489,16 +531,6 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
                       ),
                     )
                   else ...[
-                    Expanded(
-                      child: AppButton.save(
-                        label: 'Enregistrer brouillon',
-                        onPressed: () => Navigator.pop(
-                          context,
-                          _InventoryWorkflowResult(_payload(), submit: false),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
                     Expanded(
                       child: AppButton.validate(
                         label: 'Soumettre',
@@ -538,10 +570,10 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
           Text(
-            'Lot ${line['batch']?['batch_number'] ?? ''} · Exp. ${line['batch']?['expires_on'] ?? '—'}',
+            'Lot ${line['batch']?['batch_number'] ?? ''} · Exp. ${formatDay(line['batch']?['expires_on'])}',
           ),
           const SizedBox(height: 8),
-          Text('Stock théorique : ${line['theoretical_quantity']}'),
+          Text('Stock théorique : ${formatQuantity(line['theoretical_quantity'])}'),
           const SizedBox(height: 8),
           TextField(
             controller: _quantities['${line['id']}'],
@@ -568,10 +600,10 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
           '${line['product']?['name']} · lot ${line['batch']?['batch_number']}',
         ),
         subtitle: Text(
-          'Théorique ${_theoretical(line)} · Compté ${physical ?? '—'}',
+          'Théorique ${formatQuantity(_theoretical(line))} · Compté ${formatQuantity(physical)}',
         ),
         trailing: Text(
-          gap == null ? '—' : '${gap > 0 ? '+' : ''}${gap.toStringAsFixed(2)}',
+          gap == null ? '—' : '${gap > 0 ? '+' : ''}${formatQuantity(gap)}',
           style: TextStyle(
             fontWeight: FontWeight.w900,
             color: gap == 0 ? AppColors.successText : AppColors.dangerText,
@@ -598,13 +630,13 @@ class _InventoryWorkflowState extends State<_InventoryWorkflow> {
     }
     return Column(
       children: [
-        _InventorySummaryLine('Date', '${widget.inventory['period_date']}'),
+        _InventorySummaryLine('Date', formatDay(widget.inventory['period_date'])),
         _InventorySummaryLine('Produits / lots', '${_lines.length}'),
         _InventorySummaryLine(
           'Stock théorique',
-          theoretical.toStringAsFixed(2),
+          formatQuantity(theoretical),
         ),
-        _InventorySummaryLine('Stock compté', physical.toStringAsFixed(2)),
+        _InventorySummaryLine('Stock compté', formatQuantity(physical)),
         _InventorySummaryLine('Écarts positifs', '$positive'),
         _InventorySummaryLine('Écarts négatifs', '$negative'),
         _InventorySummaryLine('Sans écart', '$equal'),
@@ -662,6 +694,7 @@ class _InventoryCreateFormState extends State<InventoryCreateForm> {
     },
     children: [
       DropdownButtonFormField<String>(
+        isExpanded: true,
         decoration: const InputDecoration(labelText: 'Site'),
         items: widget.sites
             .map(
@@ -680,6 +713,7 @@ class _InventoryCreateFormState extends State<InventoryCreateForm> {
         validator: _required,
       ),
       DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: type,
         decoration: const InputDecoration(labelText: 'Type'),
         items: const [

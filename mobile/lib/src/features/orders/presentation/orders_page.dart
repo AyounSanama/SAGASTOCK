@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/access/application_access.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_form_sheet.dart';
+import '../../../core/widgets/app_navigation_drawer.dart';
+import '../../auth/data/auth_service.dart';
 import '../data/order_service.dart';
 
 class OrdersPage extends StatefulWidget {
@@ -17,6 +20,9 @@ class _OrdersPageState extends State<OrdersPage> {
   List<Map<String, dynamic>> organizations = [], orders = [];
   Map<String, dynamic> options = {};
   int pending = 0;
+  Map<String, dynamic>? _user;
+  bool get _canManage => ApplicationAccess.allows(_user, 'orders.manage');
+
   @override
   void initState() {
     super.initState();
@@ -26,17 +32,18 @@ class _OrdersPageState extends State<OrdersPage> {
   Future<void> _load() async {
     setState(() => loading = true);
     try {
+      _user ??= await AuthService().cachedUser();
       organizations = await service.organizations();
       organizationId ??= organizations.firstOrNull?['id']?.toString();
       if (organizationId != null) {
         final values = await Future.wait([
           service.orders(organizationId!),
           service.options(organizationId!),
-          service.pendingCount(),
         ]);
         orders = values[0] as List<Map<String, dynamic>>;
         options = values[1] as Map<String, dynamic>;
-        pending = values[2] as int;
+        // Lu après la liste, qui synchronise d'abord la file hors connexion.
+        pending = await service.pendingCount();
       }
     } finally {
       if (mounted) setState(() => loading = false);
@@ -90,6 +97,7 @@ class _OrdersPageState extends State<OrdersPage> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: site,
                 decoration: const InputDecoration(labelText: 'Site demandeur'),
                 items: sites
@@ -104,13 +112,17 @@ class _OrdersPageState extends State<OrdersPage> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: product,
                 decoration: const InputDecoration(labelText: 'Produit'),
                 items: products
                     .map(
                       (p) => DropdownMenuItem(
                         value: p['id'].toString(),
-                        child: Text('${p['name']}'),
+                        child: Text(
+                          '${p['code'] ?? ''} · ${p['name']}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     )
                     .toList(),
@@ -138,6 +150,11 @@ class _OrdersPageState extends State<OrdersPage> {
         ),
       ),
     );
+    final requested = double.tryParse(quantity.text.replaceAll(',', '.')) ?? 0;
+    if (ok == true && requested <= 0) {
+      _message('Saisissez une quantité demandée supérieure à 0.');
+      return;
+    }
     if (ok == true && organizationId != null) {
       final online = await service.create(organizationId!, {
         'reference': reference.text,
@@ -147,7 +164,7 @@ class _OrdersPageState extends State<OrdersPage> {
         'lines': [
           {
             'product_id': product,
-            'requested_quantity': double.tryParse(quantity.text) ?? 0,
+            'requested_quantity': requested,
           },
         ],
       });
@@ -166,14 +183,24 @@ class _OrdersPageState extends State<OrdersPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    drawer: const AppNavigationDrawer(),
     appBar: AppBar(
       title: const Text('Commandes'),
-      actions: [IconButton(onPressed: _load, icon: const Icon(Icons.sync))],
+      actions: [
+        IconButton(
+          tooltip: 'Actualiser',
+          onPressed: _load,
+          icon: const Icon(Icons.sync),
+        ),
+      ],
     ),
-    floatingActionButton: FloatingActionButton(
-      onPressed: _create,
-      child: const Icon(Icons.add),
-    ),
+    floatingActionButton: _canManage
+        ? FloatingActionButton(
+            tooltip: 'Nouvelle commande',
+            onPressed: _create,
+            child: const Icon(Icons.add),
+          )
+        : null,
     body: loading
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(
@@ -196,6 +223,7 @@ class _OrdersPageState extends State<OrdersPage> {
                     ),
                   ),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: organizationId,
                   decoration: const InputDecoration(labelText: 'Organisation'),
                   items: organizations
@@ -224,8 +252,9 @@ class _OrdersPageState extends State<OrdersPage> {
                       subtitle: Text(
                         '${site?['name'] ?? 'Site'} · ${_label(status)}',
                       ),
-                      trailing: status == 'draft'
+                      trailing: status == 'draft' && _canManage
                           ? IconButton(
+                              tooltip: 'Soumettre pour approbation',
                               icon: const Icon(Icons.send_outlined),
                               onPressed: () async {
                                 await service.submit(

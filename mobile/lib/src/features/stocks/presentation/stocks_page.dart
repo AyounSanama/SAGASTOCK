@@ -11,6 +11,7 @@ import '../../../core/widgets/app_form_sheet.dart';
 import '../../../core/access/application_access.dart';
 import '../../auth/data/auth_service.dart';
 import '../data/stock_service.dart';
+import '../../../core/format/display_format.dart';
 
 class StocksPage extends StatefulWidget {
   const StocksPage({super.key});
@@ -284,6 +285,7 @@ class _StocksPageState extends State<StocksPage> {
           padding: const EdgeInsets.all(16),
           children: [
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _organizationId,
               decoration: const InputDecoration(
                 labelText: 'Organisation',
@@ -346,7 +348,7 @@ class _StocksPageState extends State<StocksPage> {
                   Expanded(
                     child: _SummaryCard(
                       label: 'Quantité totale',
-                      value: total.toStringAsFixed(2),
+                      value: formatQuantity(total),
                       icon: Icons.stacked_bar_chart,
                     ),
                   ),
@@ -379,11 +381,11 @@ class _StocksPageState extends State<StocksPage> {
                       leading: CircleAvatar(child: Text('#${indexed.$1 + 1}')),
                       title: Text('${indexed.$2['product']?['name'] ?? 'Produit'}'),
                       subtitle: Text(
-                        'Lot ${indexed.$2['batch']?['batch_number']} • expiration ${indexed.$2['batch']?['expires_on']}\n${indexed.$2['site']?['name']}',
+                        'Lot ${indexed.$2['batch']?['batch_number']} • expiration ${formatDay(indexed.$2['batch']?['expires_on'])}\n${indexed.$2['site']?['name']}',
                       ),
                       isThreeLine: true,
                       trailing: Text(
-                        '${indexed.$2['available_quantity']}',
+                        formatQuantity(indexed.$2['available_quantity']),
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
@@ -415,14 +417,14 @@ class _StocksPageState extends State<StocksPage> {
                       ),
                       subtitle: Text(
                         '${balance['site']?['name'] ?? 'Site'} · Lot ${balance['batch']?['batch_number'] ?? '—'}\n'
-                        'Expiration : ${balance['batch']?['expires_on'] ?? '—'}',
+                        'Expiration : ${formatDay(balance['batch']?['expires_on'])}',
                       ),
                       isThreeLine: true,
                       trailing: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            '${balance['available_quantity']}',
+                            formatQuantity(balance['available_quantity']),
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 17,
@@ -452,13 +454,13 @@ class _StocksPageState extends State<StocksPage> {
                     ),
                     title: Text('${movement['product']?['name'] ?? 'Produit'}'),
                     subtitle: Text(
-                      '${movement['movement_type']} · ${movement['site']?['name'] ?? 'Site'}',
+                      '${_MovementFormState._types[movement['movement_type']] ?? movement['movement_type']} · ${movement['site']?['name'] ?? 'Site'}',
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${movement['quantity']}',
+                          formatQuantity(movement['quantity']),
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         if (_canAdjust &&
@@ -616,6 +618,7 @@ class _MovementFormState extends State<_MovementForm> {
             children: [
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Site de stockage / dispensation',
                   prefixIcon: Icon(Icons.location_on_outlined),
@@ -637,6 +640,7 @@ class _MovementFormState extends State<_MovementForm> {
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Médicament / produit médical et lot',
                   prefixIcon: Icon(Icons.medication_outlined),
@@ -658,6 +662,7 @@ class _MovementFormState extends State<_MovementForm> {
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Nature du mouvement',
                   prefixIcon: Icon(Icons.swap_vert),
