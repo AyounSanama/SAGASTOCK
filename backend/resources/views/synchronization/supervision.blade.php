@@ -7,13 +7,13 @@
     $generated = \Illuminate\Support\Carbon::parse($board['generated_at'])->setTimezone(config('app.timezone'));
     $projectName = collect($board['projects'])->firstWhere('id', $filters['project_id'])['name'] ?? 'Tous les projets';
     $link = fn (array $query) => route('modules.synchronization', array_filter([...$filters, ...$query], fn ($value) => $value !== null && $value !== '' && $value !== 'all'));
-    $tone = ['ok' => 'success', 'check' => 'warning', 'late' => 'danger'];
+    $tone = ['ok' => 'sy-ok', 'check' => 'sy-check', 'late' => 'sy-late'];
     $selected = $board['selected'];
 @endphp
 @push('styles')<style>
 .sy{width:100%;box-sizing:border-box;max-width:1440px;margin:auto;padding:28px 32px 60px;color:var(--pc-color-text)}
 .sy-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}.sy-head small{color:var(--pc-color-text-muted)}.sy-head h1{margin:2px 0 0;font-size:24px}
-.sy-project{display:flex;align-items:center;gap:10px;color:var(--pc-color-text-muted);font-size:13px}.sy-project select{min-height:40px;border:1px solid var(--pc-color-border);border-radius:10px;padding:8px 12px;font:inherit;background:var(--pc-color-surface,#fff);color:var(--pc-color-text)}
+.sy-project{display:flex;align-items:center;gap:10px;color:var(--pc-color-text-muted);font-size:13px}.sy-project span{white-space:nowrap}.sy-project select{max-width:300px;min-height:40px;border:1px solid var(--pc-color-border);border-radius:10px;padding:8px 12px;font:inherit;background:var(--pc-color-surface,#fff);color:var(--pc-color-text)}
 .sy-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0}.sy-kpi{background:var(--pc-color-surface,#fff);border:1px solid var(--pc-color-border);border-radius:14px;padding:16px 18px}.sy-kpi small{color:var(--pc-color-text-muted);font-size:13px}.sy-kpi strong{font-size:28px;margin-right:6px}.sy-kpi span{color:var(--pc-color-text-muted)}.sy-kpi .warn{color:var(--pc-color-primary-strong)}.sy-kpi .bad{color:var(--pc-status-danger-text)}
 .sy-card{background:var(--pc-color-surface,#fff);border:1px solid var(--pc-color-border);border-radius:14px;overflow:hidden;margin-bottom:18px}
 .sy-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px}.sy-chips{display:flex;gap:8px;flex-wrap:wrap}
@@ -21,7 +21,7 @@
 .sy-search{min-height:40px;min-width:260px;border:1px solid var(--pc-color-border);border-radius:10px;padding:8px 12px;font:inherit;background:var(--pc-color-surface,#fff);color:inherit}
 .sy-scroll{overflow-x:auto}.sy-table{width:100%;border-collapse:collapse;min-width:860px}.sy-table th{font-size:12px;text-align:left;color:var(--pc-color-text-muted);padding:10px 16px;background:var(--pc-color-surface-subtle);border-top:1px solid var(--pc-color-border);border-bottom:1px solid var(--pc-color-border)}.sy-table td{padding:13px 16px;border-bottom:1px solid var(--pc-color-border)}.sy-table .num{text-align:right}.sy-table tr.sel td{background:var(--pc-color-primary-soft)}.sy-table tbody tr{cursor:pointer}.sy-table tbody tr:hover td{background:var(--pc-color-surface-subtle)}.sy-table a{color:inherit;text-decoration:none;font-weight:700}
 .sy-zero{color:var(--pc-color-text-muted)}.sy-red{color:var(--pc-status-danger-text);font-weight:700}.sy-orange{color:var(--pc-color-primary-strong);font-weight:700}
-.sy-badge{display:inline-flex;white-space:nowrap;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:700}.sy-badge.success{background:var(--pc-status-success-bg);color:var(--pc-status-success-text)}.sy-badge.warning{background:var(--pc-color-primary-soft);color:var(--pc-color-primary-strong)}.sy-badge.danger{background:var(--pc-status-danger-bg);color:var(--pc-status-danger-text)}
+.sy-badge{display:inline-flex;white-space:nowrap;padding:3px 10px;border:0;border-radius:999px;font-size:13px;font-weight:700}.sy-badge.sy-ok{background:var(--pc-status-success-bg);color:var(--pc-status-success-text)}.sy-badge.sy-check{background:var(--pc-color-primary-soft);color:var(--pc-color-primary-strong)}.sy-badge.sy-late{background:var(--pc-status-danger-bg);color:var(--pc-status-danger-text)}
 .sy-note{padding:12px 16px;color:var(--pc-color-text-muted);font-size:13px;border-top:1px solid var(--pc-color-border)}.sy-empty{padding:22px 16px;color:var(--pc-color-text-muted)}
 .sy-detail>header{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:16px 16px 8px}.sy-detail h2{margin:0;font-size:17px}.sy-detail header span{color:var(--pc-color-text-muted);font-size:13px}
 .sy-issues{display:grid;gap:10px;padding:8px 16px}.sy-issue{display:grid;grid-template-columns:110px 1fr auto;gap:12px;align-items:center;border:1px solid var(--pc-color-border);border-radius:12px;padding:12px 14px}.sy-issue strong{display:block}.sy-issue p{margin:2px 0 0;color:var(--pc-color-text-muted);font-size:13px}.sy-issue time{color:var(--pc-color-text-muted);font-size:13px;white-space:nowrap}
@@ -100,7 +100,7 @@
             <div class="sy-issues">
                 @forelse($selected['issues'] as $issue)
                     <article class="sy-issue">
-                        <span class="sy-badge {{ $issue['kind'] === 'conflict' ? 'warning' : 'danger' }}" style="justify-content:center">{{ $issue['kind_label'] }}</span>
+                        <span class="sy-badge {{ $issue['kind'] === 'conflict' ? 'sy-check' : 'sy-late' }}" style="justify-content:center">{{ $issue['kind_label'] }}</span>
                         <div><strong>{{ $issue['module_label'] }} {{ $issue['reference'] }}</strong><p>{{ $issue['kind'] === 'conflict' ? '' : 'Refusé : ' }}{{ $issue['reason'] ?: 'Motif non transmis.' }}@if($issue['reported']) · <strong style="display:inline">Signalé par l’utilisateur</strong>@endif</p></div>
                         <time>{{ $issue['occurred_label'] }}</time>
                     </article>
