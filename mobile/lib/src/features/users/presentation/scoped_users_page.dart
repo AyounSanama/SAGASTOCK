@@ -1,3 +1,4 @@
+import 'temporary_password_dialog.dart';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -739,6 +740,16 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
     if (result == null || !mounted) return;
     await _load();
     if (!mounted) return;
+    final temporary = result['temporary_password'];
+    if (!editing && temporary is String && temporary.isNotEmpty) {
+      // Mot de passe généré : montré une seule fois, à transmettre.
+      await showTemporaryPassword(
+        context,
+        password: temporary,
+        userName: '${(result['user'] as Map?)?['name'] ?? 'l’utilisateur'}',
+      );
+      return;
+    }
     _message(
       editing
           ? 'Utilisateur modifié.'
@@ -858,8 +869,37 @@ class _ScopedUsersPageState extends State<ScopedUsersPage> {
       );
       return;
     }
-    await _service.resetPassword('${user['id']}');
+    // L'ancien mot de passe cesse de fonctionner et l'utilisateur est déconnecté.
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Réinitialiser le mot de passe ?'),
+        content: Text(
+          '${user['name'] ?? 'L’utilisateur'} sera déconnecté et devra utiliser le nouveau mot de passe temporaire.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Réinitialiser'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final temporary = await _service.resetPassword('${user['id']}');
     if (!mounted) return;
+    if (temporary != null && temporary.isNotEmpty) {
+      await showTemporaryPassword(
+        context,
+        password: temporary,
+        userName: '${user['name'] ?? 'l’utilisateur'}',
+      );
+      return;
+    }
     _message(
       'Mot de passe réinitialisé. L’utilisateur devra le modifier lors de sa prochaine connexion.',
     );

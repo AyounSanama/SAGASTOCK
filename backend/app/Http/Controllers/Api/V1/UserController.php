@@ -134,6 +134,9 @@ class UserController extends Controller
         return response()->json([
             'user' => $user->load('roles:id,code,name'),
             'message' => 'Compte créé avec succès. L’utilisateur devra modifier son mot de passe lors de sa première connexion.',
+            // Mot de passe généré : montré une seule fois à l'administrateur
+            // (jamais journalisé ni conservé en clair).
+            ...($generated ? ['temporary_password' => $password] : []),
         ], 201);
     }
 
@@ -190,6 +193,8 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'Mot de passe réinitialisé. L’utilisateur devra le modifier lors de sa prochaine connexion.',
+            // Montré une seule fois à l'administrateur, à transmettre à l'utilisateur.
+            'temporary_password' => $temporary,
         ]);
     }
 

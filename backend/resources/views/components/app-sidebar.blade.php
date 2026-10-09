@@ -1,3 +1,4 @@
+@include('components.temporary-password')
 @php
     $actor = auth()->user();
     $navigationItems = $actor ? app(\App\Services\ApplicationNavigationService::class)->items($actor) : [];

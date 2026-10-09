@@ -77,6 +77,7 @@ Audit réalisé **sans modifier le code** (lecture du code, des configurations, 
 | S-07 | **Corrigé** | Périmètre plateforme réservé à l'Admin Sago. | `SecurityHardeningTest` |
 | S-09 | **Corrigé** | Connexion Web limitée à 6 essais par minute et par adresse IP. | `SecurityHardeningTest` |
 | S-11 | **Corrigé** | `league/commonmark` 2.10.3, `axios` 1.20, `nanoid` corrigé : `composer audit` et `npm audit` sans vulnérabilité. | — |
+| S-16 | **Corrigé** (09/10, validé par le client) | Mot de passe généré à la création ou à la réinitialisation d'un compte : **montré une seule fois** à l'administrateur (fenêtre avec « Copier », Web et mobile ; réinitialisation confirmée), jamais journalisé ni conservé en clair ; l'utilisateur le change à la première connexion (S-04). Avant : généré puis perdu, compte inutilisable. | `TemporaryPasswordDisclosureTest` |
 
 Constatés pendant les corrections :
 

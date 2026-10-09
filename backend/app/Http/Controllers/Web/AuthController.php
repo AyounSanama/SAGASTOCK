@@ -217,6 +217,10 @@ class AuthController extends Controller
             ? redirect()->route('organizations.missions.show', [$organization, $mission])
                 ->with('status', "L’administrateur projet {$user->name} a été créé et affecté avec succès.")
             : redirect()->route('users.index')->with('success', "L’utilisateur {$user->name} a été créé avec succès.");
+        // Mot de passe généré : montré une seule fois à l'administrateur.
+        if ($generated) {
+            $response->with(['temporary_password' => $password, 'temporary_password_for' => $user->name]);
+        }
 
         return $response;
     }
@@ -264,7 +268,9 @@ class AuthController extends Controller
         $user->tokens()->delete();
         $this->audit->record($request, 'user.password_reset', $user);
 
-        return back()->with('success', 'Mot de passe réinitialisé. L’utilisateur devra le modifier lors de sa prochaine connexion.');
+        return back()->with('success', 'Mot de passe réinitialisé. L’utilisateur devra le modifier lors de sa prochaine connexion.')
+            // Montré une seule fois à l'administrateur, à transmettre à l'utilisateur.
+            ->with(['temporary_password' => $temporary, 'temporary_password_for' => $user->name]);
     }
 
     private function parseScope(string $scope): array

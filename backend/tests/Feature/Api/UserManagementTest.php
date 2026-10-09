@@ -73,8 +73,11 @@ class UserManagementTest extends TestCase
             'scope_id' => $this->project->id,
         ])->assertCreated()
             ->assertJsonStructure(['user', 'message'])
-            ->assertJsonMissingPath('temporary_password')
-            ->assertJsonMissingPath('password');
+            // Décision du 09/10 : mot de passe généré montré une seule fois à
+            // l'administrateur (sinon le compte était inutilisable).
+            ->assertJsonStructure(['temporary_password'])
+            ->assertJsonMissingPath('password')
+            ->assertJsonMissingPath('user.password');
         $user = User::where('email', 'marie@example.org')->firstOrFail();
         $this->putJson('/api/v1/users/'.$user->id, ['is_active' => false])->assertOk()->assertJsonPath('user.is_active', false);
         $this->assertDatabaseHas('audit_logs', ['event' => 'user.created', 'auditable_id' => (string) $user->id]);

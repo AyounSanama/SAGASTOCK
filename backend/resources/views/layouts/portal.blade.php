@@ -31,6 +31,7 @@
 <body class="pc-app portal-body">
     <div class="portal-shell">
         @include('components.navigation.sidebar')
+        @include('components.temporary-password')
         <div class="portal-workspace">
             <main class="portal-content">
                 <x-app-page-layout>

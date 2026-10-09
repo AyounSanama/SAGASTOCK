@@ -72,11 +72,13 @@ class UserService {
     );
   }
 
-  Future<void> resetPassword(String userId) async {
-    await _client.dio.post<Map<String, dynamic>>(
+  /// Renvoie le mot de passe temporaire généré (à montrer une seule fois).
+  Future<String?> resetPassword(String userId) async {
+    final response = await _client.dio.post<Map<String, dynamic>>(
       '/users/$userId/reset-password',
       options: await _authorized(),
     );
+    return response.data?['temporary_password'] as String?;
   }
 
   Future<Options> _authorized() async => Options(

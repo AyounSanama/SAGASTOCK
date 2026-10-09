@@ -5,6 +5,7 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_form_sheet.dart';
 import '../../organizations/data/organization_service.dart';
 import '../data/user_service.dart';
+import 'temporary_password_dialog.dart';
 
 /// Configuration Mission, rubrique Comptes : depuis « Ma Coordination »,
 /// l'Admin Coordination crée un Admin Projet (projet choisi dans la liste des
@@ -60,7 +61,7 @@ Future<bool> openCoordinationAccountSheet(
   String roleCode() =>
       '${roles.firstWhere((role) => role['id'] == roleId)['code']}';
 
-  final created = await showAppFormSheet<bool>(
+  final created = await showAppFormSheet<Map<String, dynamic>>(
     context: context,
     title: 'Créer un compte',
     description:
@@ -75,7 +76,7 @@ Future<bool> openCoordinationAccountSheet(
             error = null;
           });
           try {
-            await userService.create({
+            final response = await userService.create({
               'name': '${firstName.text.trim()} ${lastName.text.trim()}',
               'first_name': firstName.text.trim(),
               'last_name': lastName.text.trim(),
@@ -87,7 +88,7 @@ Future<bool> openCoordinationAccountSheet(
               'scope_id': projectAdmin ? projectId : missionId,
               'must_change_password': true,
             });
-            if (sheetContext.mounted) Navigator.of(sheetContext).pop(true);
+            if (sheetContext.mounted) Navigator.of(sheetContext).pop(response);
           } on DioException catch (exception) {
             final data = exception.response?.data;
             setSheetState(() {
@@ -202,7 +203,17 @@ Future<bool> openCoordinationAccountSheet(
   );
   // Champs de la fenêtre : jamais libérés pendant sa fermeture animée
   // (écran rouge « _dependents.isEmpty ») ; la mémoire les récupère.
-  return created ?? false;
+  if (created == null) return false;
+  // Mot de passe généré par le serveur : montré une seule fois, à transmettre.
+  final temporary = created['temporary_password'];
+  if (temporary is String && temporary.isNotEmpty && context.mounted) {
+    await showTemporaryPassword(
+      context,
+      password: temporary,
+      userName: '${firstName.text.trim()} ${lastName.text.trim()}'.trim(),
+    );
+  }
+  return true;
 }
 
 /// Libellé des rôles proposés à la Coordination (null : rôle non proposé).
