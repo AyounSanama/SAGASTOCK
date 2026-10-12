@@ -17,7 +17,7 @@ class Receipt extends Model
 
     protected $fillable = ['organization_id', 'site_id', 'supplier_id', 'reference', 'order_reference', 'received_on', 'status', 'notes', 'created_by', 'validated_by', 'validated_at',
         // Niveau 7 : origine (couple ONG/Bailleur = projet, ou « Autre »).
-        'origin_type', 'origin_project_id', 'origin_label'];
+        'origin_type', 'origin_project_id', 'origin_label', 'outside_list_reason'];
 
     protected function casts(): array
     {

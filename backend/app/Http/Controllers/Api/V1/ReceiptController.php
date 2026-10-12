@@ -9,6 +9,7 @@ use App\Notifications\OperationalNotification;
 use App\Models\Receipt;
 use App\Models\Site;
 use App\Services\AuditService;
+use App\Services\OutsideListService;
 use App\Services\ModuleActivationService;
 use App\Services\StockLedgerService;
 use App\Services\StockOriginService;
@@ -40,7 +41,9 @@ class ReceiptController extends Controller
         return response()->json([
             // Niveau 7 : couples ONG/Bailleur proposés pour chaque site (projets de sa FOSA).
             'sites' => Site::with('healthFacility:id,name')->whereIn('id', $this->siteIds($request, $organization))->orderBy('name')->get()
-                ->map(fn (Site $site) => [...$site->toArray(), 'origins' => $this->origins->options($site)->values()]),
+                ->map(fn (Site $site) => [...$site->toArray(), 'origins' => $this->origins->options($site)->values(),
+                    // Produits de la Liste Standard du site : les autres sont « hors liste ».
+                    'standard_product_ids' => app(OutsideListService::class)->standardProductIds($organization, $site)]),
             'suppliers' => $organization->suppliers()->where('is_active', true)->orderBy('name')->get(),
             'products' => $organization->products()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
         ]);
@@ -62,14 +65,18 @@ class ReceiptController extends Controller
             'items.*.quantity_received' => ['required', 'numeric', 'gt:0'], 'items.*.quantity_accepted' => ['required', 'numeric', 'gte:0'],
             'items.*.quantity_rejected' => ['nullable', 'numeric', 'gte:0'], 'items.*.unit_cost' => ['nullable', 'numeric', 'gte:0'],
             'items.*.discrepancy_reason' => ['nullable', 'string', 'max:1000'],
+            'outside_list_reason' => ['nullable', 'string', 'max:500'],
             ...StockOriginService::rules(),
         ], StockOriginService::messages(), StockOriginService::attributes());
         $site = $this->site($request, $organization, $data['site_id']);
         $origin = $this->origins->resolve($site, $data);
+        $outsideList = app(OutsideListService::class)->check($organization, $site, collect($data['items'])->map(fn (array $row) => filled($row['batch_id'] ?? null)
+            ? Batch::where('organization_id', $organization->id)->whereKey($row['batch_id'])->value('product_id')
+            : $row['product_id']), $origin, $data['outside_list_reason'] ?? null);
         if (filled($data['supplier_id'] ?? null)) {
             abort_unless($organization->suppliers()->whereKey($data['supplier_id'])->exists(), 422);
         }
-        $receipt = DB::transaction(function () use ($organization, $site, $data, $request, $origin) {
+        $receipt = DB::transaction(function () use ($organization, $site, $data, $request, $origin, $outsideList) {
             $receipt = Receipt::create([...collect($data)->except(['items', 'origin_type', 'origin_project_id', 'origin_label'])->all(), ...collect($origin)->except('origin_key')->all(), 'organization_id' => $organization->id, 'site_id' => $site->id, 'created_by' => $request->user()->id]);
             foreach ($data['items'] as $row) {
                 if (filled($row['batch_id'] ?? null)) {
@@ -105,12 +112,14 @@ class ReceiptController extends Controller
                     'batch_id' => $batch->id,
                     'product_id' => $batch->product_id,
                     'quantity_rejected' => $rejected,
+                    'outside_list' => $outsideList->has($batch->product_id),
                 ]);
             }
 
             return $receipt;
         });
         $this->audit->record($request, 'receipt.created', $receipt);
+        app(OutsideListService::class)->signal($site, $receipt, $outsideList);
 
         return response()->json(['receipt' => $receipt->fresh('items')], 201);
     }
@@ -155,4 +164,5 @@ class ReceiptController extends Controller
     {
         return $this->scopes->sites($request->user())->whereKey($id)->whereHas('healthFacility', fn ($q) => $q->where('organization_id', $organization->id))->firstOrFail();
     }
+
 }

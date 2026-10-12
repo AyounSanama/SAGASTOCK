@@ -14,11 +14,11 @@ class ReceiptItem extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['receipt_id', 'product_id', 'batch_id', 'quantity_ordered', 'quantity_received', 'quantity_accepted', 'quantity_rejected', 'unit_cost', 'discrepancy_reason'];
+    protected $fillable = ['receipt_id', 'product_id', 'batch_id', 'quantity_ordered', 'quantity_received', 'quantity_accepted', 'quantity_rejected', 'unit_cost', 'discrepancy_reason', 'outside_list'];
 
     protected function casts(): array
     {
-        return ['quantity_ordered' => 'decimal:4', 'quantity_received' => 'decimal:4', 'quantity_accepted' => 'decimal:4', 'quantity_rejected' => 'decimal:4', 'unit_cost' => 'decimal:4'];
+        return ['quantity_ordered' => 'decimal:4', 'quantity_received' => 'decimal:4', 'quantity_accepted' => 'decimal:4', 'quantity_rejected' => 'decimal:4', 'unit_cost' => 'decimal:4', 'outside_list' => 'boolean'];
     }
 
     public function receipt(): BelongsTo

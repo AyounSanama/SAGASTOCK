@@ -9,6 +9,7 @@ use App\Models\Receipt;
 use App\Models\Site;
 use App\Notifications\OperationalNotification;
 use App\Services\AuditService;
+use App\Services\OutsideListService;
 use App\Services\StockOriginService;
 use App\Services\ModuleActivationService;
 use App\Services\StockLedgerService;
@@ -81,6 +82,8 @@ class ReceiptController extends Controller
             'sites' => $sites,
             'suppliers' => $organization->suppliers()->where('is_active', true)->orderBy('name')->get(),
             'products' => $organization->products()->where('is_active', true)->orderBy('name')->get(),
+            // Niveau 7 : produits de la Liste Standard ; les autres sont marqués « hors liste ».
+            'standardProductIds' => $sites->flatMap(fn (Site $site) => app(OutsideListService::class)->standardProductIds($organization, $site))->unique()->values(),
             'canManage' => $request->user()->hasPermission('receipts.manage'),
         ]);
     }
@@ -111,15 +114,17 @@ class ReceiptController extends Controller
             'items.*.quantity_rejected' => ['nullable', 'numeric', 'gte:0'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'gte:0'],
             'items.*.discrepancy_reason' => ['nullable', 'string', 'max:1000'],
+            'outside_list_reason' => ['nullable', 'string', 'max:500'],
             ...StockOriginService::rules(),
         ], StockOriginService::messages(), StockOriginService::attributes());
         $site = $this->site($request, $organization, $data['site_id']);
         $origin = app(StockOriginService::class)->resolve($site, $data);
+        $outsideList = app(OutsideListService::class)->check($organization, $site, collect($data['items'])->pluck('product_id'), $origin, $data['outside_list_reason'] ?? null);
         if (filled($data['supplier_id'] ?? null)) {
             abort_unless($organization->suppliers()->whereKey($data['supplier_id'])->exists(), 422);
         }
 
-        $receipt = DB::transaction(function () use ($organization, $site, $data, $request, $origin) {
+        $receipt = DB::transaction(function () use ($organization, $site, $data, $request, $origin, $outsideList) {
             $receipt = Receipt::create([
                 ...collect($data)->except(['items', 'origin_type', 'origin_project_id', 'origin_label'])->all(),
                 ...collect($origin)->except('origin_key')->all(),
@@ -159,12 +164,14 @@ class ReceiptController extends Controller
                     'quantity_rejected' => $rejected,
                     'unit_cost' => $row['unit_cost'] ?? null,
                     'discrepancy_reason' => $row['discrepancy_reason'] ?? null,
+                    'outside_list' => $outsideList->has($product->id),
                 ]);
             }
 
             return $receipt;
         });
         $this->audit->record($request, 'receipt.created', $receipt);
+        app(OutsideListService::class)->signal($site, $receipt, $outsideList);
 
         return redirect()->route('organizations.receipts.index', $organization)
             ->with('status', 'Réception enregistrée comme brouillon. Vérifiez le rapport avant validation.');

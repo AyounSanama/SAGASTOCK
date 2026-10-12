@@ -462,6 +462,15 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
 
   bool get _forPatient => _destination == 'patient';
 
+  /// Produits proposés : Liste Standard, plus les articles hors liste en
+  /// stock tiers quand l'origine est « Autre » (niveau 7, décision du 09/10).
+  List<Map<String, dynamic>> get _productChoices => [
+    ...?_options['products'],
+    if (_originProjectId == _otherOrigin)
+      for (final product in _options['outside_list_products'] ?? const [])
+        {...product, 'outside_list': true},
+  ];
+
   int? get _ageYears {
     final value = int.tryParse(_age.text.trim());
     return value == null || value < 0 || value > 130 ? null : value;
@@ -674,7 +683,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
       _notice('Choisissez le lot périmé ou détérioré.');
       return;
     }
-    final product = _options['products']!.firstWhere(
+    final product = _productChoices.firstWhere(
       (value) => '${value['id']}' == _productId,
     );
     setState(() {
@@ -696,7 +705,7 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
     );
     if (code == null || !mounted) return;
 
-    final products = _options['products'] ?? const [];
+    final products = _productChoices;
     Map<String, dynamic>? matched;
     for (final product in products) {
       final primaryCode = '${product['code'] ?? ''}'.trim();
@@ -1058,11 +1067,15 @@ class _NewDispensationFlowPageState extends State<NewDispensationFlowPage> {
         isExpanded: true,
         initialValue: _productId,
         decoration: const InputDecoration(labelText: 'Produit'),
-        items: (_options['products'] ?? const [])
+        items: _productChoices
             .map(
               (product) => DropdownMenuItem(
                 value: '${product['id']}',
-                child: Text('${product['code']} · ${product['name']}'),
+                child: Text(
+                  '${product['code']} · ${product['name']}'
+                  '${product['outside_list'] == true ? ' · hors liste' : ''}',
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             )
             .toList(),

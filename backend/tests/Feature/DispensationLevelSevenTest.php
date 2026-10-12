@@ -52,7 +52,7 @@ class DispensationLevelSevenTest extends TestCase
         $this->product = Product::create(['organization_id' => $this->organization->id, 'code' => 'PARA', 'name' => 'Paracétamol', 'product_type' => 'medicine', 'is_active' => true]);
 
         $role = Role::create(['code' => 'care_test', 'name' => 'Soins']);
-        $role->permissions()->attach(collect(['patients.view', 'patients.manage', 'prescriptions.view', 'prescriptions.manage', 'dispensations.view', 'dispensations.manage', 'dispensing.view', 'inventories.view', 'inventories.manage'])
+        $role->permissions()->attach(collect(['patients.view', 'patients.manage', 'prescriptions.view', 'prescriptions.manage', 'dispensations.view', 'dispensations.manage', 'dispensing.view', 'inventories.view', 'inventories.manage', 'receipts.view', 'receipts.manage', 'stocks.view'])
             ->map(fn ($code) => Permission::firstOrCreate(['code' => $code], ['name' => $code])->id));
         $user = User::factory()->create(['is_active' => true, 'organization_id' => $this->organization->id]);
         $user->roles()->attach($role, ['scope_type' => 'organization', 'scope_id' => $this->organization->id]);
@@ -115,6 +115,39 @@ class DispensationLevelSevenTest extends TestCase
         // Écart = théorique − inventorié : 10 − 9 = 1 manquant.
         $this->putJson($this->url("inventories/$id/count"), ['lines' => [['id' => $lines[0]['id'], 'physical_quantity' => 9, 'justification' => 'Une boîte cassée']]])
             ->assertOk()->assertJsonPath('inventory.lines.0.variance_quantity', '1.0000');
+    }
+
+    public function test_outside_list_article_only_from_a_third_party_and_signaled(): void
+    {
+        // Liste Standard du projet : Paracétamol seulement ; l'Amoxicilline est hors liste.
+        $list = \App\Models\StandardList::create(['organization_id' => $this->organization->id, 'code' => 'LS-GFFO5', 'name' => 'Liste GFFO5',
+            'scope_type' => 'project', 'scope_id' => $this->gffo5->id, 'is_active' => true, 'allow_outside_list' => false]);
+        $version = \App\Models\StandardListVersion::create(['standard_list_id' => $list->id, 'version_number' => 1, 'status' => 'published']);
+        \Illuminate\Support\Facades\DB::table('standard_list_items')->insert(['standard_list_version_id' => $version->id, 'product_id' => $this->product->id]);
+        $outside = Product::create(['organization_id' => $this->organization->id, 'code' => 'AMOX', 'name' => 'Amoxicilline', 'product_type' => 'medicine', 'is_active' => true]);
+        $mission = Mission::firstOrFail();
+        $this->site->healthFacility->update(['mission_id' => $mission->id]);
+        $coordinator = User::factory()->create(['is_active' => true, 'organization_id' => $this->organization->id]);
+        $coordinator->roles()->attach(Role::firstOrCreate(['code' => 'coordination_admin'], ['name' => 'Admin Coordination']), ['scope_type' => 'mission', 'scope_id' => $mission->id]);
+
+        $receipt = fn (array $origin, ?string $reason = null) => $this->postJson($this->url('receipts'), [
+            'site_id' => $this->site->id, 'reference' => 'REC-HL-'.uniqid(), 'received_on' => now()->toDateString(), 'outside_list_reason' => $reason, ...$origin,
+            'items' => [['product_id' => $outside->id, 'batch_number' => 'LOT-HL', 'expires_on' => now()->addYear()->toDateString(), 'quantity_received' => 10, 'quantity_accepted' => 10, 'quantity_ordered' => 10]],
+        ]);
+
+        $receipt(['origin_type' => 'project', 'origin_project_id' => $this->gffo5->id], 'Dotation d’urgence')->assertUnprocessable()->assertJsonValidationErrors('items');
+        $receipt(['origin_type' => 'other', 'origin_label' => 'Pharmacie régionale'])->assertUnprocessable()->assertJsonValidationErrors('outside_list_reason');
+        $id = $receipt(['origin_type' => 'other', 'origin_label' => 'Pharmacie régionale'], 'Dotation d’urgence du district')->assertCreated()
+            ->assertJsonPath('receipt.items.0.outside_list', true)->json('receipt.id');
+        $this->assertSame(1, $coordinator->notifications()->where('data->category', 'outside_list')->count());
+        $this->postJson($this->url("receipts/$id/validate"))->assertOk();
+
+        // Délivrance : seulement depuis le stock tiers (origine « Autre »).
+        $issue = fn (array $origin) => $this->postJson($this->url('dispensations'), [...$this->dispensation(['reference' => 'DIS-HL-'.uniqid(), ...$origin]),
+            'items' => [['product_id' => $outside->id, 'quantity' => 2]]]);
+        $issue(['origin_type' => 'project', 'origin_project_id' => $this->gffo5->id])->assertUnprocessable()->assertJsonValidationErrors('items');
+        $issue(['origin_type' => 'other', 'origin_project_id' => null])->assertCreated();
+        $this->assertContains($outside->id, collect($this->getJson($this->url('dispensations/options'))->json('outside_list_products'))->pluck('id')->all());
     }
 
     public function test_other_origin_uses_only_third_party_stock(): void

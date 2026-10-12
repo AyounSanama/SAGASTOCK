@@ -217,7 +217,13 @@ class DispensationController extends Controller
                     'origin_project_id' => $balance->batch?->origin_project_id, 'available' => (float) $balance->available_quantity])->values(),
             'patients' => $this->patientQuery($request, $organization)->where('is_active', true)->orderBy('last_name')->get(),
             'prescriptions' => Prescription::with(['patient', 'items.product'])->where('organization_id', $organization->id)->whereIn('site_id', $sites->pluck('id'))->whereIn('status', Prescription::DISPENSABLE_STATUSES)->latest('prescribed_on')->get(),
-            'products' => $this->allowedProducts($request, $organization)->with('codes:id,product_id,code_type,value,is_primary')->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name'])]);
+            'products' => $this->allowedProducts($request, $organization)->with('codes:id,product_id,code_type,value,is_primary')->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
+            // Niveau 7 : articles hors liste en stock tiers, proposés avec l'origine « Autre ».
+            'outside_list_products' => Product::where('organization_id', $organization->id)
+                ->whereNotIn('id', $this->allowedProducts($request, $organization)->select('id'))
+                ->whereIn('id', \App\Models\StockBalance::whereIn('site_id', $sites->pluck('id'))->where('theoretical_quantity', '>', 0)
+                    ->whereHas('batch', fn ($q) => $q->where('origin_type', StockOriginService::TYPE_OTHER))->select('product_id'))
+                ->with('codes:id,product_id,code_type,value,is_primary')->orderBy('name')->get(['id', 'code', 'name'])]);
     }
 
     public function fefoSuggestion(Request $request, Organization $organization): JsonResponse
@@ -293,10 +299,17 @@ class DispensationController extends Controller
                 'organization_id' => $organization->id, 'patient_id' => $patient?->id, 'site_id' => $site->id, 'prescription_id' => $prescription?->id, 'status' => 'validated', 'dispensed_by' => $request->user()->id]);
             $totalRequested = 0.0; $totalDispensed = 0.0;
             // Patient et service : produits de la Liste Standard ; retour et périmés : tout produit en stock.
-            $products = in_array($destination, Dispensation::STANDARD_LIST_DESTINATIONS, true)
+            // Origine « Autre » : un article hors liste livré par un tiers sort aussi,
+            // mais seulement de ce stock tiers (FEFO limité à l'origine).
+            $products = in_array($destination, Dispensation::STANDARD_LIST_DESTINATIONS, true) && ($origin['origin_type'] ?? null) !== StockOriginService::TYPE_OTHER
                 ? $this->allowedProducts($request, $organization) : Product::where('organization_id', $organization->id);
             foreach ($data['items'] as $row) {
-                $product = (clone $products)->findOrFail($row['product_id']);
+                $product = (clone $products)->find($row['product_id']);
+                if (! $product) {
+                    $name = Product::where('organization_id', $organization->id)->whereKey($row['product_id'])->value('name');
+                    abort_if($name === null, 404);
+                    throw ValidationException::withMessages(['items' => "« {$name} » est hors Liste Standard : il ne sort que du stock livré par un tiers (origine « Autre »)."]);
+                }
                 $requested = (float) $row['quantity']; $totalRequested += $requested;
                 $prescriptionItem = ! $prescription ? null : (empty($row['prescription_item_id'])
                     // Sans ligne précisée : la ligne de l'ordonnance pour ce produit (reliquat suivi).

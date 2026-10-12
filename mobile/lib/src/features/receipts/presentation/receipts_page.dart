@@ -475,6 +475,27 @@ class _ReceiptFormState extends State<_ReceiptForm> {
       Map<String, dynamic>.from(origin as Map),
   ];
 
+  // Niveau 7 (décision du 09/10) : article hors Liste Standard, seulement
+  // livré par un tiers (origine « Autre ») avec un motif ; signalé à la
+  // Coordination par le serveur.
+  final _outsideReason = TextEditingController();
+
+  Set<String>? get _standardIds {
+    final ids = widget.sites
+        .where((site) => '${site['id']}' == _siteId)
+        .firstOrNull?['standard_product_ids'];
+    return ids is List ? {for (final id in ids) '$id'} : null;
+  }
+
+  bool _isOutside(String? productId) =>
+      productId != null && (_standardIds?.contains(productId) == false);
+
+  List<String> get _outsideNames => [
+    for (final line in _lines)
+      if (_isOutside(line.productId))
+        '${widget.products.where((p) => '${p['id']}' == line.productId).firstOrNull?['name'] ?? ''}',
+  ];
+
   String get _originSummary => _originChoice == 'other'
       ? 'Autre · ${_originLabel.text.trim()}'
       : '${_origins.where((origin) => '${origin['project_id']}' == _originChoice).firstOrNull?['label'] ?? 'Non renseignée'}';
@@ -489,6 +510,7 @@ class _ReceiptFormState extends State<_ReceiptForm> {
     _orderReference.dispose();
     _notes.dispose();
     _originLabel.dispose();
+    _outsideReason.dispose();
     for (final line in _lines) {
       line.dispose();
     }
@@ -534,6 +556,8 @@ class _ReceiptFormState extends State<_ReceiptForm> {
           'order_reference': _orderReference.text.trim(),
         'received_on': _date(_receivedOn),
         if (_notes.text.trim().isNotEmpty) 'notes': _notes.text.trim(),
+        if (_outsideNames.isNotEmpty)
+          'outside_list_reason': _outsideReason.text.trim(),
         'items': _lines.map((line) => line.toJson()).toList(),
       });
       if (mounted) Navigator.pop(context, _ReceiptResult(online));
@@ -748,6 +772,26 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                         const SizedBox(height: 10),
                         for (var index = 0; index < _lines.length; index++)
                           _productCard(index),
+                        if (_outsideNames.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Hors Liste Standard : ${_outsideNames.join(', ')}. '
+                            'Entrée possible seulement avec l’origine « Autre (fournisseur tiers) » ; la Coordination en sera informée.',
+                            style: TextStyle(color: AppColors.primaryStrong),
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _outsideReason,
+                            decoration: const InputDecoration(
+                              labelText: 'Motif de l’article hors liste *',
+                              hintText: 'Ex. dotation d’urgence du district',
+                            ),
+                            validator: (value) =>
+                                (value ?? '').trim().length < 5
+                                ? 'Indiquez le motif (5 caractères minimum).'
+                                : null,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -910,13 +954,14 @@ class _ReceiptFormState extends State<_ReceiptForm> {
                     (product) => DropdownMenuItem(
                       value: '${product['id']}',
                       child: Text(
-                        '${product['code']} · ${product['name']}',
+                        '${product['code']} · ${product['name']}'
+                        '${_isOutside('${product['id']}') ? ' · hors liste' : ''}',
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   )
                   .toList(),
-              onChanged: (value) => line.productId = value,
+              onChanged: (value) => setState(() => line.productId = value),
               validator: (value) =>
                   value == null ? 'Sélectionnez un produit.' : null,
             ),
@@ -1050,6 +1095,19 @@ class _ReceiptFormState extends State<_ReceiptForm> {
       2 => _lotsKey.currentState?.validate() ?? false,
       _ => true,
     };
+    if (valid && step == 1 && _outsideNames.isNotEmpty) {
+      if (_originChoice != 'other') {
+        setState(
+          () => _error =
+              '« ${_outsideNames.first} » est hors Liste Standard : il n’entre qu’avec l’origine « Autre (fournisseur tiers) ».',
+        );
+        return false;
+      }
+      if (_outsideReason.text.trim().length < 5) {
+        setState(() => _error = 'Indiquez le motif de l’article hors liste.');
+        return false;
+      }
+    }
     if (!valid || step != 2) return valid;
     for (final line in _lines) {
       if ((line.number(line.accepted.text) +

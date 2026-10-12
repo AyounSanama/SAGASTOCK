@@ -52,6 +52,8 @@
 <label>Site destinataire<select name="site_id" required><option value="">Sélectionner</option>@foreach($sites as $site)<option value="{{ $site->id }}" @selected(old('site_id')===$site->id)>{{ $site->name }} · {{ $site->healthFacility?->name }}</option>@endforeach</select></label>
 <label>Origine (couple ONG/Bailleur) *<select name="origin_choice" required data-origin-select><option value="">Sélectionner d’abord le site</option>@foreach($originsBySite as $siteId => $origins)@foreach($origins as $origin)<option value="{{ $origin['project_id'] }}" data-site="{{ $siteId }}" @selected(old('origin_choice')===$origin['project_id'] && old('site_id')===$siteId)>{{ $origin['label'] }}</option>@endforeach @endforeach<option value="other" @selected(old('origin_choice')==='other')>Autre (fournisseur tiers)</option></select></label>
 <label data-origin-other @if(old('origin_choice')!=='other') hidden @endif>Nom du fournisseur tiers *<input name="origin_label" value="{{ old('origin_label') }}" maxlength="190" placeholder="Ex. Pharmacie régionale, don ponctuel"></label>
+{{-- Niveau 7 (décision du 09/10) : article hors Liste Standard, seulement livré par un tiers, motif obligatoire, signalé à la Coordination. --}}
+<label class="wide" data-origin-other @if(old('origin_choice')!=='other') hidden @endif>Motif de l’article hors liste (si un produit est marqué « hors liste »)<input name="outside_list_reason" value="{{ old('outside_list_reason') }}" maxlength="500" placeholder="Ex. dotation d’urgence du district"></label>
 <label>Fournisseur<select name="supplier_id"><option value="">Non renseigné</option>@foreach($suppliers as $supplier)<option value="{{ $supplier->id }}" @selected(old('supplier_id')===$supplier->id)>{{ $supplier->name }}</option>@endforeach</select></label>
 <label>Date de réception<input type="date" name="received_on" value="{{ old('received_on',now()->toDateString()) }}" max="{{ now()->toDateString() }}" required></label>
 <label class="wide">Observations<textarea name="notes" placeholder="État de la livraison, document associé, remarques…">{{ old('notes') }}</textarea></label>
@@ -64,7 +66,7 @@
 <article class="receipt-item">
 <div class="item-title"><strong>Ligne <span data-line-number></span></strong><button type="button" class="remove-item">Retirer</button></div>
 <div class="item-grid">
-<label class="wide">Médicament / produit<select data-field="product_id" required><option value="">Sélectionner un produit</option>@foreach($products as $product)<option value="{{ $product->id }}">{{ $product->code }} · {{ $product->name }}</option>@endforeach</select></label>
+<label class="wide">Médicament / produit<select data-field="product_id" required><option value="">Sélectionner un produit</option>@foreach($products as $product)<option value="{{ $product->id }}">{{ $product->code }} · {{ $product->name }}{{ $standardProductIds->contains($product->id) ? "" : " · hors liste" }}</option>@endforeach</select></label>
 <label>Numéro de lot<input data-field="batch_number" required></label>
 <label>Date de péremption<input type="date" data-field="expires_on" min="{{ now()->addDay()->toDateString() }}" required></label>
 <label>Quantité commandée<input type="number" step="0.0001" min="0" data-field="quantity_ordered" value="0"></label>

@@ -107,6 +107,8 @@ class ClinicalSupplyService {
       'products',
       'destinations',
       'batches',
+      // Articles hors liste en stock tiers (origine « Autre »).
+      'outside_list_products',
     ])
       key: (d[key] as List? ?? []).cast<Map<String, dynamic>>(),
   };
