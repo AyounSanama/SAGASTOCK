@@ -352,6 +352,27 @@ Captures : `.tmp/ui-screenshots/lot-ma-coordination/web-tableau-de-bord.png`, `m
 
 **Reste du niveau 3** : Policies Laravel (utilisateurs, FOSA, projets) ; M-04 (opérations hors ligne antérieures à la suspension, niveau 10) ; vérification sur le vrai téléphone (APK à recompiler).
 
+## Niveau 7 — Stock et dispensation FOSA · 08/10 au 12/10/2026 · `6018438b`, `8a9ec752`, `83f6b662`, `c69a0092`, `652bcbdd`
+
+| ID | Domaine | Amélioration | Tests |
+|---|---|---|---|
+| AM-174 | DISP | Entête Patient (décision du 09/10) : nom et prénom, âge, sexe, n° d'ordonnance, prescripteur obligatoires pour une sortie « Patient » ; âge et sexe figés sur la dispensation, repris du dossier et de l'ordonnance ; masqués dans le journal. Web et mobile. | `DispensationLevelSevenTest::test_patient_header_requires_the_five_fields` |
+| AM-175 | SEC | Policies `PatientPolicy` et `PrescriptionPolicy` (Web et API) ; matrice E1 appliquée (décision du 09/10) : Coordination et Admin Projet sans saisie ni fiche patient, patient visible par son seul code. Liste Web des patients limitée au périmètre du compte. | `PatientPrescriptionPolicyTest` (2), `RolePermissionsSeederTest` |
+| AM-176 | STK | Inventaire par couple ONG/Bailleur (lots du couple seulement) ; signe de l'écart aligné sur le cahier (théorique − inventorié, positif = manquant), écarts existants convertis par migration. | `test_inventory_counts_only_the_lots_of_its_couple`, `InventoryManagementTest` |
+| AM-177 | STK | Commandes : produits limités à la Liste Standard du site (API et Web), règle commune `AllowedProductsService`. Couple sur la commande : V2. | suite complète |
+| AM-178 | CAT | Article hors liste livré par un tiers (décision du 09/10) : origine « Autre » et motif obligatoires, ligne marquée, Coordination notifiée ; sortie depuis le stock tiers seulement (`OutsideListService`). | `test_outside_list_article_only_from_a_third_party_and_signaled` |
+| AM-179 | RAP | Rapports opérationnels Web (mêmes chiffres que le mobile, `OperationalReportService`). | `OperationalReportWebTest` |
+
+Déjà en place et vérifiés : date de l'ordonnance bloquée sur le jour, statut « Validation non requise (V1) ». Tests Android des 6 comptes (08–09/10). Backend 410 tests, mobile 123 tests, `flutter analyze` sans remarque.
+
+## Niveau 10 (commencé) — Synchronisation · 09/10/2026 · `fa951203`
+
+| ID | Domaine | Amélioration | Tests |
+|---|---|---|---|
+| AM-180 | SYNC | Écran Synchronisation du téléphone (refusés : réessayer / abandonner, conflits) ; état déclaré au serveur ; supervision Web et mobile pour la Coordination et l'Admin Projet ; refus mémorisé par la clé d'idempotence réexaminé au nouvel essai. | `SyncSupervisionTest` (4), `IdempotencyTest`, `sync_status_service_test.dart` (3) |
+
+**Reste du niveau 10** : chiffrement de la base locale, détection des conflits métier (règle de résolution à décider), bandeau hors ligne sur le Web.
+
 ## Modèle d'entrée pour les prochaines livraisons
 
 ```markdown

@@ -11,7 +11,7 @@ Adoptée le 02/10/2026. **Remplace le plan précédent** (`ameliorations/07-audi
 | 4 | Mode clair / sombre (3 bis) | **Livré le 07/10, à valider** (palette validée le 06/10 ; Web et mobile ; contrastes testés dans les deux modes) |
 | 5 | Écrans Admin Projet (c2 / c3) | **Livré le 06/10, à valider** (Web et mobile ; mobile compilé et testé en local le 07/10) |
 | 6 | Listes Standard (f) | **Livré le 07/10, à valider** (Web et mobile ; « Article hors liste » reporté au niveau 7, car il dépend du champ « Origine ») |
-| 7 | Stock et dispensation FOSA (g) | **En cours** (faits : Origine sur entrées et dispensation, Utilisateur Site sur entrées et inventaires, destinations, FEFO ; tests Android des 6 comptes le 09/10) |
+| 7 | Stock et dispensation FOSA (g) | **Livré le 12/10, à valider** (Origine sur entrées, dispensation et inventaire ; entête Patient à 5 champs ; Policies patients et ordonnances, matrice E1 ; signe de l'écart ; article hors liste ; produits des commandes selon la Liste Standard ; couple sur la commande en V2) |
 | 8 | Capture par téléphone | À faire |
 | 9 | Analyses de base (h) | À faire |
 | 10 | Hors ligne et chiffrement (d) | **Commencé le 09/10** (écran Synchronisation du téléphone : refusés réessayer / abandonner ; supervision Web et mobile) |

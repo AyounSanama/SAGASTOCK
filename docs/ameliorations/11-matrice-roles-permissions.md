@@ -1,6 +1,6 @@
 # Matrice rôles × permissions — proposition à valider · 06/10/2026
 
-**Statut : proposition, NON appliquée.** Le code (`backend/app/Support/RolePermissions.php`) contient les permissions effectives actuelles ; seules les corrections demandées explicitement y sont déjà (alias `owner` aligné sur `sago_admin`, libellés accentués, profil Coordination en lecture seule). Après validation : mise à jour de `RolePermissions`, des tests par rôle, puis application sur la copie de travail, et sur la base réelle seulement après validation et sauvegarde vérifiée.
+**Mise à jour du 12/10/2026 : appliqué** pour la Coordination et l'Admin Projet sur les données de santé (lignes barrées `dispensing.manage`, `patients.*`, `prescriptions.manage/validate`, `dispensations.manage` et écart E1), décision du 09/10, migration `2026_10_09_130000`. **Le reste de la matrice : proposition, NON appliquée.** Le code (`backend/app/Support/RolePermissions.php`) contient les permissions effectives actuelles ; seules les corrections demandées explicitement y sont déjà (alias `owner` aligné sur `sago_admin`, libellés accentués, profil Coordination en lecture seule). Après validation : mise à jour de `RolePermissions`, des tests par rôle, puis application sur la copie de travail, et sur la base réelle seulement après validation et sauvegarde vérifiée.
 
 ## Comparaison des seeders
 
