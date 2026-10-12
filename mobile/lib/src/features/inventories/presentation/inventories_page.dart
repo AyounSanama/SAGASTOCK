@@ -253,7 +253,11 @@ class _InventoriesPageState extends State<InventoriesPage> {
               ],
             ),
             Text(
-              '${inv['site']?['name'] ?? ''} · ${formatDay(inv['period_date'])}',
+              [
+                '${inv['site']?['name'] ?? ''} · ${formatDay(inv['period_date'])}',
+                // Niveau 7 : couple ONG/Bailleur inventorié.
+                if (inv['origin_display'] != null) '${inv['origin_display']}',
+              ].join('\n'),
               style: TextStyle(color: AppTheme.muted),
             ),
             if (status == 'counting')
